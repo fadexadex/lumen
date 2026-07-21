@@ -1,5 +1,5 @@
 // Tier 2 #3 — token-roundtrip
-// Starts the real token-server (Node, real LIVEKIT_API_KEY/SECRET from sparklearn-ai/.env),
+// Starts the real token-server (Node, real LIVEKIT_API_KEY/SECRET from frontend/.env),
 // hits GET /token, and verifies the JWT shape + grants + expiry for real.
 import { spawn } from "node:child_process";
 import path from "node:path";
@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const tokenServerDir = path.resolve(__dirname, "../../token-server");
-const envFile = path.resolve(__dirname, "../../sparklearn-ai/.env");
+const envFile = path.resolve(__dirname, "../../frontend/.env");
 const PORT = 8787;
 
 function b64urlDecode(seg) {

@@ -3,7 +3,7 @@
 
 # Secrets (Lumen Live)
 .env
-sparklearn-ai/.env
+frontend/.env
 agent/.env.local
 token-server/.env
 # Python

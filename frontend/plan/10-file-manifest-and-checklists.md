@@ -22,7 +22,7 @@ acceptance criteria and the current code anchors for the edits.
 | `token-server/package.json` | deps                  | `03 A`        |
 | `token-server/.env`         | secrets               | `03 A`        |
 
-### Frontend (`sparklearn-ai/src`)
+### Frontend (`frontend/src`)
 
 | File                                          | Purpose                      | Spec      |
 | --------------------------------------------- | ---------------------------- | --------- |
@@ -62,7 +62,7 @@ acceptance criteria and the current code anchors for the edits.
 
 ## 4. Dependency changes
 
-`sparklearn-ai/package.json`:
+`frontend/package.json`:
 
 ```jsonc
 "dependencies": {

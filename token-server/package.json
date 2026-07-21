@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "node --env-file=../sparklearn-ai/.env server.mjs"
+    "start": "node --env-file=../frontend/.env server.mjs"
   },
   "dependencies": {
     "livekit-server-sdk": "^2.9.0"

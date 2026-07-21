@@ -71,7 +71,7 @@ niche topics.
 ## File manifest (new)
 
 ```
-sparklearn-ai/
+frontend/
   plan-generative-courses/          # this plan
   src/lib/course-gen/
     types.ts

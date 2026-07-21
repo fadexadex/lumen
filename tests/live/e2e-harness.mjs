@@ -18,7 +18,7 @@ import { Room, RoomEvent, ConnectionState } from "@livekit/rtc-node";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "../..");
-const envPath = path.resolve(root, "sparklearn-ai/.env");
+const envPath = path.resolve(root, "frontend/.env");
 
 function loadEnv() {
   const raw = readFileSync(envPath, "utf8");
@@ -126,7 +126,7 @@ async function testAgentJoinsRoom(env) {
 function runVitest() {
   return new Promise((resolve) => {
     const proc = spawn("npm", ["test", "--", "--run", "src/lib/live/__tests__/"], {
-      cwd: path.resolve(root, "sparklearn-ai"),
+      cwd: path.resolve(root, "frontend"),
       stdio: ["ignore", "pipe", "pipe"],
     });
     let out = "";

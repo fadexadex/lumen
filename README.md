@@ -6,7 +6,7 @@ Local development runs **three processes** that work together over LiveKit Cloud
 
 | Process | Directory | Default port | Role |
 | --- | --- | --- | --- |
-| Web app | `sparklearn-ai/` | `8080` | TanStack Start + Vite frontend (lessons, board, Live UI) |
+| Web app | `frontend/` | `8080` | TanStack Start + Vite frontend (lessons, board, Live UI) |
 | API / token server | `token-server/` | `8787` | Mints LiveKit JWTs; also serves Monnify payment APIs |
 | Voice agent | `agent/` | — | Python LiveKit worker (Gemini Live or OpenAI Realtime) |
 
@@ -20,7 +20,7 @@ token-server (:8787) ──► LiveKit Cloud (wss://…)
    └──────── agent worker joins the same room, speaks + RPCs canvas tools
 ```
 
-> `math-canvas-ai/` is an earlier sibling canvas app. Day-to-day work and Live tutoring use **`sparklearn-ai`**.
+> `math-canvas-ai/` is an earlier sibling canvas app. Day-to-day work and Live tutoring use **`frontend`**.
 
 ---
 
@@ -51,7 +51,7 @@ From the repo root:
 
 ```bash
 # Web app
-cd sparklearn-ai
+cd frontend
 npm install
 cd ..
 
@@ -70,12 +70,12 @@ cd ..
 
 ## 2. Configure environment
 
-All shared secrets live in **one file**: `sparklearn-ai/.env`.
+All shared secrets live in **one file**: `frontend/.env`.
 
-The token server loads it via `node --env-file=../sparklearn-ai/.env`.  
+The token server loads it via `node --env-file=../frontend/.env`.  
 The agent loads it first, then optionally overrides with `agent/.env.local`.
 
-Create `sparklearn-ai/.env` (it is gitignored):
+Create `frontend/.env` (it is gitignored):
 
 ```dotenv
 # --- Required for Live tutoring ---
@@ -136,7 +136,7 @@ Open **three terminals**. Start in this order so health checks are easy.
 ```bash
 cd token-server
 npm start
-# equivalent: node --env-file=../sparklearn-ai/.env server.mjs
+# equivalent: node --env-file=../frontend/.env server.mjs
 ```
 
 Expected log:
@@ -191,7 +191,7 @@ LUMEN_MODEL_BACKEND=openai uv run agent.py dev
 ### Terminal 3 — Web app (`:8080`)
 
 ```bash
-cd sparklearn-ai
+cd frontend
 npm run dev
 ```
 
@@ -271,7 +271,7 @@ node browser-e2e.mjs
 App unit tests:
 
 ```bash
-cd sparklearn-ai
+cd frontend
 npm test
 ```
 
@@ -281,10 +281,10 @@ npm test
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| Token server exits immediately | Missing `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | Fill `sparklearn-ai/.env`; run via `npm start` so `--env-file` is used |
+| Token server exits immediately | Missing `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | Fill `frontend/.env`; run via `npm start` so `--env-file` is used |
 | `curl /token` fails / CORS in browser | Token server not running or wrong `VITE_LUMEN_TOKEN_URL` | Start terminal 1; URL should be `http://localhost:8787/token` |
 | Live connects but silence | Agent not running or bad Gemini key | Start `uv run agent.py dev`; verify `GEMINI_API_KEY` |
-| Agent: missing Google key | Only `GEMINI_API_KEY` set incorrectly | Ensure key is in `sparklearn-ai/.env` (agent loads that path) |
+| Agent: missing Google key | Only `GEMINI_API_KEY` set incorrectly | Ensure key is in `frontend/.env` (agent loads that path) |
 | Port 8080 in use | Another Vite instance | Use the printed port, or kill the old process |
 | Payments fail | Missing Monnify contract / keys | Add `MONNIFY_*` to `.env`; restart token-server |
 | Mic denied | Browser permission | Allow mic for `localhost` and retry Live |
@@ -295,7 +295,7 @@ npm test
 
 ```
 teacher-ai/
-├── sparklearn-ai/     # Main web app (Vite + TanStack Start)
+├── frontend/     # Main web app (Vite + TanStack Start)
 ├── token-server/      # LiveKit JWT + Monnify payment API (:8787)
 ├── agent/             # Python LiveKit + Gemini/OpenAI voice worker
 ├── tests/live/        # Live integration / browser checks
@@ -303,7 +303,7 @@ teacher-ai/
 └── README.md          # This file
 ```
 
-Design and implementation notes for Lumen Live live under `sparklearn-ai/plan/`. Generative course plans: `sparklearn-ai/plan-generative-courses/`.
+Design and implementation notes for Lumen Live live under `frontend/plan/`. Generative course plans: `frontend/plan-generative-courses/`.
 
 ---
 
@@ -317,7 +317,7 @@ cd token-server && npm start
 cd agent && uv run agent.py dev
 
 # Terminal 3
-cd sparklearn-ai && npm run dev
+cd frontend && npm run dev
 ```
 
 Then open http://localhost:8080 → enter a lesson → click **Live**.

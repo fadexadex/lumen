@@ -100,7 +100,7 @@ Run:
 cd token-server && npm i && node --env-file=.env server.mjs
 ```
 
-Client env (`sparklearn-ai/.env` — Vite reads `VITE_` vars):
+Client env (`frontend/.env` — Vite reads `VITE_` vars):
 
 ```dotenv
 VITE_LIVEKIT_URL=wss://<project>.livekit.cloud
@@ -114,7 +114,7 @@ VITE_LUMEN_TOKEN_URL=http://localhost:8787/token
 If you prefer one dev command, add a server route inside the app. TanStack Start (this repo:
 `@tanstack/react-start ^1.168`) supports server routes via `createServerFileRoute`.
 
-`sparklearn-ai/src/routes/api/lumen-token.ts`:
+`frontend/src/routes/api/lumen-token.ts`:
 
 ```ts
 import { createServerFileRoute } from "@tanstack/react-start/server";
@@ -147,7 +147,7 @@ export const ServerRoute = createServerFileRoute("/api/lumen-token").methods({
 Add `livekit-server-sdk` to the app deps:
 
 ```bash
-cd sparklearn-ai && npm i livekit-server-sdk
+cd frontend && npm i livekit-server-sdk
 ```
 
 App env (`.env`, server-side — NOT `VITE_` so it never reaches the client):
@@ -200,7 +200,7 @@ sessions) comfortably serves a demo.
   files (`token-server/.env`, `agent/.env.local`, and the app server env). Never `VITE_`-prefix
   them — that would ship them to the browser.
 - Client only ever receives: the short-lived JWT + the public `wss://` URL.
-- Add to `.gitignore`: `agent/.env.local`, `token-server/.env`, `sparklearn-ai/.env`.
+- Add to `.gitignore`: `agent/.env.local`, `token-server/.env`, `frontend/.env`.
 - For a shared demo build, use Gemini AI Studio **ephemeral tokens** later; not needed locally.
 
 ---
@@ -215,7 +215,7 @@ cd token-server && node --env-file=.env server.mjs        # :8787
 cd agent && uv run agent.py dev                            # connects to LiveKit Cloud
 
 # 3) the app
-cd sparklearn-ai && npm run dev                            # :3000
+cd frontend && npm run dev                            # :3000
 ```
 
 Health check order: token server responds to

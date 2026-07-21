@@ -14,7 +14,7 @@ topology, the **full real-time loop**, and the exact sequence for "AI draws whil
                          │  - Data channel / RPC                 │
    Browser (learner)     │  - Room: lumen-<moduleId>-<uid>       │      Agent worker (you run)
  ┌───────────────────┐   │                                      │   ┌──────────────────────────┐
- │ sparklearn-ai app │   │                                      │   │ Python  livekit-agents   │
+ │ frontend app │   │                                      │   │ Python  livekit-agents   │
  │  - MathCanvas     │◀─▶│◀════════ audio (Opus/WebRTC) ═══════▶│◀─▶│  AgentSession            │
  │  - LumenOverlay   │   │                                      │   │   └ RealtimeModel(Gemini) │
  │  - RPC client     │◀─▶│◀──────── data: transcripts ─────────▶│   │   └ function tools        │
@@ -30,7 +30,7 @@ topology, the **full real-time loop**, and the exact sequence for "AI draws whil
 
 Three things you run locally for the demo:
 
-1. **`sparklearn-ai`** (already: `npm run dev`).
+1. **`frontend`** (already: `npm run dev`).
 2. **Token server** (`node token-server/server.mjs`) — mints LiveKit JWTs. See `03`.
 3. **Agent worker** (`uv run agent.py dev`) — joins rooms, runs Gemini. See `02`.
 

@@ -15,10 +15,10 @@ from board_context import board
 
 logger = logging.getLogger("lumen-agent")
 
-# Shared secrets live in sparklearn-ai/.env. Load that first, then let an optional
+# Shared secrets live in frontend/.env. Load that first, then let an optional
 # agent/.env.local override/add to it for agent-only settings.
 _here = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(_here, "..", "sparklearn-ai", ".env"))
+load_dotenv(os.path.join(_here, "..", "frontend", ".env"))
 load_dotenv(os.path.join(_here, ".env.local"), override=True)
 
 # The LiveKit Google plugin reads GOOGLE_API_KEY; the repo only defines GEMINI_API_KEY.
@@ -36,7 +36,7 @@ def build_model():
         if not os.environ.get("OPENAI_API_KEY"):
             raise RuntimeError(
                 "LUMEN_MODEL_BACKEND=openai but OPENAI_API_KEY is not set. "
-                "Add it to sparklearn-ai/.env or agent/.env.local, or unset "
+                "Add it to frontend/.env or agent/.env.local, or unset "
                 "LUMEN_MODEL_BACKEND to use the default gemini backend."
             )
         # Fallback speech-to-speech

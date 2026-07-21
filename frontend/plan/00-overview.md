@@ -101,7 +101,7 @@ token-server/                       # tiny Node token minter (NEW, or TanStack r
   server.mjs
 ```
 
-New frontend (all under `sparklearn-ai/src`):
+New frontend (all under `frontend/src`):
 
 ```
 lib/live/

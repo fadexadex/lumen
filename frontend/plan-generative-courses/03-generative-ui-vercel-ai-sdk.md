@@ -9,7 +9,7 @@ Official docs: [AI SDK UI — Generative User Interfaces](https://ai-sdk.dev/doc
 
 ## 1. Recommended approach for Lumen
 
-| Approach                                                         | Status                    | Fit for sparklearn-ai      |
+| Approach                                                         | Status                    | Fit for frontend      |
 | ---------------------------------------------------------------- | ------------------------- | -------------------------- |
 | **AI SDK UI** (`streamText` + tools + `useChat` / message parts) | **Production**            | ✅ TanStack Start friendly |
 | AI SDK RSC (`streamUI`, `createStreamableUI`)                    | Experimental; Next.js RSC | ❌ Skip for now            |

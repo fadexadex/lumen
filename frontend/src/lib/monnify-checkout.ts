@@ -65,13 +65,33 @@ export type CheckoutPublicConfig = {
   currencyCode: string;
 };
 
+/**
+ * Monnify's client SDK validates redirectUrl with a regex that requires a dotted
+ * hostname (e.g. example.com or 127.0.0.1). Plain `localhost` fails with
+ * "Monnify: Invalid redirectUrl". redirectUrl is optional for the Checkout SDK
+ * (we rely on onComplete / Unlock), so skip unsafe local URLs.
+ */
+export function monnifySafeRedirectUrl(url: string | undefined | null): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "localhost") return undefined;
+    // Mirror Monnify plugin regex: hostname must contain a "."
+    if (!parsed.hostname.includes(".")) return undefined;
+    return url;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Opens Monnify's in-page checkout modal. Resolves when the modal closes or payment completes. */
 export function openMonnifyCheckout(input: {
   config: CheckoutPublicConfig;
   customerName: string;
   customerEmail: string;
   paymentReference: string;
-  redirectUrl: string;
+  /** Optional; omitted when Monnify would reject it (e.g. http://localhost/...). */
+  redirectUrl?: string;
 }): Promise<MonnifyCompleteResponse | null> {
   return loadMonnifySdk().then(
     (sdk) =>
@@ -83,6 +103,8 @@ export function openMonnifyCheckout(input: {
           resolve(value);
         };
 
+        const redirectUrl = monnifySafeRedirectUrl(input.redirectUrl);
+
         sdk.initialize({
           amount: input.config.amount || STARTER_PACK.amountNaira,
           currency: input.config.currencyCode || "NGN",
@@ -93,7 +115,7 @@ export function openMonnifyCheckout(input: {
           apiKey: input.config.apiKey,
           contractCode: input.config.contractCode,
           paymentDescription: `Lumen starter pack — ${input.config.credits} credits`,
-          redirectUrl: input.redirectUrl,
+          ...(redirectUrl ? { redirectUrl } : {}),
           metadata: {
             product: "lumen-starter",
             credits: String(input.config.credits),

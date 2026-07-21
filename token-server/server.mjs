@@ -18,7 +18,7 @@ const {
 
 if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
   console.error(
-    "Missing LIVEKIT_API_KEY / LIVEKIT_API_SECRET in env. Run with: node --env-file=../sparklearn-ai/.env server.mjs",
+    "Missing LIVEKIT_API_KEY / LIVEKIT_API_SECRET in env. Run with: node --env-file=../frontend/.env server.mjs",
   );
   process.exit(1);
 }
@@ -299,7 +299,7 @@ server.listen(PORT, () => {
   console.log(`lumen api on :${PORT}`);
   if (!MONNIFY_CONTRACT_CODE) {
     console.warn(
-      "⚠ MONNIFY_CONTRACT_CODE missing — payments will fail until you add it to sparklearn-ai/.env",
+      "⚠ MONNIFY_CONTRACT_CODE missing — payments will fail until you add it to frontend/.env",
     );
   }
 });

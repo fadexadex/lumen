@@ -13,7 +13,7 @@ small **`TutorSession`** so React only ever touches a clean interface.
 ## 1. Install
 
 ```bash
-cd sparklearn-ai
+cd frontend
 npm i livekit-client @livekit/components-react
 ```
 

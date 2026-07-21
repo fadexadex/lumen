@@ -10,7 +10,7 @@ a contract test, and the quota/fallback strategy so a live pitch can't die.
 1. Create a **LiveKit Cloud** project (Build, free) → copy `LIVEKIT_URL`, API key/secret.
 2. Create a **Google AI Studio** API key (free tier) for Gemini Live.
 3. (Optional) OpenAI key for fallback.
-4. Scaffold: `agent/`, `token-server/`, `sparklearn-ai/lib/live/`, `components/live/`.
+4. Scaffold: `agent/`, `token-server/`, `frontend/lib/live/`, `components/live/`.
 5. Install the LiveKit docs MCP for your IDE (optional but recommended — the quickstart repo
    suggests it): `https://docs.livekit.io/mcp`.
 
