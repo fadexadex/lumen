@@ -1,0 +1,274 @@
+/* ============================================================
+   Math Canvas concept — pannable, immersive lesson board
+   ============================================================ */
+
+.mc-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--tutor-bg);
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.mc-world {
+  position: absolute;
+  left: 0; top: 0;
+  transform-origin: 0 0;
+}
+
+.mc-board {
+  position: relative;
+  background:
+    radial-gradient(1200px 800px at 20% 0%, oklch(0.98 0.02 80 / 0.6), transparent 60%),
+    linear-gradient(180deg, oklch(1 0 0), oklch(0.995 0 0));
+  box-shadow:
+    inset 0 0 0 1px oklch(0.9 0 0),
+    0 30px 80px oklch(0 0 0 / 0.04);
+}
+
+.mc-lesson-layer {
+  position: absolute; inset: 0;
+  font-family: var(--font-sans);
+  color: var(--tutor-ink);
+}
+
+.mc-title {
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  color: var(--tutor-ink);
+}
+.mc-title--h1 { font-size: 4.6rem; }
+.mc-title--h2 { font-size: 2.4rem; margin-top: 0.15em; }
+
+.mc-text {
+  font-size: 1.5rem;
+  line-height: 1.5;
+  max-width: 720px;
+  color: oklch(0.28 0 0);
+  font-family: var(--font-sans);
+}
+
+.mc-math {
+  font-size: 1.6rem;
+  color: var(--tutor-ink);
+}
+.mc-math .katex { font-size: 1.6rem; }
+
+.mc-options {
+  display: flex; flex-wrap: wrap; gap: 12px;
+}
+.mc-option {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 12px 18px; border-radius: 14px;
+  background: white;
+  border: 1px solid var(--tutor-line);
+  font-size: 1.15rem; color: var(--tutor-ink);
+  transition: all 0.18s var(--ease-tutor);
+  cursor: pointer;
+}
+.mc-option:hover { border-color: var(--tutor-accent); transform: translateY(-1px); }
+.mc-option[data-state="correct"] {
+  border-color: oklch(0.7 0.15 145);
+  background: oklch(0.96 0.05 145);
+}
+.mc-option[data-state="wrong"] {
+  border-color: oklch(0.7 0.18 25);
+  background: oklch(0.97 0.04 25);
+}
+.mc-option-key {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 999px;
+  background: var(--tutor-accent-soft); color: oklch(0.35 0.08 55);
+  font-weight: 600; font-size: 0.85rem;
+}
+
+.mc-caret {
+  display: inline-block;
+  width: 3px; height: 0.9em;
+  margin-left: 4px;
+  transform: translateY(0.14em);
+  background: var(--tutor-accent);
+  animation: mc-caret 0.9s steps(2) infinite;
+}
+@keyframes mc-caret { 50% { opacity: 0; } }
+
+.mc-diagram {
+  background: white;
+  border: 1px solid var(--tutor-line);
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: 0 30px 60px oklch(0 0 0 / 0.05);
+}
+
+/* Parabola widget */
+.mc-para { display: flex; flex-direction: column; gap: 10px; }
+.mc-para-sliders { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 6px 8px; }
+.mc-para-slider { display: flex; align-items: center; gap: 8px; font-family: var(--font-sans); font-size: 0.95rem; color: var(--tutor-ink); }
+.mc-para-slider-label { width: 18px; font-weight: 600; font-family: var(--font-serif); font-size: 1.15rem; }
+.mc-para-slider input { flex: 1; accent-color: oklch(0.55 0.16 55); }
+.mc-para-slider-value { width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: var(--tutor-muted); }
+.mc-para-caption {
+  padding: 4px 8px; font-family: var(--font-serif); font-size: 1.05rem;
+  color: oklch(0.35 0 0);
+}
+.mc-para-sep { padding: 0 10px; color: var(--tutor-muted); }
+
+/* Ink + notes */
+.mc-ink { position: absolute; inset: 0; touch-action: none; }
+.mc-notes { position: absolute; inset: 0; }
+.mc-note { position: absolute; font-family: var(--font-serif); }
+.mc-note-input {
+  min-height: 2rem; min-width: 10rem;
+  resize: none;
+  border: 1px dashed oklch(0.7 0 0);
+  background: oklch(1 0 0 / 0.9);
+  padding: 4px 6px;
+  font-size: 1.25rem; color: var(--tutor-ink);
+  outline: none;
+  border-radius: 6px;
+}
+.mc-note-text { white-space: pre-wrap; font-size: 1.25rem; color: var(--tutor-ink); }
+
+/* Tool rail */
+.mc-toolrail {
+  position: absolute;
+  left: 16px; top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px;
+  background: white;
+  border: 1px solid var(--tutor-line);
+  border-radius: 18px;
+  box-shadow: 0 20px 40px oklch(0 0 0 / 0.06);
+}
+.mc-tool {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 12px;
+  color: oklch(0.35 0 0);
+  transition: all 0.16s var(--ease-tutor);
+  cursor: pointer;
+}
+.mc-tool:hover { background: oklch(0.96 0 0); }
+.mc-tool[data-active="true"] {
+  background: var(--tutor-ink); color: white;
+}
+.mc-toolrail-sep { height: 1px; background: var(--tutor-line); margin: 4px 2px; }
+
+/* Bottom controls */
+.mc-controls {
+  position: absolute; left: 50%; bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid var(--tutor-line);
+  border-radius: 999px;
+  box-shadow: 0 24px 60px oklch(0 0 0 / 0.08);
+  max-width: min(920px, calc(100vw - 32px));
+}
+.mc-ctrl {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 40px; height: 40px; padding: 0 14px;
+  border-radius: 999px;
+  font-size: 1rem; color: oklch(0.3 0 0);
+  transition: all 0.16s var(--ease-tutor);
+  cursor: pointer; white-space: nowrap;
+}
+.mc-ctrl:hover:not(:disabled) { background: oklch(0.96 0 0); }
+.mc-ctrl:disabled { opacity: 0.35; cursor: default; }
+.mc-ctrl--primary { background: var(--tutor-ink); color: white; }
+.mc-ctrl--primary:hover:not(:disabled) { background: oklch(0.28 0 0); }
+.mc-ctrl--ghost { border: 1px solid var(--tutor-line); }
+.mc-ctrl--live {
+  background: var(--tutor-accent-soft);
+  color: oklch(0.35 0.08 55);
+  font-weight: 500;
+  border: 1px solid oklch(0.85 0.08 80);
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.mc-ctrl--live:hover { background: oklch(0.92 0.06 80); }
+.mc-live-orb {
+  display: inline-block;
+  width: 12px; height: 12px; border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, oklch(0.95 0.06 80), var(--tutor-accent));
+  box-shadow: 0 0 0 3px oklch(0.9 0.08 80 / 0.5);
+  animation: mc-orb 2.6s ease-in-out infinite;
+}
+@keyframes mc-orb {
+  0%, 100% { box-shadow: 0 0 0 3px oklch(0.9 0.08 80 / 0.5); }
+  50%      { box-shadow: 0 0 0 6px oklch(0.9 0.08 80 / 0.15); }
+}
+.mc-ctrl-sep { width: 1px; height: 24px; background: var(--tutor-line); margin: 0 2px; }
+.mc-progress {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 6px;
+}
+.mc-progress-tick {
+  width: 22px; height: 6px; border-radius: 999px;
+  background: oklch(0.92 0 0);
+  transition: all 0.2s var(--ease-tutor);
+  cursor: pointer;
+}
+.mc-progress-tick:hover { background: oklch(0.8 0 0); }
+.mc-progress-tick[data-done="true"] { background: oklch(0.55 0 0); }
+.mc-progress-tick[data-active="true"] {
+  width: 36px; background: var(--tutor-accent);
+}
+.mc-count { font-size: 0.85rem; color: var(--tutor-muted); font-variant-numeric: tabular-nums; padding: 0 4px; }
+.mc-count { white-space: nowrap; }
+
+/* Full-viewport ink layer — allows drawing anywhere, not just on the board */
+.mc-ink-layer {
+  position: absolute; inset: 0; z-index: 15;
+}
+.mc-ink-layer .mc-ink { position: absolute; left: 0; top: 0; }
+
+/* Instant tooltip for the tool rail (no browser 500ms delay) */
+.mc-tool { position: relative; }
+.mc-tool[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; left: calc(100% + 10px); top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  background: var(--tutor-ink); color: white;
+  font-size: 0.75rem; font-family: var(--font-sans);
+  padding: 4px 8px; border-radius: 6px;
+  white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 40;
+}
+.mc-tool[data-tip]:hover::after {
+  opacity: 1; transform: translateY(-50%) translateX(0);
+}
+
+/* Zoom */
+.mc-zoom {
+  position: absolute; right: 18px; bottom: 22px;
+  z-index: 30;
+  display: inline-flex; align-items: center;
+  background: white;
+  border: 1px solid var(--tutor-line);
+  border-radius: 999px;
+  box-shadow: 0 20px 40px oklch(0 0 0 / 0.06);
+  padding: 4px;
+}
+.mc-zoom button {
+  min-width: 36px; height: 32px;
+  border-radius: 999px;
+  font-size: 0.9rem; color: oklch(0.3 0 0);
+  padding: 0 8px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.mc-zoom button:hover { background: oklch(0.96 0 0); }
+
+@media (max-width: 720px) {
+  .mc-toolrail { left: 8px; padding: 6px; }
+  .mc-tool { width: 36px; height: 36px; }
+  .mc-controls { bottom: 14px; padding: 6px 8px; gap: 6px; }
+  .mc-ctrl { min-width: 36px; height: 36px; padding: 0 10px; font-size: 0.9rem; }
+  .mc-ctrl--ghost { display: none; }
+  .mc-zoom { right: 8px; bottom: 14px; }
+}
