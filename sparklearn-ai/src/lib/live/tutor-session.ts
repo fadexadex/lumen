@@ -15,9 +15,39 @@ type Listeners = {
   status: (s: SessionStatus) => void;
   transcript: (turns: TranscriptTurn[]) => void;
   amplitude: (level: number) => void; // 0..1, drives the orb
-  command: (cmd: CanvasCommand) => void; // canvas commands (handled by canvas bridge)
-  error: (message: string) => void;
+  /** Apply a canvas command; return ack string for the agent. */
+  command: (cmd: CanvasCommand) => string;
+  /** Pass `null` to clear a previous toast. */
+  error: (message: string | null) => void;
 };
+
+function isBenignDisconnectMessage(msg: string): boolean {
+  const m = msg.toLowerCase();
+  return (
+    m.includes("client initiated disconnect") ||
+    m.includes("abort connection attempt due to user initiated disconnect") ||
+    (m.includes("cancelled") && m.includes("disconnect"))
+  );
+}
+
+function transcriptionAttrs(reader: { info: { attributes?: Record<string, unknown> } }) {
+  return reader.info.attributes ?? {};
+}
+
+function transcriptionSegmentId(
+  reader: { info: { id: string; attributes?: Record<string, unknown> } },
+): string {
+  const attrs = transcriptionAttrs(reader);
+  const seg = attrs["lk.segment_id"];
+  return typeof seg === "string" && seg.length > 0 ? seg : reader.info.id;
+}
+
+function transcriptionIsFinal(reader: {
+  info: { attributes?: Record<string, unknown> };
+}): boolean {
+  const v = transcriptionAttrs(reader)["lk.transcription_final"];
+  return v === true || v === "true";
+}
 
 export class TutorSession {
   private room: Room | null = null;
@@ -25,7 +55,12 @@ export class TutorSession {
   private listeners: Partial<Listeners> = {};
   private audioEl: HTMLAudioElement | null = null;
   private raf = 0;
+  private intentionalStop = false;
   status: SessionStatus = "idle";
+  /** Last time we appended tutor transcript — used to keep one reply in one bubble. */
+  private lastTutorAt = 0;
+  private speakQuietMs = 0;
+  private lastAmpTs = 0;
 
   on<K extends keyof Listeners>(ev: K, fn: Listeners[K]) {
     this.listeners[ev] = fn;
@@ -39,9 +74,14 @@ export class TutorSession {
   private emitTurns() {
     this.listeners.transcript?.([...this.turns]);
   }
+  private emitError(message: string | null) {
+    this.listeners.error?.(message);
+  }
 
-  async start(moduleId: string) {
+  async start(moduleId: string, opts?: { mic?: boolean }) {
     if (this.room) return;
+    this.intentionalStop = false;
+    this.emitError(null);
     this.set("connecting");
     try {
       const identity = makeIdentity();
@@ -53,52 +93,63 @@ export class TutorSession {
       r.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
         if (track.kind === Track.Kind.Audio) this.attachAgentAudio(track);
       });
-      r.on(RoomEvent.Disconnected, () => this.cleanup());
-      r.on(RoomEvent.ConnectionStateChanged, () => {
-        /* optional UI */
+      r.on(RoomEvent.Disconnected, () => {
+        // Intentional End / page teardown — never toast.
+        this.cleanup();
       });
 
       // Transcriptions arrive as text streams on topic "lk.transcription".
-      // NOTE: livekit-client v2.20 passes `participantInfo: { identity: string }` (not a
-      // full RemoteParticipant) to the text-stream handler.
+      // Prefer LiveKit segment id so interim streams of the same utterance upsert one line.
       r.registerTextStreamHandler("lk.transcription", async (reader, participantInfo) => {
         const from: TranscriptTurn["from"] =
           participantInfo?.identity === identity ? "you" : "tutor";
-        const id = reader.info.id;
         let text = "";
         for await (const chunk of reader) {
           text = chunk;
-          this.upsertTurn(id, from, text, false);
+          const id = transcriptionSegmentId(reader);
+          this.upsertTurn(id, from, text, transcriptionIsFinal(reader));
         }
-        this.upsertTurn(id, from, text, true);
+        if (text) {
+          const id = transcriptionSegmentId(reader);
+          // Only finalize when LiveKit marks the segment final — interim streams close too.
+          this.upsertTurn(id, from, text, transcriptionIsFinal(reader));
+        }
       });
 
-      // Canvas commands from the agent (Week 1). Registered even on Day 1 (no-op if unused).
       r.registerRpcMethod("lumen.canvas", async (data) => {
         try {
           const cmd = JSON.parse(data.payload) as CanvasCommand;
-          this.set("thinking");
-          this.listeners.command?.(cmd); // handed to canvas bridge (06/05)
-          // return fast — client animates independently
-          queueMicrotask(() => this.set("speaking"));
-          return "applied";
+          // Apply immediately; don't flip status to "thinking" (that starved follow-up UX).
+          return this.listeners.command?.(cmd) ?? "no-handler";
         } catch (e) {
           return "error:" + (e as Error).message;
         }
       });
 
-      // System messages (quota, fallback) from the agent.
       r.registerRpcMethod("lumen.system", async (data) => {
-        this.listeners.error?.(data.payload);
+        // Real system notices (quota, fallback) — not disconnect noise.
+        this.emitError(data.payload);
         return "ok";
       });
 
       await r.connect(url, token);
-      await r.localParticipant.setMicrophoneEnabled(true);
+      if (this.intentionalStop) {
+        this.cleanup();
+        return;
+      }
+      // Headless E2E can skip mic (no getUserMedia) and still exercise connect + text + canvas.
+      if (opts?.mic !== false) {
+        await r.localParticipant.setMicrophoneEnabled(true);
+      }
       this.set("listening");
     } catch (e) {
+      const msg = (e as Error).message || String(e);
+      if (this.intentionalStop || isBenignDisconnectMessage(msg)) {
+        this.cleanup();
+        return;
+      }
       this.set("error");
-      this.listeners.error?.((e as Error).message);
+      this.emitError(msg);
       this.cleanup();
     }
   }
@@ -121,11 +172,17 @@ export class TutorSession {
   }
 
   async stop() {
-    await this.room?.disconnect();
+    this.intentionalStop = true;
+    this.emitError(null);
+    try {
+      await this.room?.disconnect();
+    } catch {
+      /* disconnect while connecting can throw — treated as intentional */
+    }
     this.cleanup();
   }
 
-  // ---- audio → amplitude (orb) ----
+  // ---- audio → amplitude (orb) + stable speaking status ----
   private attachAgentAudio(track: RemoteTrack) {
     const el = track.attach() as HTMLAudioElement;
     el.autoplay = true;
@@ -133,6 +190,8 @@ export class TutorSession {
     document.body.appendChild(el);
     this.audioEl = el;
     this.set("speaking");
+    this.speakQuietMs = 0;
+    this.lastAmpTs = performance.now();
 
     const AC =
       window.AudioContext ||
@@ -143,6 +202,11 @@ export class TutorSession {
     analyser.fftSize = 256;
     src.connect(analyser);
     const buf = new Uint8Array(analyser.frequencyBinCount);
+    // Hysteresis: easy to enter speaking, hard to leave (avoids Listening↔Talking flicker).
+    const SPEAK_ON = 0.045;
+    const SPEAK_OFF = 0.02;
+    const QUIET_HOLD_MS = 520;
+
     const tick = () => {
       analyser.getByteTimeDomainData(buf);
       let sum = 0;
@@ -153,24 +217,124 @@ export class TutorSession {
       const rms = Math.sqrt(sum / buf.length); // 0..~0.5
       const level = Math.min(1, rms * 3.2); // normalize for the orb
       this.listeners.amplitude?.(level);
-      if (level < 0.03 && this.status === "speaking") this.set("listening");
-      else if (level >= 0.03 && this.status !== "speaking") this.set("speaking");
+
+      const now = performance.now();
+      const dt = Math.min(80, Math.max(0, now - this.lastAmpTs));
+      this.lastAmpTs = now;
+
+      if (level >= SPEAK_ON) {
+        this.speakQuietMs = 0;
+        if (this.status !== "speaking") this.set("speaking");
+      } else if (level < SPEAK_OFF) {
+        this.speakQuietMs += dt;
+        if (this.speakQuietMs >= QUIET_HOLD_MS && this.status === "speaking") {
+          this.set("listening");
+          // End of spoken reply — seal the open tutor bubble.
+          const i = this.turns.length - 1;
+          if (i >= 0 && this.turns[i]!.from === "tutor" && !this.turns[i]!.final) {
+            this.turns[i] = { ...this.turns[i]!, final: true };
+            this.emitTurns();
+          }
+        }
+      } else {
+        // Mid band — keep current status; slowly decay quiet clock so brief dips don't stick.
+        this.speakQuietMs = Math.max(0, this.speakQuietMs - dt * 0.35);
+      }
       this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
   }
 
   private upsertTurn(id: string, from: TranscriptTurn["from"], text: string, final: boolean) {
-    const i = this.turns.findIndex((t) => t.id === id);
-    if (i >= 0) this.turns[i] = { id, from, text, final };
-    else this.turns.push({ id, from, text, final });
-    // keep last 12 for the minimal transcript
-    if (this.turns.length > 12) this.turns = this.turns.slice(-12);
+    if (!text || isNoiseTranscript(text)) return;
+
+    // Tutor audio often arrives as many LiveKit segments (word / sentence finals), each with
+    // a unique id. Keep ONE bubble per spoken reply: merge while still in the same turn
+    // (speaking, or only a short gap). Split only after the learner speaks or a long pause.
+    if (from === "tutor") {
+      const now = performance.now();
+      const lastIdx = this.turns.length - 1;
+      const last = lastIdx >= 0 ? this.turns[lastIdx] : null;
+      if (last?.from === "tutor" && shouldMergeTutor(last, now - this.lastTutorAt, this.status)) {
+        const merged = mergeTutorText(last.text, text);
+        this.turns[lastIdx] = {
+          id: last.id,
+          from,
+          text: merged,
+          // Stay open until a real turn boundary — sentence finals mid-reply stay partial.
+          final: false,
+        };
+        this.lastTutorAt = now;
+        this.trimTurns();
+        this.emitTurns();
+        return;
+      }
+      // New tutor bubble — seal the previous tutor line if any.
+      if (last?.from === "tutor" && !last.final) {
+        this.turns[lastIdx] = { ...last, final: true };
+      }
+      this.turns.push({ id, from, text, final: false });
+      this.lastTutorAt = now;
+      this.trimTurns();
+      this.emitTurns();
+      return;
+    }
+
+    // Learner STT: merge by LiveKit segment id.
+    const byId = this.turns.findIndex((t) => t.id === id);
+    if (byId >= 0) {
+      const prev = this.turns[byId]!.text;
+      const next = text.startsWith(prev) ? text : prev.startsWith(text) ? prev : text;
+      this.turns[byId] = { id, from, text: next, final };
+      this.trimTurns();
+      this.emitTurns();
+      return;
+    }
+
+    // Seal open tutor bubble when the learner starts talking.
+    const lastIdx = this.turns.length - 1;
+    const last = lastIdx >= 0 ? this.turns[lastIdx] : null;
+    if (last?.from === "tutor" && !last.final) {
+      this.turns[lastIdx] = { ...last, final: true };
+    }
+
+    // Fallback when segment id is missing: keep one open partial per speaker.
+    if (!final) {
+      const partialIdx = this.turns.findIndex((t) => t.from === from && !t.final);
+      if (partialIdx >= 0) {
+        const prev = this.turns[partialIdx]!.text;
+        const next = text.startsWith(prev) ? text : prev.startsWith(text) ? prev : text;
+        this.turns[partialIdx] = { id, from, text: next, final: false };
+        this.trimTurns();
+        this.emitTurns();
+        return;
+      }
+    } else {
+      const partialIdx = this.turns.findIndex((t) => t.from === from && !t.final);
+      if (partialIdx >= 0) {
+        const prev = this.turns[partialIdx]!.text;
+        const next = text.startsWith(prev) ? text : prev.startsWith(text) ? prev : text;
+        this.turns[partialIdx] = { id, from, text: next, final: true };
+        this.trimTurns();
+        this.emitTurns();
+        return;
+      }
+    }
+
+    this.turns.push({ id, from, text, final });
+    this.trimTurns();
     this.emitTurns();
+  }
+
+  private trimTurns() {
+    if (this.turns.length > 12) this.turns = this.turns.slice(-12);
   }
 
   private cleanup() {
     cancelAnimationFrame(this.raf);
+    this.speakQuietMs = 0;
+    this.lastAmpTs = 0;
+    this.lastTutorAt = 0;
     if (this.audioEl) {
       this.audioEl.remove();
       this.audioEl = null;
@@ -181,3 +345,82 @@ export class TutorSession {
     this.set("idle");
   }
 }
+
+/** Keep merging tutor chunks into one paragraph unless the reply turn clearly ended. */
+const TUTOR_TURN_GAP_MS = 2800;
+
+function shouldMergeTutor(
+  last: TranscriptTurn,
+  gapMs: number,
+  status: SessionStatus,
+): boolean {
+  if (last.from !== "tutor") return false;
+  // Still audibly speaking — always same reply, even across sentence finals.
+  if (status === "speaking") return true;
+  // Short pause mid-thought / mid-tool — still same reply.
+  if (gapMs < TUTOR_TURN_GAP_MS) return true;
+  return false;
+}
+
+function isNoiseTranscript(text: string): boolean {
+  const t = text.trim();
+  if (!t) return true;
+  if (/^<noise>$/i.test(t)) return true;
+  if (/^<unk>$/i.test(t)) return true;
+  if (/^\[noise\]$/i.test(t)) return true;
+  // Lone punctuation / dots Gemini sometimes emits as "transcripts"
+  if (/^[.\s…,!?]+$/.test(t)) return true;
+  return false;
+}
+
+function mergeTutorText(prev: string, next: string): string {
+  if (next.startsWith(prev)) return next; // cumulative
+  if (prev.startsWith(next)) return prev; // stale shorter partial
+  const n = next.trim();
+  const p = prev.trim();
+  if (!n) return prev;
+  // Exact echo / trailing duplicate ("upward." then "upward.")
+  if (p === n || p.endsWith(n) || p.endsWith(" " + n)) return prev;
+
+  // Overlap dedupe: "hoping to" + "to learn" → "hoping to learn"
+  const overlap = suffixPrefixOverlap(p, n);
+  if (overlap >= 2) {
+    return p + n.slice(overlap);
+  }
+
+  const needsSpace = !/[\s([{/-]$/.test(p) && !/^[\s.,!?;:)'"\]]/.test(n);
+  return p + (needsSpace ? " " : "") + n;
+}
+
+/** Longest suffix of `prev` that matches a prefix of `next` (case-insensitive). */
+function suffixPrefixOverlap(prev: string, next: string): number {
+  const max = Math.min(prev.length, next.length, 48);
+  const pl = prev.toLowerCase();
+  const nl = next.toLowerCase();
+  for (let len = max; len >= 2; len--) {
+    if (pl.slice(-len) === nl.slice(0, len)) return len;
+  }
+  return 0;
+}
+
+/** @deprecated kept for tests — prefer shouldMergeTutor for live path. */
+function isNewTutorUtterance(prev: string, next: string): boolean {
+  // Legacy linguistic split — only used in unit tests for documentation of old behavior.
+  // Live path uses time/status via shouldMergeTutor instead.
+  if (next.startsWith(prev) || prev.startsWith(next)) return false;
+  const p = prev.trim();
+  const n = next.trim();
+  if (!p || !n) return false;
+  if (p === n || p.endsWith(n)) return false;
+  return false; // default: do not treat as new (stable paragraphs)
+}
+
+/** Exported for unit tests — same helpers used by TutorSession.upsertTurn. */
+export const __transcriptTest = {
+  isNoiseTranscript,
+  mergeTutorText,
+  isNewTutorUtterance,
+  shouldMergeTutor,
+  suffixPrefixOverlap,
+  TUTOR_TURN_GAP_MS,
+};

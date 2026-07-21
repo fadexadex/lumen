@@ -12,7 +12,7 @@ export function LumenTranscript({
   useEffect(() => {
     ref.current?.scrollTo({ top: 1e6, behavior: "smooth" });
   }, [turns, thinking]);
-  const recent = turns.slice(-4);
+  const recent = turns.slice(-6);
   return (
     <div className="lumen-transcript" ref={ref} role="log" aria-live="polite">
       {recent.map((t) => (

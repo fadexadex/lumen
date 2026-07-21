@@ -785,6 +785,35 @@
 .mc-anno--label {
   animation: anno-rise 340ms var(--ease-tutor) both;
 }
+.mc-anno--write {
+  animation: anno-write-in 480ms var(--ease-tutor) both;
+}
+.mc-anno--write .mc-write-wash {
+  transition: height 120ms ease-out, opacity 280ms ease;
+}
+.mc-anno--write.is-writing .mc-write-caret {
+  animation: mc-write-blink 900ms steps(1) infinite;
+}
+@keyframes anno-write-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes mc-write-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
 @keyframes anno-pop {
   from {
     opacity: 0;

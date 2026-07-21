@@ -1,15 +1,19 @@
 import os
 import json
+import asyncio
+import logging
 
 from dotenv import load_dotenv
 
 from livekit import agents, rtc
 from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions
-from livekit.plugins import google, openai, silero
+from livekit.plugins import google, openai
 
 from prompts import SYSTEM_PROMPT, GREETING
 from tools import ALL_TOOLS
 from board_context import board
+
+logger = logging.getLogger("lumen-agent")
 
 # Shared secrets live in sparklearn-ai/.env. Load that first, then let an optional
 # agent/.env.local override/add to it for agent-only settings.
@@ -51,7 +55,16 @@ async def entrypoint(ctx: JobContext):
     # Wait for the learner to appear so we know the RPC destination identity.
     participant = await ctx.wait_for_participant()
 
-    # Ingest board-state deltas the client sends over the data channel (topic "lumen.board").
+    # Fresh board state per job (worker processes can be reused).
+    board.module_id = ""
+    board.step_index = 0
+    board.step_total = 0
+    board.step_title = ""
+    board.equation = ""
+    board.parabola = None
+    board.targets = []
+
+    # Ingest board-state deltas. Store only — do NOT call update_instructions mid-session.
     @ctx.room.on("data_received")
     def _on_data(pkt: rtc.DataPacket):
         if pkt.topic != "lumen.board":
@@ -68,19 +81,31 @@ async def entrypoint(ctx: JobContext):
         board.parabola = data.get("parabola", board.parabola)
         board.targets = data.get("targets", board.targets)
 
+    # Critical: Gemini Live already has server-side turn detection. Driving turns with Silero
+    # VAD caused empty "user turn committed" events (no transcript) after tool/draw turns,
+    # so follow-ups never reached the model.
     session = AgentSession(
         llm=build_model(),
-        vad=silero.VAD.load(),  # turn-detection safety net
+        vad=None,
+        turn_detection="realtime_llm",
+        max_tool_steps=8,
         userdata={"room": ctx.room, "user_identity": participant.identity},
     )
 
     agent = Agent(instructions=SYSTEM_PROMPT, tools=ALL_TOOLS)
     await session.start(agent=agent, room=ctx.room)
 
-    # Greet with current board context appended so the first turn is grounded.
-    await session.generate_reply(
-        instructions=f"{GREETING}\n\n[board]\n{board.as_prompt()}"
-    )
+    # Brief wait so the client's first board push can land before the greeting.
+    await asyncio.sleep(0.5)
+    try:
+        await session.generate_reply(
+            instructions=f"{GREETING}\n\n[board]\n{board.as_prompt()}"
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "greeting generate_reply failed; session continues without it",
+            exc_info=True,
+        )
 
 
 if __name__ == "__main__":

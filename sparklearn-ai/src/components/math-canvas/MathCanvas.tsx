@@ -9,6 +9,7 @@ import { useBeatPlayer } from "./use-beat-player";
 import { AnnotationLayer, type LumenCanvasController } from "./annotation-layer";
 import { setCanvasController } from "@/lib/live/canvas-agent-bridge";
 import { resolveTargets } from "@/lib/live/board-targets";
+import { emitLiveParabola } from "@/lib/live/board-live";
 
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 3;
@@ -127,19 +128,29 @@ export function MathCanvas(props: MathCanvasProps) {
   const lastFitVpRef = useRef({ w: 0, h: 0 });
   const panning = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const annoRef = useRef<LumenCanvasController | null>(null);
+  const boardElRef = useRef<HTMLDivElement | null>(null);
+  const scriptPara = script.diagram?.parabola ?? null;
+  const [paraParams, setParaParams] = useState<{ a: number; b: number; c: number } | null>(
+    scriptPara,
+  );
+
+  useEffect(() => {
+    setParaParams(script.diagram?.parabola ?? null);
+  }, [script]);
 
   const { beats, height: BOARD_H } = useMemo(() => layoutScript(script), [script]);
 
   // Register the Lumen Live canvas controller: annotations + view/coord helpers.
-  // Keyed on `script` so targets are re-resolved whenever the lesson changes.
+  // Re-resolve targets when the lesson OR live parabola params change.
   useEffect(() => {
-    const targets = resolveTargets(script);
+    const targets = resolveTargets(script, paraParams);
     setCanvasController({
       anno: () => annoRef.current,
       targets,
       getView: () => viewRef.current,
       setView,
       viewportEl: () => viewportRef.current,
+      boardEl: () => boardElRef.current,
       screenToWorld: (sx, sy) => {
         const v = viewRef.current;
         return { x: (sx - v.x) / v.scale, y: (sy - v.y) / v.scale };
@@ -149,9 +160,14 @@ export function MathCanvas(props: MathCanvasProps) {
         return { x: wx * v.scale + v.x, y: wy * v.scale + v.y };
       },
       boardSize: { w: BOARD_W, h: BOARD_H },
+      setParabola: (a, b, c) => {
+        const next = { a, b, c };
+        setParaParams(next);
+        emitLiveParabola(next);
+      },
     });
     return () => setCanvasController(null);
-  }, [script, BOARD_H]);
+  }, [script, BOARD_H, paraParams]);
 
   // Reset the idle countdown on any interaction; ~2.6s of stillness fades chrome.
   const bumpActivity = useCallback(() => {
@@ -349,7 +365,11 @@ export function MathCanvas(props: MathCanvasProps) {
         className="mc-world"
         style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}
       >
-        <div className="mc-board" style={{ width: BOARD_W, height: BOARD_H }}>
+        <div
+          ref={boardElRef}
+          className="mc-board"
+          style={{ width: BOARD_W, height: BOARD_H }}
+        >
           <div className="mc-lesson-layer" style={{ pointerEvents: "none" }}>
             {visibleBeats.map((b) => {
               const beatIndex = beats.indexOf(b);
@@ -366,6 +386,11 @@ export function MathCanvas(props: MathCanvasProps) {
                   }
                   picked={picked}
                   onPick={(bi, oi) => setPicked((p) => ({ ...p, [bi]: oi }))}
+                  paraParams={paraParams}
+                  onParaChange={(p) => {
+                    setParaParams(p);
+                    emitLiveParabola(p);
+                  }}
                 />
               );
             })}
@@ -421,8 +446,9 @@ export function MathCanvas(props: MathCanvasProps) {
           onClick={() => {
             inkRef.current?.clear();
             notesRef.current?.clear();
+            annoRef.current?.clear();
           }}
-          label="Clear notes"
+          label="Clear notes & marks"
         >
           <TrashI />
         </ToolBtn>
@@ -556,6 +582,8 @@ function BeatView({
   active,
   picked,
   onPick,
+  paraParams,
+  onParaChange,
 }: {
   beat: Beat;
   beatIndex: number;
@@ -563,6 +591,8 @@ function BeatView({
   active: boolean;
   picked: Record<number, number>;
   onPick: (bi: number, oi: number) => void;
+  paraParams: { a: number; b: number; c: number } | null;
+  onParaChange: (p: { a: number; b: number; c: number }) => void;
 }) {
   const base = { position: "absolute" as const, left: beat.x, top: beat.y };
   if (beat.kind === "title") {
@@ -623,7 +653,13 @@ function BeatView({
         className="mc-diagram tutor-fade-in"
         data-no-pan
       >
-        <ParabolaWidget width={beat.w} height={beat.h} initial={beat.params} />
+        <ParabolaWidget
+          width={beat.w}
+          height={beat.h}
+          initial={beat.params}
+          value={paraParams ?? beat.params}
+          onChange={onParaChange}
+        />
       </div>
     );
   }

@@ -1,11 +1,13 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { LearnerProfile, Roadmap } from "./types";
+import type { LearnerProfile, Roadmap, Subscription } from "./types";
 import { buildRoadmap } from "./mock-roadmaps";
 
 interface TutorState {
   profile: LearnerProfile | null;
   roadmap: Roadmap | null;
+  /** Set after a verified Monnify payment. Display-only for now (no credit spend). */
+  subscription: Subscription | null;
   stepByModule: Record<string, number>;
   /** Modules the learner has reached the end of. */
   completed: Record<string, boolean>;
@@ -13,6 +15,7 @@ interface TutorState {
   lastModuleId: string | null;
   setProfile: (p: LearnerProfile) => void;
   setRoadmap: (r: Roadmap) => void;
+  setSubscription: (s: Subscription) => void;
   setStep: (moduleId: string, step: number) => void;
   markComplete: (moduleId: string) => void;
   setLastModule: (moduleId: string) => void;
@@ -32,11 +35,13 @@ export const useTutorStore = create<TutorState>()(
     (set, get) => ({
       profile: null,
       roadmap: null,
+      subscription: null,
       stepByModule: {},
       completed: {},
       lastModuleId: null,
       setProfile: (profile) => set({ profile }),
       setRoadmap: (roadmap) => set({ roadmap }),
+      setSubscription: (subscription) => set({ subscription }),
       setStep: (moduleId, step) =>
         set((s) => ({ stepByModule: { ...s.stepByModule, [moduleId]: step } })),
       markComplete: (moduleId) =>
@@ -55,6 +60,7 @@ export const useTutorStore = create<TutorState>()(
         set({
           profile: null,
           roadmap: null,
+          subscription: null,
           stepByModule: {},
           completed: {},
           lastModuleId: null,
@@ -62,24 +68,26 @@ export const useTutorStore = create<TutorState>()(
     }),
     {
       name: "tutor:state",
-      // Bump only when the persisted shape breaks — NOT on every app update,
-      // so shipping changes never forces learners to redo onboarding.
-      version: 1,
-      // Persist durably across browser sessions (was sessionStorage before,
-      // which wiped onboarding every time the tab closed).
+      // Bump when persisted shape gains subscription entitlement.
+      version: 2,
+      migrate: (persisted, fromVersion) => {
+        const p = (persisted ?? {}) as Record<string, unknown>;
+        // v1 → v2: add subscription field (null until paid).
+        if (fromVersion < 2 && p.subscription === undefined) {
+          return { ...p, subscription: null };
+        }
+        return p as typeof p & { subscription?: unknown };
+      },
       storage: createJSONStorage(() =>
         typeof window !== "undefined" ? window.localStorage : (memoryStorage as unknown as Storage),
       ),
-      // The roadmap is derived from the profile — don't store it. This lets us
-      // improve/expand roadmaps in updates without stranding returning learners
-      // on a stale, cached path.
       partialize: (s) => ({
         profile: s.profile,
+        subscription: s.subscription,
         stepByModule: s.stepByModule,
         completed: s.completed,
         lastModuleId: s.lastModuleId,
       }),
-      // Rebuild the roadmap from the restored profile as soon as we rehydrate.
       onRehydrateStorage: () => (state) => {
         if (state?.profile && !state.roadmap) {
           state.roadmap = buildRoadmap(state.profile.topic, state.profile.grade);

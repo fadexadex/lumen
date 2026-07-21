@@ -43,16 +43,19 @@ export function Onboarding() {
   const setProfile = useTutorStore((s) => s.setProfile);
   const setRoadmap = useTutorStore((s) => s.setRoadmap);
   const savedProfile = useTutorStore((s) => s.profile);
+  const subscription = useTutorStore((s) => s.subscription);
   const ensureRoadmap = useTutorStore((s) => s.ensureRoadmap);
 
-  // Returning learner in this browser — skip straight to their path instead of
-  // re-asking every question. "Start over" on the roadmap clears this.
+  // Returning learner: skip questions. Paid → path; unpaid → paywall.
   useEffect(() => {
-    if (savedProfile) {
+    if (!savedProfile) return;
+    if (subscription?.status === "active") {
       ensureRoadmap();
       navigate({ to: "/roadmap" });
+      return;
     }
-  }, [savedProfile, ensureRoadmap, navigate]);
+    navigate({ to: "/subscribe" });
+  }, [savedProfile, subscription, ensureRoadmap, navigate]);
 
   const [i, setI] = useState(0);
   const [dir, setDir] = useState<Dir>("forward");
@@ -163,7 +166,8 @@ export function Onboarding() {
     setProfile(profile);
     setRoadmap(buildRoadmap(profile.topic, profile.grade));
     setFinishing(true);
-    setTimeout(() => navigate({ to: "/roadmap" }), 1600);
+    // Paywall sits between onboarding and the platform.
+    setTimeout(() => navigate({ to: "/subscribe" }), 1600);
   };
 
   const advance = () => {

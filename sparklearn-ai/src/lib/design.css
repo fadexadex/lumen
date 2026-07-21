@@ -308,6 +308,187 @@
   }
 }
 
+/* ---------- Subscription paywall ---------- */
+.paywall-shell {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 10%, var(--tutor-accent-soft), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 85%, oklch(0.97 0.03 90), transparent 50%),
+    var(--tutor-bg);
+}
+.paywall-glow {
+  position: absolute;
+  inset: auto -10% 35% auto;
+  width: min(28rem, 70vw);
+  height: min(28rem, 70vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.92 0.08 75 / 0.55), transparent 70%);
+  pointer-events: none;
+  animation: paywall-drift 10s var(--ease-tutor) infinite alternate;
+}
+@keyframes paywall-drift {
+  from {
+    transform: translate(-8%, 4%) scale(1);
+  }
+  to {
+    transform: translate(6%, -6%) scale(1.08);
+  }
+}
+.paywall-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+.paywall-panel {
+  width: 100%;
+  max-width: 28rem;
+}
+.paywall-eyebrow {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--tutor-muted);
+  margin-bottom: 1rem;
+}
+.paywall-title {
+  font-size: clamp(2.1rem, 5vw, 3rem);
+  line-height: 1.1;
+  margin-bottom: 0.85rem;
+}
+.paywall-lede {
+  color: var(--tutor-muted);
+  font-size: 1.02rem;
+  line-height: 1.55;
+  margin-bottom: 1.75rem;
+}
+.paywall-offer {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.25rem 1.35rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--tutor-line);
+  background: oklch(1 0 0 / 0.72);
+  backdrop-filter: blur(8px);
+  animation: paywall-offer-in 700ms var(--ease-tutor) both;
+}
+@keyframes paywall-offer-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.paywall-credits {
+  display: flex;
+  flex-direction: column;
+  min-width: 5.5rem;
+}
+.paywall-credits-value {
+  font-family: var(--font-serif);
+  font-size: 2.75rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.paywall-credits-label {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--tutor-muted);
+}
+.paywall-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--tutor-line);
+}
+.paywall-price {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.paywall-price-value {
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+.paywall-price-note {
+  font-size: 0.8rem;
+  color: var(--tutor-muted);
+}
+.paywall-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 1.25rem;
+}
+.paywall-field > span {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--tutor-muted);
+}
+.paywall-error {
+  color: oklch(0.45 0.14 25);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+.paywall-cta {
+  width: 100%;
+  justify-content: center;
+  padding: 0.85rem 1.4rem;
+}
+.paywall-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.75rem 1.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--tutor-line);
+  background: transparent;
+  color: var(--tutor-ink);
+  font-size: 0.95rem;
+  transition:
+    transform 0.2s var(--ease-tutor),
+    border-color 0.2s var(--ease-tutor),
+    background 0.2s var(--ease-tutor);
+  cursor: pointer;
+}
+.paywall-secondary:hover:not(:disabled) {
+  border-color: var(--tutor-ink);
+  transform: translateY(-1px);
+}
+.paywall-secondary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.paywall-fine {
+  margin-top: 1rem;
+  font-size: 0.82rem;
+  color: var(--tutor-muted);
+  text-align: center;
+  line-height: 1.45;
+}
+
+.paywall-credits-chip {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--tutor-muted);
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--tutor-line);
+  border-radius: 999px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tutor-fade-in,
   .onboard-step[data-dir="forward"],
@@ -315,11 +496,13 @@
   .onboard-step.is-leaving[data-dir="forward"],
   .onboard-step.is-leaving[data-dir="back"],
   .onboard-finish,
-  .tutor-chip[data-selected="true"] {
+  .tutor-chip[data-selected="true"],
+  .paywall-offer {
     animation: onboard-fade-only 200ms ease-out both;
   }
   .onboard-finish-bar > span,
-  .live-dot {
+  .live-dot,
+  .paywall-glow {
     animation: none;
   }
   .tutor-chip:hover,

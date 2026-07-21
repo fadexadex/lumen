@@ -148,9 +148,11 @@
 .lumen-line-text {
   font-family: var(--font-serif);
   font-size: 0.98rem;
-  line-height: 1.35;
+  line-height: 1.45;
   color: var(--tutor-ink);
   margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .lumen-line--you .lumen-line-text {
   color: var(--tutor-muted);

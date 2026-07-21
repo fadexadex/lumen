@@ -10,9 +10,13 @@ export interface CanvasControllerHandle {
   getView: () => View;
   setView: (v: View) => void;
   viewportEl: () => HTMLElement | null;
+  /** `.mc-board` element — used to measure lesson content for free-space writes. */
+  boardEl?: () => HTMLElement | null;
   screenToWorld: (sx: number, sy: number) => WPoint;
   worldToScreen: (wx: number, wy: number) => WPoint;
   boardSize: { w: number; h: number };
+  /** Drive the live parabola widget (sliders + curve), not just an overlay stroke. */
+  setParabola?: (a: number, b: number, c: number) => void;
 }
 
 let handle: CanvasControllerHandle | null = null;

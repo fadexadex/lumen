@@ -44,6 +44,18 @@ def plot_parabola(a: float, b: float, c: float) -> str:
     return _cmd("plotParabola", a=a, b=b, c=c)
 
 
+def set_parabola(a: float, b: float, c: float) -> str:
+    return _cmd("setParabola", a=a, b=b, c=c)
+
+
+def write_block(lines: list[str], target: Optional[str] = None, place: str = "below", job_id: Optional[str] = None) -> str:
+    return _cmd("writeBlock", lines=lines, target=target, place=place, jobId=job_id)
+
+
+def cancel_writing(job_id: Optional[str] = None) -> str:
+    return _cmd("cancelWriting", jobId=job_id)
+
+
 def focus(target: str) -> str:
     return _cmd("panTo", target=target)
 

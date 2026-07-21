@@ -42,7 +42,10 @@ function estimateBeatRect(b: Beat): WRect {
 
 const centerOf = (r: WRect): WPoint => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
 
-export function resolveTargets(script: LessonScript): ResolvedTargets {
+export function resolveTargets(
+  script: LessonScript,
+  parabolaOverride?: { a: number; b: number; c: number } | null,
+): ResolvedTargets {
   const { beats } = layoutScript(script);
   const names: string[] = [];
   const rects = new Map<string, WRect>();
@@ -72,7 +75,7 @@ export function resolveTargets(script: LessonScript): ResolvedTargets {
     | Extract<Beat, { kind: "diagram" }>
     | undefined;
   if (dia && dia.params) {
-    const { a, b, c } = dia.params;
+    const { a, b, c } = parabolaOverride ?? dia.params;
     const plotW = dia.w;
     const plotH = dia.h - 130; // matches ParabolaWidget
     const graphToWorld = (gx: number, gy: number): WPoint => ({

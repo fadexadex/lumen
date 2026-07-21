@@ -9,14 +9,28 @@ export function ParabolaWidget({
   width,
   height,
   initial,
+  value,
+  onChange,
 }: {
   width: number;
   height: number;
   initial?: { a: number; b: number; c: number };
+  /** Controlled params — when set, drives the curve + sliders. */
+  value?: { a: number; b: number; c: number };
+  onChange?: (p: { a: number; b: number; c: number }) => void;
 }) {
-  const [a, setA] = useState(initial?.a ?? 1);
-  const [b, setB] = useState(initial?.b ?? -5);
-  const [c, setC] = useState(initial?.c ?? 6);
+  const [local, setLocal] = useState(initial ?? { a: 1, b: -5, c: 6 });
+  const controlled = value != null;
+  const a = controlled ? value.a : local.a;
+  const b = controlled ? value.b : local.b;
+  const c = controlled ? value.c : local.c;
+  const setParams = (next: { a: number; b: number; c: number }) => {
+    if (!controlled) setLocal(next);
+    onChange?.(next);
+  };
+  const setA = (n: number) => setParams({ a: n, b, c });
+  const setB = (n: number) => setParams({ a, b: n, c });
+  const setC = (n: number) => setParams({ a, b, c: n });
 
   const plotH = height - 130;
   const plotW = width;

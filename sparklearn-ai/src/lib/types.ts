@@ -10,6 +10,14 @@ export interface LearnerProfile {
   audio: AudioPref;
 }
 
+/** Display-only starter pack entitlement after Monnify checkout. Credits are not spent in-app yet. */
+export interface Subscription {
+  status: "active";
+  credits: number;
+  paymentReference: string;
+  paidAt: string;
+}
+
 export interface RoadmapModule {
   id: string;
   title: string;

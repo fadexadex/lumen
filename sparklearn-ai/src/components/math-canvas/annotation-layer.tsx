@@ -1,4 +1,11 @@
-import { forwardRef, useImperativeHandle, useRef, useState, useCallback } from "react";
+import {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
 
 /** World-space rectangle/point. */
 export type WRect = { x: number; y: number; w: number; h: number };
@@ -12,7 +19,15 @@ type Anno =
   | { id: string; kind: "label"; at: WPoint; text: string; place: Place }
   | { id: string; kind: "arrow"; from: WPoint; to: WPoint; text?: string }
   | { id: string; kind: "axis"; x: number; y0: number; y1: number; label?: string }
-  | { id: string; kind: "path"; d: string; color: string }; // e.g. overlaid parabola
+  | { id: string; kind: "path"; d: string; color: string }
+  | {
+      id: string;
+      kind: "writeBlock";
+      at: WPoint;
+      lines: string[];
+      revealed: number;
+      writing: boolean;
+    };
 
 export interface LumenCanvasController {
   highlight(rect: WRect, opts?: { color?: string; label?: string }): string;
@@ -21,8 +36,13 @@ export interface LumenCanvasController {
   arrow(from: WPoint, to: WPoint, text?: string): string;
   drawAxis(x: number, y0: number, y1: number, label?: string): string;
   drawPath(d: string, color?: string): string;
+  /** Multi-line board writing with typewriter. Same jobId replaces in place (resume-safe). */
+  writeBlock(at: WPoint, lines: string[], opts?: { jobId?: string }): string;
+  cancelWriting(jobId?: string): void;
   remove(id: string): void;
   clear(): void;
+  /** World-space boxes already claimed by AI marks (for free-space placement). */
+  occupiedRects(excludeId?: string): WRect[];
 }
 
 const COLORS: Record<string, string> = {
@@ -49,6 +69,37 @@ export const AnnotationLayer = forwardRef<LumenCanvasController, AnnotationLayer
       return a.id;
     }, []);
 
+    // Typewriter: ~1 char / 36ms — slower, more “handwritten” cadence.
+    const writingActive = annos.some((a) => a.kind === "writeBlock" && a.writing);
+    useEffect(() => {
+      if (!writingActive) return;
+      const t = window.setInterval(() => {
+        setAnnos((xs) => {
+          let changed = false;
+          const next = xs.map((a) => {
+            if (a.kind !== "writeBlock" || !a.writing) return a;
+            const total = a.lines.join("\n").length;
+            const revealed = Math.min(total, a.revealed + 1);
+            if (revealed === a.revealed && revealed >= total) {
+              if (a.writing) {
+                changed = true;
+                return { ...a, writing: false };
+              }
+              return a;
+            }
+            if (revealed === a.revealed) return a;
+            changed = true;
+            return { ...a, revealed, writing: revealed < total };
+          });
+          return changed ? next : xs;
+        });
+      }, 36);
+      return () => clearInterval(t);
+    }, [writingActive]);
+
+    const annosRef = useRef(annos);
+    annosRef.current = annos;
+
     useImperativeHandle(
       ref,
       (): LumenCanvasController => ({
@@ -66,8 +117,37 @@ export const AnnotationLayer = forwardRef<LumenCanvasController, AnnotationLayer
         drawAxis: (x, y0, y1, label) => add({ id: newId(), kind: "axis", x, y0, y1, label }),
         drawPath: (d, color = "teal") =>
           add({ id: newId(), kind: "path", d, color: COLORS[color] ?? color }),
+        writeBlock: (at, lines, o) => {
+          const id = o?.jobId ?? newId();
+          const clean = lines.map((l) => l.trimEnd()).filter((l, i, arr) => l.length || i < arr.length - 1);
+          setAnnos((xs) => {
+            const without = xs.filter((a) => a.id !== id);
+            return [
+              ...without,
+              {
+                id,
+                kind: "writeBlock",
+                at,
+                lines: clean.length ? clean : [""],
+                revealed: 0,
+                writing: true,
+              },
+            ];
+          });
+          return id;
+        },
+        cancelWriting: (jobId) => {
+          setAnnos((xs) =>
+            xs.map((a) => {
+              if (a.kind !== "writeBlock" || !a.writing) return a;
+              if (jobId && a.id !== jobId) return a;
+              return { ...a, writing: false };
+            }),
+          );
+        },
         remove: (id) => setAnnos((xs) => xs.filter((a) => a.id !== id)),
         clear: () => setAnnos([]),
+        occupiedRects: (excludeId) => occupiedFromAnnos(annosRef.current, excludeId),
       }),
       [add],
     );
@@ -216,9 +296,78 @@ function AnnoView({ a }: { a: Anno }) {
       );
     case "label":
       return <AnnoLabel at={a.at} text={a.text} place={a.place} />;
+    case "writeBlock":
+      return <WriteBlockView a={a} />;
     default:
       return null;
   }
+}
+
+function occupiedFromAnnos(annos: Anno[], excludeId?: string): WRect[] {
+  const out: WRect[] = [];
+  for (const a of annos) {
+    if (excludeId && a.id === excludeId) continue;
+    if (a.kind === "writeBlock") {
+      const w = Math.min(520, 28 + Math.max(...a.lines.map((l) => l.length), 8) * 11);
+      const h = 16 + Math.max(a.lines.length, 1) * 28;
+      out.push({ x: a.at.x - 12, y: a.at.y - 8, w, h });
+    } else if (a.kind === "highlight") {
+      out.push(a.rect);
+    } else if (a.kind === "circle") {
+      out.push({ x: a.at.x - a.r, y: a.at.y - a.r, w: a.r * 2, h: a.r * 2 });
+    } else if (a.kind === "label") {
+      const w = Math.min(280, 24 + a.text.length * 10);
+      out.push({ x: a.at.x - w / 2, y: a.at.y - 22, w, h: 28 });
+    }
+  }
+  return out;
+}
+
+function WriteBlockView({
+  a,
+}: {
+  a: Extract<Anno, { kind: "writeBlock" }>;
+}) {
+  const full = a.lines.join("\n");
+  const shown = full.slice(0, a.revealed);
+  const shownLines = shown.split("\n");
+  const boxW = Math.min(520, 28 + Math.max(...a.lines.map((l) => l.length), 8) * 11);
+  const boxH = 16 + Math.max(shownLines.length, 1) * 28;
+  return (
+    <g className={`mc-anno mc-anno--write${a.writing ? " is-writing" : ""}`}>
+      {/* Soft wash — ink on board, not a floating card */}
+      <rect
+        className="mc-write-wash"
+        x={a.at.x - 10}
+        y={a.at.y - 6}
+        width={boxW}
+        height={boxH}
+        rx={6}
+        fill="oklch(0.985 0.008 95)"
+        fillOpacity={0.55}
+        stroke="none"
+      />
+      {shownLines.map((line, i) => (
+        <text
+          key={i}
+          className="mc-write-line"
+          x={a.at.x}
+          y={a.at.y + 14 + i * 28}
+          fontSize={21}
+          fontFamily="var(--font-serif)"
+          fill={COLORS.ink}
+          style={{ paintOrder: "stroke", stroke: "oklch(0.99 0.01 95)", strokeWidth: 5 }}
+        >
+          {line}
+          {a.writing && i === shownLines.length - 1 ? (
+            <tspan className="mc-write-caret" fill="oklch(0.55 0.14 55)">
+              |
+            </tspan>
+          ) : null}
+        </text>
+      ))}
+    </g>
+  );
 }
 
 function AnnoLabel({ at, text, place }: { at: WPoint; text: string; place: Place }) {

@@ -6,6 +6,7 @@ export function RoadmapView() {
   const navigate = useNavigate();
   const profile = useTutorStore((s) => s.profile);
   const roadmap = useTutorStore((s) => s.roadmap);
+  const subscription = useTutorStore((s) => s.subscription);
   const completed = useTutorStore((s) => s.completed);
   const lastModuleId = useTutorStore((s) => s.lastModuleId);
   const ensureRoadmap = useTutorStore((s) => s.ensureRoadmap);
@@ -17,10 +18,16 @@ export function RoadmapView() {
   }, [profile, roadmap, ensureRoadmap]);
 
   useEffect(() => {
-    if (!profile) navigate({ to: "/" });
-  }, [profile, navigate]);
+    if (!profile) {
+      navigate({ to: "/" });
+      return;
+    }
+    if (subscription?.status !== "active") {
+      navigate({ to: "/subscribe" });
+    }
+  }, [profile, subscription, navigate]);
 
-  if (!profile || !roadmap) return null;
+  if (!profile || !roadmap || subscription?.status !== "active") return null;
 
   const modules = roadmap.modules;
   const doneCount = modules.filter((m) => completed[m.id]).length;
@@ -68,9 +75,16 @@ export function RoadmapView() {
         >
           ← start over
         </button>
-        <span className="text-xs uppercase tracking-widest" style={{ color: "var(--tutor-muted)" }}>
-          Grade {profile.grade} · {profile.subject}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--tutor-muted)" }}>
+            Grade {profile.grade} · {profile.subject}
+          </span>
+          {subscription?.credits != null && (
+            <span className="paywall-credits-chip" title="Display only — not spent in lessons yet">
+              {subscription.credits} credits
+            </span>
+          )}
+        </div>
       </header>
 
       <section className="roadmap-hero">

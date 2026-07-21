@@ -1,6 +1,7 @@
 import type { LessonScript } from "@/lib/types";
 import { resolveTargets } from "./board-targets";
 import { prettifyLatex } from "@/lib/whiteboard-bridge";
+import { getCanvasController } from "./canvas-agent-bridge";
 
 export interface BoardState {
   moduleId: string;
@@ -16,16 +17,21 @@ export function buildBoardState(
   script: LessonScript,
   stepIndex: number,
   moduleId: string,
+  parabolaOverride?: { a: number; b: number; c: number } | null,
 ): BoardState {
-  const step = script.steps[stepIndex];
-  const T = resolveTargets(script);
+  // Prefer explicit override, then live canvas controller params, then script defaults.
+  const live = getCanvasController()?.targets.parabola;
+  const override =
+    parabolaOverride ?? (live ? { a: live.a, b: live.b, c: live.c } : null);
 
-  // Prefer the step's own math; fall back to the diagram equation.
+  const T = resolveTargets(script, override);
+  const step = script.steps[stepIndex];
+
   const stepMath =
     step && "math" in step && step.math
       ? step.math
-      : script.diagram?.parabola
-        ? paramsToEq(script.diagram.parabola)
+      : T.parabola
+        ? paramsToEq({ a: T.parabola.a, b: T.parabola.b, c: T.parabola.c })
         : "";
 
   return {

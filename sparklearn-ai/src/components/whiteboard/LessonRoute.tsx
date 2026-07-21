@@ -12,11 +12,13 @@ import { PathNavigator } from "@/components/tutor/PathNavigator";
 import { useLumenSession } from "@/lib/live/use-lumen-session";
 import { LumenOverlay } from "@/components/live/LumenOverlay";
 import { buildBoardState } from "@/lib/live/board-context";
+import { onLiveParabolaChange } from "@/lib/live/board-live";
 
 export function LessonRoute() {
   const { moduleId } = useParams({ from: "/lesson/$moduleId" });
   const navigate = useNavigate();
   const roadmap = useTutorStore((s) => s.roadmap);
+  const subscription = useTutorStore((s) => s.subscription);
   const stepByModule = useTutorStore((s) => s.stepByModule);
   const setStep = useTutorStore((s) => s.setStep);
   const completed = useTutorStore((s) => s.completed);
@@ -25,14 +27,28 @@ export function LessonRoute() {
 
   const mod = roadmap?.modules.find((m) => m.id === moduleId);
 
+  const [hydrated, setHydrated] = useState(() => useTutorStore.persist.hasHydrated());
+
   useEffect(() => {
-    if (!roadmap) navigate({ to: "/" });
-  }, [roadmap, navigate]);
+    setHydrated(useTutorStore.persist.hasHydrated());
+    return useTutorStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!roadmap) {
+      navigate({ to: "/" });
+      return;
+    }
+    if (subscription?.status !== "active") {
+      navigate({ to: "/subscribe" });
+    }
+  }, [hydrated, roadmap, subscription, navigate]);
 
   // Remember this as the module to resume from.
   useEffect(() => {
-    if (roadmap) setLastModule(moduleId);
-  }, [roadmap, moduleId, setLastModule]);
+    if (roadmap && subscription?.status === "active") setLastModule(moduleId);
+  }, [roadmap, subscription, moduleId, setLastModule]);
 
   const script = useMemo(
     () => getLessonScript(moduleId, mod?.title ?? "Lesson"),
@@ -44,8 +60,9 @@ export function LessonRoute() {
 
   // Reaching the last step counts as finishing the module.
   useEffect(() => {
+    if (subscription?.status !== "active") return;
     if (safeIndex >= script.steps.length - 1) markComplete(moduleId);
-  }, [safeIndex, script.steps.length, moduleId, markComplete]);
+  }, [subscription, safeIndex, script.steps.length, moduleId, markComplete]);
 
   const lumen = useLumenSession();
   const [showMath, setShowMath] = useState(false);
@@ -77,6 +94,7 @@ export function LessonRoute() {
     roadmap && moduleIndex >= 0 && moduleIndex < roadmap.modules.length - 1
       ? roadmap.modules[moduleIndex + 1]
       : null;
+
   const goNextModule = () => {
     if (!nextMod) {
       navigate({ to: "/roadmap" });
@@ -99,13 +117,21 @@ export function LessonRoute() {
     onFinish: () => setDemoActive(false),
   });
 
-  // Ground Lumen whenever the visible step changes (pull-first grounding, see plan 08).
+  // Ground Lumen whenever the visible step changes, or Live starts.
   useEffect(() => {
     if (lumen.status !== "idle") {
       lumen.sendBoardState(buildBoardState(script, safeIndex, moduleId));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [safeIndex, moduleId, script, lumen.status]);
+
+  // Push live parabola slider / set_parabola changes so Lumen knows "this" on screen.
+  useEffect(() => {
+    return onLiveParabolaChange((p) => {
+      if (lumen.status === "idle") return;
+      lumen.sendBoardState(buildBoardState(script, safeIndex, moduleId, p));
+    });
+  }, [lumen, script, safeIndex, moduleId]);
 
   const insertShortcut = (latex: string) => setMathValue((v) => v + latex);
 
@@ -123,6 +149,8 @@ export function LessonRoute() {
 
   const ConceptView = concept.Component;
   const boardTone = concept.boardTone;
+
+  if (!roadmap || subscription?.status !== "active") return null;
 
   return (
     <div className="lesson-shell" data-board-tone={boardTone}>

@@ -12,4 +12,15 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    server: {
+      // Same-origin /payments/* → token-server (avoids CORS + clearer failures in the browser)
+      proxy: {
+        "/payments": {
+          target: "http://localhost:8787",
+          changeOrigin: true,
+        },
+      },
+    },
+  },
 });

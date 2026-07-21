@@ -8,24 +8,35 @@ the session userdata set in agent.py.
 
 from livekit.agents import function_tool, RunContext
 
+import asyncio
+
 import commands as C
 from board_context import board
 
 
 async def _send(ctx: RunContext, payload: str) -> str:
+    """Fire-and-forget canvas RPC so Gemini isn't blocked / interrupted mid-turn.
+
+    Awaiting RPC while mic audio still flows is a known Gemini Live stall pattern after
+    draw tools. Return immediately; the client animates independently.
+    """
     ud = ctx.session.userdata
     room = ud["room"]
     user = ud["user_identity"]
-    try:
-        res = await room.local_participant.perform_rpc(
-            destination_identity=user,
-            method="lumen.canvas",
-            payload=payload,
-            response_timeout=5.0,
-        )
-        return f"ok:{res}"
-    except Exception as e:  # noqa: BLE001
-        return f"error:{e}"  # model can react verbally
+
+    async def _rpc() -> None:
+        try:
+            await room.local_participant.perform_rpc(
+                destination_identity=user,
+                method="lumen.canvas",
+                payload=payload,
+                response_timeout=5.0,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    asyncio.create_task(_rpc())
+    return "ok"
 
 
 @function_tool
@@ -60,8 +71,32 @@ async def draw_axis_of_symmetry(ctx: RunContext) -> str:
 
 @function_tool
 async def plot_parabola(ctx: RunContext, a: float, b: float, c: float) -> str:
-    """Overlay a new parabola y = a x^2 + b x + c on the graph to compare shapes."""
+    """Overlay a comparison parabola stroke y = a x^2 + b x + c without moving the widget sliders."""
     return await _send(ctx, C.plot_parabola(a, b, c))
+
+
+@function_tool
+async def set_parabola(ctx: RunContext, a: float, b: float, c: float) -> str:
+    """Move the live parabola widget (sliders + curve) to y = a x^2 + b x + c. Prefer this when showing a different example on the graph."""
+    return await _send(ctx, C.set_parabola(a, b, c))
+
+
+@function_tool
+async def write_on_board(
+    ctx: RunContext,
+    lines: list[str],
+    target: str | None = None,
+    place: str = "below",
+    job_id: str | None = None,
+) -> str:
+    """Write a worked example or steps on the board (typewriter). Use short lines. Same job_id replaces the block (safe after interrupt/continue)."""
+    return await _send(ctx, C.write_block(lines, target, place, job_id))
+
+
+@function_tool
+async def cancel_writing(ctx: RunContext, job_id: str | None = None) -> str:
+    """Pause/stop an in-progress write_on_board animation (keeps text already revealed)."""
+    return await _send(ctx, C.cancel_writing(job_id))
 
 
 @function_tool
@@ -72,7 +107,7 @@ async def focus_on(ctx: RunContext, target: str) -> str:
 
 @function_tool
 async def clear_annotations(ctx: RunContext) -> str:
-    """Remove all of Lumen's drawings from the board."""
+    """Remove all of Lumen's drawings and writing from the board."""
     return await _send(ctx, C.clear())
 
 
@@ -84,5 +119,6 @@ async def get_board_state(ctx: RunContext) -> str:
 
 ALL_TOOLS = [
     highlight_region, circle_point, add_label, draw_arrow, draw_axis_of_symmetry,
-    plot_parabola, focus_on, clear_annotations, get_board_state,
+    plot_parabola, set_parabola, write_on_board, cancel_writing,
+    focus_on, clear_annotations, get_board_state,
 ]

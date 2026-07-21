@@ -37,12 +37,20 @@ function makeMockAnno() {
       calls.push({ method: "drawPath", args });
       return `mock-${++seq}`;
     },
+    writeBlock: (...args) => {
+      calls.push({ method: "writeBlock", args });
+      return `mock-${++seq}`;
+    },
+    cancelWriting: (...args) => {
+      calls.push({ method: "cancelWriting", args });
+    },
     remove: (...args) => {
       calls.push({ method: "remove", args });
     },
     clear: (...args) => {
       calls.push({ method: "clear", args });
     },
+    occupiedRects: () => [],
   };
   return { anno, calls };
 }
@@ -62,6 +70,9 @@ function makeHandle(): { handle: CanvasControllerHandle; calls: { method: string
     screenToWorld: (sx, sy) => ({ x: sx, y: sy }),
     worldToScreen: (wx, wy) => ({ x: wx, y: wy }),
     boardSize: { w: 1600, h: 1000 },
+    setParabola: () => {
+      calls.push({ method: "setParabola", args: [] });
+    },
   };
   return { handle, calls };
 }
@@ -93,15 +104,21 @@ describe("canvas-commands contract (TS<->Py dispatch + resolver guard)", () => {
     { id: "c5", op: "label", args: { target: "root1", text: "root" } },
     { id: "c6", op: "arrow", args: { from: "vertex", to: "root1" } },
     { id: "c7", op: "panTo", args: { target: "graph" } },
-    { id: "c8", op: "clear" },
+    { id: "c8", op: "setParabola", args: { a: 1, b: -5, c: 6 } },
+    {
+      id: "c9",
+      op: "writeBlock",
+      args: { lines: ["Factor:", "x^2 - 5x + 6 = (x-2)(x-3)"], target: "graph", place: "left" },
+    },
+    { id: "c10", op: "clear" },
   ];
 
   it.each(CMDS)("dispatches %o and returns ok", (cmd) => {
     const result = applyCommand(handle, cmd);
-    expect(result).toBe("ok");
+    expect(result === "ok" || result.startsWith("ok:")).toBe(true);
   });
 
-  it("records exactly one annotation-layer call per non-panTo/clear op", () => {
+  it("records annotation-layer calls for draw ops", () => {
     for (const cmd of CMDS) {
       applyCommand(handle, cmd);
     }
@@ -113,7 +130,9 @@ describe("canvas-commands contract (TS<->Py dispatch + resolver guard)", () => {
       "drawPath", // plotParabola draws a path
       "label",
       "arrow",
-      // panTo does not touch `anno` — it only moves the view
+      // panTo does not touch `anno`
+      "setParabola",
+      "writeBlock",
       "clear",
     ]);
   });
