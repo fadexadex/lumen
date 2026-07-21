@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, Link } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { useTutorStore } from "@/lib/tutor-store";
 import { getLessonScript } from "@/lib/lesson-scripts";
 import { Whiteboard } from "./Whiteboard";
@@ -9,6 +9,7 @@ import { BlockMath } from "react-katex";
 import { insertMathOnBoard } from "@/lib/whiteboard-bridge";
 import { ConceptSwitcher } from "./ConceptSwitcher";
 import { getConcept, useDemoPlayer } from "@/lib/lesson-concepts";
+import { PathNavigator } from "@/components/tutor/PathNavigator";
 
 export function LessonRoute() {
   const { moduleId } = useParams({ from: "/lesson/$moduleId" });
@@ -50,6 +51,25 @@ export function LessonRoute() {
 
   const goto = (i: number) => setStep(moduleId, Math.max(0, Math.min(script.steps.length - 1, i)));
 
+  const moduleIndex = roadmap?.modules.findIndex((m) => m.id === moduleId) ?? -1;
+  const nextMod =
+    roadmap && moduleIndex >= 0 && moduleIndex < roadmap.modules.length - 1
+      ? roadmap.modules[moduleIndex + 1]
+      : null;
+  const goNextModule = () => {
+    if (!nextMod) {
+      navigate({ to: "/roadmap" });
+      return;
+    }
+    setStep(nextMod.id, 0);
+    navigate({ to: "/lesson/$moduleId", params: { moduleId: nextMod.id } });
+  };
+
+  const goToModule = (id: string) => {
+    setStep(id, 0);
+    navigate({ to: "/lesson/$moduleId", params: { moduleId: id } });
+  };
+
   const demoTick = useDemoPlayer({
     active: demoActive,
     stepIndex: safeIndex,
@@ -84,9 +104,18 @@ export function LessonRoute() {
       )}
 
       <header className="lesson-topbar">
-        <Link to="/roadmap" className="lesson-crumb">
-          <span aria-hidden>←</span> path
-        </Link>
+        {roadmap ? (
+          <PathNavigator
+            topic={roadmap.topic}
+            modules={roadmap.modules}
+            currentId={moduleId}
+            onSelect={goToModule}
+          />
+        ) : (
+          <button type="button" className="lesson-crumb" onClick={() => navigate({ to: "/" })}>
+            <span aria-hidden>←</span> path
+          </button>
+        )}
         <div className="lesson-title-wrap">
           <h1 className="tutor-serif lesson-title">{script.title}</h1>
           <p className="lesson-eyebrow">
@@ -106,7 +135,7 @@ export function LessonRoute() {
         </button>
       </header>
 
-      <div className={`concept-stage concept-stage--${concept.id}`} key={concept.id}>
+      <div className={`concept-stage concept-stage--${concept.id}`} key={`${concept.id}:${moduleId}`}>
         <ConceptView
           script={script}
           stepIndex={safeIndex}
@@ -115,6 +144,8 @@ export function LessonRoute() {
           demoActive={demoActive}
           onWriteMath={() => setShowMath(true)}
           onOpenLive={() => setLiveOpen(true)}
+          nextModule={nextMod ? { id: nextMod.id, title: nextMod.title } : null}
+          onNextModule={goNextModule}
         />
       </div>
 

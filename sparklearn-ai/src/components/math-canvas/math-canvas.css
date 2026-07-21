@@ -24,50 +24,100 @@
     linear-gradient(180deg, oklch(1 0 0), oklch(0.995 0 0));
   box-shadow:
     inset 0 0 0 1px oklch(0.9 0 0),
-    0 30px 80px oklch(0 0 0 / 0.04);
+    var(--elev-md);
 }
 
 .mc-lesson-layer {
   position: absolute; inset: 0;
-  font-family: var(--font-sans);
   color: var(--tutor-ink);
 }
 
+/*
+  Board type system
+  — Display titles: Instrument Serif
+  — Prose: Inter
+  — Math: Instrument Serif
+  — Chrome (controls/dock): Inter only — never serif
+*/
 .mc-title {
-  line-height: 1.05;
-  letter-spacing: -0.015em;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.022em;
   color: var(--tutor-ink);
 }
-.mc-title--h1 { font-size: 4.6rem; }
-.mc-title--h2 { font-size: 2.4rem; margin-top: 0.15em; }
+.mc-title--h1 {
+  font-size: clamp(2.8rem, 4.2vw, 4.1rem);
+  max-width: 18ch;
+}
+.mc-title--h2 {
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  color: oklch(0.28 0.01 55);
+}
 
 .mc-text {
-  font-size: 1.5rem;
-  line-height: 1.5;
-  max-width: 720px;
-  color: oklch(0.28 0 0);
   font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 1.15rem;
+  line-height: 1.55;
+  max-width: 36rem;
+  color: oklch(0.34 0.012 55);
+  letter-spacing: -0.011em;
 }
 
+/* Equations — same Instrument Serif voice as board titles */
 .mc-math {
-  font-size: 1.6rem;
+  display: inline-block;
+  max-width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   color: var(--tutor-ink);
 }
-.mc-math .katex { font-size: 1.6rem; }
+.mc-equation {
+  font-family: var(--font-serif);
+  font-size: 1.85rem;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  color: var(--tutor-ink);
+  white-space: pre-wrap;
+}
+.mc-equation-sup {
+  font-family: inherit;
+  font-size: 0.58em;
+  font-weight: 400;
+  vertical-align: super;
+  line-height: 0;
+}
+.mc-equation-sub {
+  font-family: inherit;
+  font-size: 0.55em;
+  font-weight: 400;
+  vertical-align: sub;
+  line-height: 0;
+  color: inherit;
+}
 
 .mc-options {
-  display: flex; flex-wrap: wrap; gap: 12px;
+  display: flex; flex-wrap: wrap; gap: 10px;
 }
 .mc-option {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 12px 18px; border-radius: 14px;
-  background: white;
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-radius: 12px;
+  background: oklch(1 0 0 / 0.72);
   border: 1px solid var(--tutor-line);
-  font-size: 1.15rem; color: var(--tutor-ink);
-  transition: all 0.18s var(--ease-tutor);
+  font-size: 1.05rem; color: var(--tutor-ink);
+  transition: border-color 0.16s var(--ease-tutor), background 0.16s var(--ease-tutor);
   cursor: pointer;
+  backdrop-filter: blur(6px);
 }
-.mc-option:hover { border-color: var(--tutor-accent); transform: translateY(-1px); }
+.mc-option:hover { border-color: oklch(0.78 0.13 70 / 0.7); background: white; }
 .mc-option[data-state="correct"] {
   border-color: oklch(0.7 0.15 145);
   background: oklch(0.96 0.05 145);
@@ -78,17 +128,23 @@
 }
 .mc-option-key {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; border-radius: 999px;
+  width: 28px; height: 28px; border-radius: 999px;
   background: var(--tutor-accent-soft); color: oklch(0.35 0.08 55);
+  font-family: var(--font-sans);
   font-weight: 600; font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.mc-option .mc-equation {
+  font-size: 1.45rem;
 }
 
 .mc-caret {
   display: inline-block;
-  width: 3px; height: 0.9em;
-  margin-left: 4px;
-  transform: translateY(0.14em);
+  width: 2px; height: 0.95em;
+  margin-left: 3px;
+  transform: translateY(0.12em);
   background: var(--tutor-accent);
+  border-radius: 1px;
   animation: mc-caret 0.9s steps(2) infinite;
 }
 @keyframes mc-caret { 50% { opacity: 0; } }
@@ -117,71 +173,124 @@
 /* Ink + notes */
 .mc-ink { position: absolute; inset: 0; touch-action: none; }
 .mc-notes { position: absolute; inset: 0; }
-.mc-note { position: absolute; font-family: var(--font-serif); }
+.mc-note { position: absolute; font-family: var(--font-hand); font-weight: 500; }
 .mc-note-input {
   min-height: 2rem; min-width: 10rem;
   resize: none;
   border: 1px dashed oklch(0.7 0 0);
   background: oklch(1 0 0 / 0.9);
   padding: 4px 6px;
-  font-size: 1.25rem; color: var(--tutor-ink);
+  font-family: var(--font-hand);
+  font-weight: 500;
+  font-size: 1.45rem; color: var(--tutor-ink);
   outline: none;
   border-radius: 6px;
 }
-.mc-note-text { white-space: pre-wrap; font-size: 1.25rem; color: var(--tutor-ink); }
+.mc-note-text { white-space: pre-wrap; font-size: 1.45rem; color: var(--tutor-ink); }
 
 /* Tool rail */
 .mc-toolrail {
   position: absolute;
-  left: 16px; top: 50%;
+  left: var(--space-16); top: 50%;
   transform: translateY(-50%);
-  z-index: 30;
-  display: flex; flex-direction: column; gap: 4px;
-  padding: 8px;
+  z-index: var(--z-chrome);
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-8);
   background: white;
   border: 1px solid var(--tutor-line);
   border-radius: 18px;
-  box-shadow: 0 20px 40px oklch(0 0 0 / 0.06);
+  box-shadow: var(--elev-sm);
 }
 .mc-tool {
   display: inline-flex; align-items: center; justify-content: center;
   width: 40px; height: 40px; border-radius: 12px;
   color: oklch(0.35 0 0);
-  transition: all 0.16s var(--ease-tutor);
+  transition: background 0.16s var(--ease-tutor), color 0.16s var(--ease-tutor);
   cursor: pointer;
 }
 .mc-tool:hover { background: oklch(0.96 0 0); }
 .mc-tool[data-active="true"] {
   background: var(--tutor-ink); color: white;
 }
-.mc-toolrail-sep { height: 1px; background: var(--tutor-line); margin: 4px 2px; }
+.mc-toolrail-sep { height: 1px; background: var(--tutor-line); margin: var(--space-4) var(--space-2); }
 
 /* Bottom controls */
 .mc-controls {
-  position: absolute; left: 50%; bottom: 22px;
+  position: absolute; left: 50%;
+  /* Sit above the concept switcher dock — generous chrome stack */
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
-  z-index: 30;
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 8px 12px;
+  z-index: var(--z-chrome);
+  display: inline-flex; align-items: center; gap: var(--space-8);
+  padding: var(--space-8) var(--space-12);
   background: white;
   border: 1px solid var(--tutor-line);
   border-radius: 999px;
-  box-shadow: 0 24px 60px oklch(0 0 0 / 0.08);
-  max-width: min(920px, calc(100vw - 32px));
+  box-shadow: var(--elev-md);
+  /* Leave a right gutter so zoom never sits under the rail */
+  max-width: min(44rem, calc(100vw - 11.5rem));
+  font-family: var(--font-sans);
 }
 .mc-ctrl {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 40px; height: 40px; padding: 0 14px;
   border-radius: 999px;
+  font-family: var(--font-sans);
   font-size: 1rem; color: oklch(0.3 0 0);
-  transition: all 0.16s var(--ease-tutor);
+  transition: background 0.16s var(--ease-tutor), color 0.16s var(--ease-tutor);
   cursor: pointer; white-space: nowrap;
 }
 .mc-ctrl:hover:not(:disabled) { background: oklch(0.96 0 0); }
 .mc-ctrl:disabled { opacity: 0.35; cursor: default; }
 .mc-ctrl--primary { background: var(--tutor-ink); color: white; }
-.mc-ctrl--primary:hover:not(:disabled) { background: oklch(0.28 0 0); }
+.mc-ctrl--primary:hover:not(:disabled) { background: oklch(0.28 0 0); color: white; }
 .mc-ctrl--ghost { border: 1px solid var(--tutor-line); }
+/* Finished state: play slot becomes Continue — same reach target, quieter than a banner */
+.mc-ctrl--continue {
+  background: var(--tutor-ink);
+  color: white;
+  width: auto;
+  min-width: 44px;
+  padding: 0 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+/* Must beat .mc-ctrl:hover:not(:disabled) specificity or white label washes out on gray */
+.mc-ctrl--continue:hover:not(:disabled) {
+  background: oklch(0.28 0 0);
+  color: white;
+}
+.mc-continue-hint {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 11rem;
+  padding: 0 4px;
+  min-width: 0;
+  color: var(--tutor-muted);
+  pointer-events: none;
+}
+.mc-continue-hint-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.mc-continue-hint-title {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--tutor-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.mc-controls[data-finished] .mc-progress-tick[data-done="true"],
+.mc-controls[data-finished] .mc-progress-tick[data-active="true"] {
+  background: var(--tutor-accent);
+}
 .mc-ctrl--live {
   background: var(--tutor-accent-soft);
   color: oklch(0.35 0.08 55);
@@ -220,11 +329,13 @@
 .mc-count { font-size: 0.85rem; color: var(--tutor-muted); font-variant-numeric: tabular-nums; padding: 0 4px; }
 .mc-count { white-space: nowrap; }
 
-/* Full-viewport ink layer — allows drawing anywhere, not just on the board */
-.mc-ink-layer {
+/* Full-viewport ink + text — annotate anywhere, not just on the board */
+.mc-ink-layer,
+.mc-notes-layer {
   position: absolute; inset: 0; z-index: 15;
 }
 .mc-ink-layer .mc-ink { position: absolute; left: 0; top: 0; }
+.mc-notes-layer .mc-notes { position: absolute; left: 0; top: 0; }
 
 /* Instant tooltip for the tool rail (no browser 500ms delay) */
 .mc-tool { position: relative; }
@@ -243,32 +354,131 @@
   opacity: 1; transform: translateY(-50%) translateX(0);
 }
 
-/* Zoom */
+/* Zoom — quiet chip, bottom-right (Figma / Excalidraw habit) */
 .mc-zoom {
-  position: absolute; right: 18px; bottom: 22px;
-  z-index: 30;
-  display: inline-flex; align-items: center;
-  background: white;
-  border: 1px solid var(--tutor-line);
+  position: absolute;
+  right: 14px;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: var(--z-dock, 40);
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  background: oklch(0.98 0 0 / 0.72);
+  border: 1px solid oklch(0.9 0 0 / 0.7);
   border-radius: 999px;
-  box-shadow: 0 20px 40px oklch(0 0 0 / 0.06);
-  padding: 4px;
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+  opacity: 0.55;
+  transition: opacity 0.18s var(--ease-tutor), background 0.18s var(--ease-tutor);
+}
+.mc-zoom:hover,
+.mc-zoom:focus-within {
+  opacity: 1;
+  background: oklch(1 0 0 / 0.92);
+  border-color: var(--tutor-line);
 }
 .mc-zoom button {
-  min-width: 36px; height: 32px;
+  min-width: 22px;
+  height: 22px;
   border-radius: 999px;
-  font-size: 0.9rem; color: oklch(0.3 0 0);
-  padding: 0 8px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: oklch(0.42 0 0);
+  padding: 0 4px;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
-.mc-zoom button:hover { background: oklch(0.96 0 0); }
+.mc-zoom button:hover { background: oklch(0.94 0 0); color: var(--tutor-ink); }
+.mc-zoom-fit {
+  min-width: 2.4rem !important;
+  padding: 0 5px !important;
+  font-size: 0.65rem !important;
+  letter-spacing: -0.02em;
+  color: var(--tutor-muted) !important;
+}
+.mc-zoom-fit:hover { color: var(--tutor-ink) !important; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1200px) {
+  .mc-continue-hint { display: none; }
+  .mc-controls { max-width: min(36rem, calc(100vw - 10.5rem)); gap: 8px; }
+}
+
+@media (max-width: 1100px) {
+  .mc-title--h1 { font-size: clamp(2.4rem, 5vw, 3.4rem); }
+  .mc-title--h2 { font-size: 1.35rem; }
+  .mc-text { font-size: 1.08rem; max-width: 34rem; }
+  .mc-equation { font-size: 1.75rem; }
+  .mc-controls {
+    max-width: min(34rem, calc(100vw - 2rem));
+  }
+}
+
+@media (max-width: 900px) {
+  .mc-ctrl--ghost { display: none; }
+  .mc-ctrl-sep--end { display: none; }
+  .mc-controls { gap: 6px; padding: 7px 10px; }
+  .mc-zoom { right: 10px; }
+}
 
 @media (max-width: 720px) {
-  .mc-toolrail { left: 8px; padding: 6px; }
+  .mc-toolrail {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: calc(148px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    flex-direction: row;
+    padding: 6px;
+    gap: 2px;
+  }
+  .mc-toolrail-sep {
+    width: 1px; height: 24px; margin: 2px 4px;
+  }
   .mc-tool { width: 36px; height: 36px; }
-  .mc-controls { bottom: 14px; padding: 6px 8px; gap: 6px; }
-  .mc-ctrl { min-width: 36px; height: 36px; padding: 0 10px; font-size: 0.9rem; }
+  .mc-tool[data-tip]::after { display: none; }
+
+  .mc-controls {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    padding: 6px 8px;
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: calc(100vw - 1.25rem);
+  }
+  .mc-controls::-webkit-scrollbar { display: none; }
+  .mc-ctrl { min-width: 34px; height: 34px; padding: 0 8px; font-size: 0.85rem; }
+  .mc-ctrl--continue { padding: 0 12px; font-size: 0.78rem; }
   .mc-ctrl--ghost { display: none; }
-  .mc-zoom { right: 8px; bottom: 14px; }
+  .mc-continue-hint { display: none; }
+  .mc-ctrl-sep { display: none; }
+  .mc-count { font-size: 0.75rem; padding: 0 2px; }
+  .mc-progress { gap: 3px; }
+  .mc-progress-tick { width: 18px; }
+
+  .mc-zoom {
+    right: 10px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  .mc-zoom button { min-width: 20px; height: 20px; font-size: 0.65rem; }
+
+  .mc-title--h1 { font-size: 2.4rem; }
+  .mc-title--h2 { font-size: 1.2rem; }
+  .mc-text { font-size: 1.02rem; max-width: 30rem; line-height: 1.5; }
+  .mc-math { padding: 0; }
+  .mc-equation { font-size: 1.45rem; }
+  .mc-option { padding: 10px 12px; border-radius: 12px; }
+  .mc-option .mc-equation { font-size: 1.2rem; }
+  .mc-options { gap: 8px; }
+}
+
+@media (max-width: 420px) {
+  .mc-toolrail { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
+  .mc-controls { gap: 2px; padding: 5px 6px; }
+  .mc-progress { display: none; }
+  .mc-zoom { display: none; }
 }

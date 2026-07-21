@@ -10,88 +10,102 @@ export type Beat =
 export const BOARD_W = 1600;
 export const BOARD_H = 1000;
 
-const LEFT_X = 80;
-const COL_W = 720;
-const LINE_H = 44;
-const H1_H = 90;
-const H2_H = 60;
-const MATH_H = 78;
-const GAP = 24;
+/* 4pt-ish rhythm tuned for Inter prose + serif math (not Caveat costume) */
+const LEFT_X = 88;
+const COL_W = 680;
+const LINE_H = 34;
+const H1_H = 68;
+const H2_H = 40;
+const MATH_H = 58;
+const INTRA = 12; // tight: heading → body / body → math
+const SECTION = 48; // generous: between lesson sections
+const QUIZ_GAP = 56;
 
 function measure(step: LessonStep): number {
-  const titleH = H2_H;
   if (step.kind === "explanation") {
-    const bodyLines = Math.max(1, Math.ceil(step.body.length / 58));
-    return titleH + bodyLines * LINE_H + (step.math ? MATH_H : 0) + GAP;
+    const bodyLines = Math.max(1, Math.ceil(step.body.length / 62));
+    return H2_H + INTRA + bodyLines * LINE_H + (step.math ? INTRA + MATH_H : 0) + SECTION;
   }
   if (step.kind === "example") {
-    return titleH + step.lines.reduce((a, l) => a + (l.math ? MATH_H : LINE_H * Math.max(1, Math.ceil((l.text ?? "").length / 58))), 0) + GAP;
+    const lines = step.lines.reduce(
+      (a, l) => a + (l.math ? MATH_H + 8 : LINE_H * Math.max(1, Math.ceil((l.text ?? "").length / 62))),
+      0,
+    );
+    return H2_H + INTRA + lines + SECTION;
   }
-  return titleH + LINE_H * Math.max(1, Math.ceil(step.prompt.length / 58)) + (step.math ? MATH_H : 0) + (step.options ? 80 : 0) + GAP;
+  return (
+    H2_H +
+    INTRA +
+    LINE_H * Math.max(1, Math.ceil(step.prompt.length / 62)) +
+    (step.math ? INTRA + MATH_H : 0) +
+    (step.options ? QUIZ_GAP : 0) +
+    SECTION
+  );
 }
 
 export function layoutScript(script: LessonScript): { beats: Beat[]; height: number } {
   const beats: Beat[] = [];
-  let y = 90;
+  let y = 72;
 
-  // Big lesson title
-  beats.push({ kind: "title", text: script.title, x: LEFT_X, y: y, size: "h1", step: 0 });
-  y += H1_H + GAP;
+  beats.push({ kind: "title", text: script.title, x: LEFT_X, y, size: "h1", step: 0 });
+  y += H1_H + SECTION;
 
   script.steps.forEach((step, i) => {
     const startY = y;
-    // step title
     beats.push({ kind: "title", text: step.title, x: LEFT_X, y, size: "h2", step: i });
-    y += H2_H;
+    y += H2_H + INTRA;
 
     if (step.kind === "explanation") {
-      beats.push({ kind: "text", text: step.body, x: LEFT_X + 20, y, size: "body", step: i });
-      const bodyLines = Math.max(1, Math.ceil(step.body.length / 58));
+      beats.push({ kind: "text", text: step.body, x: LEFT_X, y, size: "body", step: i });
+      const bodyLines = Math.max(1, Math.ceil(step.body.length / 62));
       y += bodyLines * LINE_H;
       if (step.math) {
-        beats.push({ kind: "math", latex: step.math, x: LEFT_X + 40, y, step: i });
+        y += INTRA;
+        beats.push({ kind: "math", latex: step.math, x: LEFT_X, y, step: i });
         y += MATH_H;
       }
     } else if (step.kind === "example") {
-      step.lines.forEach((l) => {
+      step.lines.forEach((l, li) => {
+        if (li > 0) y += 14;
         if (l.math) {
-          beats.push({ kind: "math", latex: l.math, x: LEFT_X + 40, y, step: i });
+          beats.push({ kind: "math", latex: l.math, x: LEFT_X, y, step: i });
           y += MATH_H;
         } else if (l.text) {
-          beats.push({ kind: "text", text: l.text, x: LEFT_X + 20, y, size: "body", step: i });
-          y += LINE_H * Math.max(1, Math.ceil(l.text.length / 58));
+          beats.push({ kind: "text", text: l.text, x: LEFT_X, y, size: "body", step: i });
+          y += LINE_H * Math.max(1, Math.ceil(l.text.length / 62));
         }
       });
     } else {
-      beats.push({ kind: "text", text: step.prompt, x: LEFT_X + 20, y, size: "body", step: i });
-      y += LINE_H * Math.max(1, Math.ceil(step.prompt.length / 58));
+      beats.push({ kind: "text", text: step.prompt, x: LEFT_X, y, size: "body", step: i });
+      y += LINE_H * Math.max(1, Math.ceil(step.prompt.length / 62));
       if (step.math) {
-        beats.push({ kind: "math", latex: step.math, x: LEFT_X + 40, y, step: i });
+        y += INTRA;
+        beats.push({ kind: "math", latex: step.math, x: LEFT_X, y, step: i });
         y += MATH_H;
       }
       if (step.options) {
-        beats.push({ kind: "options", options: step.options, answer: step.answer, x: LEFT_X + 20, y, step: i });
-        y += 90;
+        y += 20;
+        beats.push({ kind: "options", options: step.options, answer: step.answer, x: LEFT_X, y, step: i });
+        y += 88;
       }
     }
-    y = startY + measure(step);
+    y = Math.max(y + SECTION * 0.25, startY + measure(step));
   });
 
-  // Right-column diagram (parabola) if available
   if (script.diagram?.parabola) {
     beats.push({
       kind: "diagram",
       widget: "parabola",
-      x: LEFT_X + COL_W + 80,
-      y: 180,
-      w: 640,
-      h: 640,
+      x: LEFT_X + COL_W + 72,
+      y: 160,
+      w: 620,
+      h: 600,
       step: Math.min(2, script.steps.length - 1),
       params: script.diagram.parabola,
     });
   }
 
-  return { beats, height: Math.max(BOARD_H, y + 120) };
+  return { beats, height: Math.max(BOARD_H, y + 100) };
 }
 
 export function beatCharCount(b: Beat): number {

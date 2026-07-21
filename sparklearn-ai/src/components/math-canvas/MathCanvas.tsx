@@ -1,14 +1,115 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { InlineMath } from "react-katex";
 import type { LessonScript } from "@/lib/types";
 import { InkCanvas, type InkHandle, type MCTool } from "./ink-canvas";
 import { TextNotes, type NotesHandle } from "./text-notes";
 import { ParabolaWidget } from "./parabola-widget";
 import { layoutScript, BOARD_W, type Beat } from "./layout";
+import { Equation, toHandMath } from "./equation";
+import { useBeatPlayer } from "./use-beat-player";
 
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 3;
-const CHAR_MS = 18;
+
+type Pad = { left: number; right: number; top: number; bottom: number };
+
+/** Chrome insets — tighten on small screens so the board stays readable. */
+function chromePad(el: HTMLElement): Pad {
+  const w = el.clientWidth;
+  const safeBottom = 0; // CSS also applies env(safe-area); keep JS pads for layout math
+  if (w < 520) {
+    return { left: 16, right: 16, top: 72, bottom: 176 + safeBottom };
+  }
+  if (w < 720) {
+    return { left: 56, right: 20, top: 80, bottom: 160 + safeBottom };
+  }
+  if (w < 1100) {
+    return { left: 72, right: 56, top: 88, bottom: 148 };
+  }
+  return { left: 96, right: 96, top: 96, bottom: 136 };
+}
+
+type Bounds = { x: number; y: number; w: number; h: number };
+type View = { x: number; y: number; scale: number };
+
+function estimateBeatBox(beat: Beat): Bounds {
+  if (beat.kind === "title") {
+    return { x: beat.x, y: beat.y, w: beat.size === "h1" ? 900 : 640, h: beat.size === "h1" ? 72 : 44 };
+  }
+  if (beat.kind === "text") {
+    const lines = Math.max(1, Math.ceil(beat.text.length / 62));
+    return { x: beat.x, y: beat.y, w: 640, h: 34 * lines };
+  }
+  if (beat.kind === "math") return { x: beat.x, y: beat.y, w: 520, h: 56 };
+  if (beat.kind === "options") return { x: beat.x, y: beat.y, w: 620, h: 100 };
+  return { x: beat.x, y: beat.y, w: beat.w, h: beat.h };
+}
+
+function unionBounds(beats: Beat[], boardH: number): Bounds {
+  if (beats.length === 0) return { x: 0, y: 0, w: BOARD_W, h: boardH };
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const beat of beats) {
+    const b = estimateBeatBox(beat);
+    minX = Math.min(minX, b.x);
+    minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.w);
+    maxY = Math.max(maxY, b.y + b.h);
+  }
+  const margin = 48;
+  return {
+    x: Math.max(0, minX - margin),
+    y: Math.max(0, minY - margin),
+    w: Math.min(BOARD_W, maxX + margin) - Math.max(0, minX - margin),
+    h: Math.min(boardH, maxY + margin) - Math.max(0, minY - margin),
+  };
+}
+
+/** Fit + center bounds. On narrow screens, prioritize readable width and let the user pan vertically. */
+function fitOverview(el: HTMLElement, bounds: Bounds): View {
+  const pad = chromePad(el);
+  const availW = Math.max(120, el.clientWidth - pad.left - pad.right);
+  const availH = Math.max(120, el.clientHeight - pad.top - pad.bottom);
+  const narrow = el.clientWidth < 720;
+
+  let scale: number;
+  if (narrow) {
+    // Width-first: keep handwriting readable; vertical overflow is pannable
+    scale = Math.min(1.05, availW / Math.max(bounds.w, 1));
+  } else {
+    scale = Math.min(1, availW / bounds.w, availH / bounds.h);
+  }
+
+  const x = pad.left + (availW - bounds.w * scale) / 2 - bounds.x * scale;
+  const y = narrow
+    ? pad.top - bounds.y * scale + 8
+    : pad.top + (availH - bounds.h * scale) / 2 - bounds.y * scale;
+  return { x, y, scale };
+}
+
+/** Soft follow: only nudge if the active beat sits outside a safe inset. */
+function ensureInView(el: HTMLElement, view: View, beat: Beat): View {
+  const pad = chromePad(el);
+  const box = estimateBeatBox(beat);
+  const left = view.x + box.x * view.scale;
+  const top = view.y + box.y * view.scale;
+  const right = left + box.w * view.scale;
+  const bottom = top + box.h * view.scale;
+  const inset = {
+    l: pad.left + 16,
+    r: el.clientWidth - pad.right - 16,
+    t: pad.top + 16,
+    b: el.clientHeight - pad.bottom - 16,
+  };
+
+  let dx = 0;
+  let dy = 0;
+  if (left < inset.l) dx = inset.l - left;
+  else if (right > inset.r) dx = inset.r - right;
+  if (top < inset.t) dy = inset.t - top;
+  else if (bottom > inset.b) dy = inset.b - bottom;
+
+  if (dx === 0 && dy === 0) return view;
+  return { ...view, x: view.x + dx, y: view.y + dy };
+}
 
 export interface MathCanvasProps {
   script: LessonScript;
@@ -17,24 +118,30 @@ export interface MathCanvasProps {
   demoActive: boolean;
   onWriteMath: () => void;
   onOpenLive: () => void;
+  nextModule?: { id: string; title: string } | null;
+  onNextModule?: () => void;
 }
 
 export function MathCanvas(props: MathCanvasProps) {
-  const { script, stepIndex, goto, onWriteMath } = props;
+  const { script, stepIndex, goto, onWriteMath, nextModule, onNextModule } = props;
   const [tool, setTool] = useState<MCTool>("pan");
+  const [picked, setPicked] = useState<Record<number, number>>({});
+  const [vp, setVp] = useState({ w: 0, h: 0 });
+  const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
+  const [spaceDown, setSpaceDown] = useState(false);
+
   const inkRef = useRef<InkHandle | null>(null);
   const notesRef = useRef<NotesHandle | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const viewRef = useRef(view);
   viewRef.current = view;
+  const fittedKeyRef = useRef<string | null>(null);
+  const lastFitVpRef = useRef({ w: 0, h: 0 });
+  const panning = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
 
   const { beats, height: BOARD_H } = useMemo(() => layoutScript(script), [script]);
-  // Per-option answer state, keyed by beat index
-  const [picked, setPicked] = useState<Record<number, number>>({});
 
   // Viewport size (for full-screen ink layer)
-  const [vp, setVp] = useState({ w: 0, h: 0 });
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
@@ -44,70 +151,62 @@ export function MathCanvas(props: MathCanvasProps) {
     return () => ro.disconnect();
   }, []);
 
-  // Playback state: auto-plays every step; pause/next/restart mimic reference
-  const [playing, setPlaying] = useState(true);
-  const playingRef = useRef(true);
-  useEffect(() => { playingRef.current = playing; }, [playing]);
+  // Playback — timer-based +1 char typewriter (same model as math-canvas-ai)
+  const player = useBeatPlayer({
+    beats,
+    stepIndex,
+    totalSteps: script.steps.length,
+    lessonKey: script.moduleId,
+    onAdvanceStep: () => goto(stepIndex + 1),
+  });
+  const { state: playerState, play, pause, restart, next, charsFor } = player;
 
-  // Reveal state: which beats are visible for the current stepIndex
-  const visibleBeats = useMemo(() => beats.filter((b) => b.step <= stepIndex), [beats, stepIndex]);
   const activeBeats = useMemo(() => beats.filter((b) => b.step === stepIndex), [beats, stepIndex]);
+  const visibleBeats = useMemo(
+    () =>
+      beats.filter((b, i) => {
+        if (b.step > stepIndex) return false;
+        if (b.step < stepIndex) return true;
+        if (b.kind === "options" || b.kind === "diagram") return playerState.stepDone;
+        if (i === playerState.activeBeatIndex) return true;
+        return charsFor(i) > 0;
+      }),
+    [beats, stepIndex, playerState.stepDone, playerState.activeBeatIndex, charsFor],
+  );
 
-  // typewriter for beats of the newly-revealed step (always on; pausable)
-  const [chars, setChars] = useState<Record<number, number>>({});
-  const [stepDone, setStepDone] = useState(false);
-  useEffect(() => {
-    setChars({});
-    setStepDone(false);
-    const typingBeats = beats
-      .map((b, i) => ({ b, i }))
-      .filter(({ b }) => b.step === stepIndex && (b.kind === "title" || b.kind === "text" || b.kind === "math"));
-    let cancelled = false;
-    (async () => {
-      for (const { b, i } of typingBeats) {
-        const total = b.kind === "math" ? (b as any).latex.length : (b as any).text.length;
-        for (let n = 0; n <= total; n += 2) {
-          if (cancelled) return;
-          while (!playingRef.current && !cancelled) {
-            // eslint-disable-next-line no-await-in-loop
-            await new Promise((r) => setTimeout(r, 100));
-          }
-          setChars((c) => ({ ...c, [i]: n }));
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise((r) => setTimeout(r, CHAR_MS));
-        }
-      }
-      if (!cancelled) setStepDone(true);
-    })();
-    return () => { cancelled = true; };
-  }, [stepIndex, beats]);
-
-  // Auto-advance to next step when current step finishes typing (like reference)
-  useEffect(() => {
-    if (!playing || !stepDone) return;
-    if (stepIndex >= script.steps.length - 1) { setPlaying(false); return; }
-    const t = setTimeout(() => goto(stepIndex + 1), 650);
-    return () => clearTimeout(t);
-  }, [stepDone, playing, stepIndex, script.steps.length, goto]);
-
-  // Fit to viewport and top-align on mount / script change
-  useEffect(() => {
+  // Full-lesson overview: fit all content into view.
+  // Re-fits on script change and significant viewport changes (orientation / resize).
+  const applyOverview = () => {
     const el = viewportRef.current;
-    if (!el) return;
-    const padTop = 96; // clear the topbar
-    const scale = Math.min(1, (el.clientWidth - 160) / BOARD_W);
-    setView({ scale, x: (el.clientWidth - BOARD_W * scale) / 2, y: padTop });
-  }, [BOARD_H]);
+    if (!el || el.clientWidth === 0 || el.clientHeight === 0) return;
+    setView(fitOverview(el, unionBounds(beats, BOARD_H)));
+  };
 
-  // Bring active step near the top of the viewport when it changes
+  useEffect(() => {
+    if (vp.w === 0 || vp.h === 0) return;
+    const scriptKey = `${script.title}:${BOARD_H}:${beats.length}`;
+    const last = lastFitVpRef.current;
+    const scriptChanged = fittedKeyRef.current !== scriptKey;
+    const sizeChanged =
+      last.w === 0 ||
+      Math.abs(vp.w - last.w) > 64 ||
+      Math.abs(vp.h - last.h) > 64;
+    if (!scriptChanged && !sizeChanged) return;
+    fittedKeyRef.current = scriptKey;
+    lastFitVpRef.current = { w: vp.w, h: vp.h };
+    applyOverview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [BOARD_H, beats, script.title, vp.w, vp.h]);
+
+  // Soft-follow the active step — only nudge if it would leave the safe inset
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
     const first = activeBeats[0];
     if (!first) return;
-    const v = viewRef.current;
-    const targetY = 140 - first.y * v.scale;
-    setView({ ...v, y: targetY });
+    // Skip until the initial overview has been applied
+    if (!fittedKeyRef.current) return;
+    setView((v) => ensureInView(el, v, first));
   }, [stepIndex, activeBeats]);
 
   // Wheel: pinch-zoom or pan
@@ -122,9 +221,9 @@ export function MathCanvas(props: MathCanvasProps) {
       const v = viewRef.current;
       if (e.ctrlKey || e.metaKey) {
         const factor = Math.exp(-e.deltaY * 0.01);
-        const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale * factor));
-        const k = next / v.scale;
-        setView({ scale: next, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k });
+        const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale * factor));
+        const k = nextScale / v.scale;
+        setView({ scale: nextScale, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k });
       } else {
         setView({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY });
       }
@@ -133,9 +232,7 @@ export function MathCanvas(props: MathCanvasProps) {
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  // Pan drag
-  const panning = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
-  const [spaceDown, setSpaceDown] = useState(false);
+  // Space-to-pan
   useEffect(() => {
     const d = (e: KeyboardEvent) => { if (e.code === "Space" && !e.repeat) setSpaceDown(true); };
     const u = (e: KeyboardEvent) => { if (e.code === "Space") setSpaceDown(false); };
@@ -143,6 +240,7 @@ export function MathCanvas(props: MathCanvasProps) {
     window.addEventListener("keyup", u);
     return () => { window.removeEventListener("keydown", d); window.removeEventListener("keyup", u); };
   }, []);
+
   const panActive = tool === "pan" || spaceDown;
   const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!(panActive || e.button === 1)) return;
@@ -163,26 +261,38 @@ export function MathCanvas(props: MathCanvasProps) {
     if (!el) return;
     const cx = el.clientWidth / 2, cy = el.clientHeight / 2;
     const v = viewRef.current;
-    const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale * f));
-    const k = next / v.scale;
-    setView({ scale: next, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k });
+    const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale * f));
+    const k = nextScale / v.scale;
+    setView({ scale: nextScale, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k });
   };
   const resetView = () => {
-    const el = viewportRef.current;
-    if (!el) return;
-    const scale = Math.min(1, (el.clientWidth - 160) / BOARD_W);
-    setView({ scale, x: (el.clientWidth - BOARD_W * scale) / 2, y: 96 });
+    applyOverview();
   };
 
   const total = script.steps.length;
 
-  const onRestart = () => { goto(0); setPlaying(true); };
-  const onNext = () => {
-    // If typewriter still running, first jump to end of current step
-    if (!stepDone) { setStepDone(true); setChars({}); return; }
-    if (stepIndex < total - 1) goto(stepIndex + 1);
+  const onRestart = () => {
+    // Step change resets the playhead; only call restart when already on step 0
+    if (stepIndex !== 0) {
+      goto(0);
+      return;
+    }
+    restart();
   };
-  const onPrev = () => { if (stepIndex > 0) goto(stepIndex - 1); };
+  const onNext = () => next();
+  const onPrev = () => {
+    if (stepIndex > 0) goto(stepIndex - 1);
+  };
+  const onTogglePlay = () => {
+    if (playerState.finished) {
+      // Full replay from the start so pause/play works again
+      if (stepIndex !== 0) goto(0);
+      else play();
+      return;
+    }
+    if (playerState.playing) pause();
+    else play();
+  };
 
   return (
     <div
@@ -200,26 +310,40 @@ export function MathCanvas(props: MathCanvasProps) {
       >
         <div className="mc-board" style={{ width: BOARD_W, height: BOARD_H }}>
           <div className="mc-lesson-layer" style={{ pointerEvents: "none" }}>
-            {visibleBeats.map((b, i) => (
-              <BeatView
-                key={i}
-                beat={b}
-                beatIndex={beats.indexOf(b)}
-                charsRevealed={chars[beats.indexOf(b)] ?? Infinity}
-                picked={picked}
-                onPick={(bi, oi) => setPicked((p) => ({ ...p, [bi]: oi }))}
-              />
-            ))}
+            {visibleBeats.map((b) => {
+              const beatIndex = beats.indexOf(b);
+              return (
+                <BeatView
+                  key={beatIndex}
+                  beat={b}
+                  beatIndex={beatIndex}
+                  charsRevealed={charsFor(beatIndex)}
+                  active={beatIndex === playerState.activeBeatIndex && !playerState.stepDone && !playerState.finished}
+                  picked={picked}
+                  onPick={(bi, oi) => setPicked((p) => ({ ...p, [bi]: oi }))}
+                />
+              );
+            })}
           </div>
-          <TextNotes tool={tool} width={BOARD_W} height={BOARD_H} overlayRef={notesRef} />
         </div>
       </div>
 
-      {/* Full-viewport ink layer — draw anywhere, not just on the board */}
+      {/* Full-viewport ink + text — annotate anywhere, not just the board */}
       {vp.w > 0 && (
-        <div className="mc-ink-layer" style={{ pointerEvents: tool === "pen" || tool === "highlighter" || tool === "eraser" ? "auto" : "none" }}>
-          <InkCanvas ref={inkRef} width={vp.w} height={vp.h} tool={tool} />
-        </div>
+        <>
+          <div
+            className="mc-ink-layer"
+            style={{ pointerEvents: tool === "pen" || tool === "highlighter" || tool === "eraser" ? "auto" : "none" }}
+          >
+            <InkCanvas ref={inkRef} width={vp.w} height={vp.h} tool={tool} />
+          </div>
+          <div
+            className="mc-notes-layer"
+            style={{ pointerEvents: tool === "text" ? "auto" : "none" }}
+          >
+            <TextNotes tool={tool} width={vp.w} height={vp.h} overlayRef={notesRef} />
+          </div>
+        </>
       )}
 
       {/* Left tool rail */}
@@ -233,19 +357,41 @@ export function MathCanvas(props: MathCanvasProps) {
         <ToolBtn onClick={() => { inkRef.current?.clear(); notesRef.current?.clear(); }} label="Clear notes"><TrashI /></ToolBtn>
       </div>
 
-      {/* Bottom lesson controls — restart / play-pause / next like the reference */}
-      <div className="mc-controls" data-no-pan>
-        <button className="mc-ctrl" onClick={onRestart} aria-label="Restart" title="Restart">↺</button>
+      {/* Bottom lesson controls — next topic lives here (thumb reach), not as a floating banner */}
+      <div className="mc-controls" data-no-pan data-finished={playerState.finished || undefined}>
+        <button className="mc-ctrl" onClick={onRestart} aria-label="Restart" title="Restart lesson">↺</button>
         <button className="mc-ctrl" onClick={onPrev} disabled={stepIndex === 0} aria-label="Previous step" title="Previous">‹</button>
+        {playerState.finished ? (
+          <button
+            className="mc-ctrl mc-ctrl--continue"
+            onClick={() => onNextModule?.()}
+            aria-label={nextModule ? `Continue to ${nextModule.title}` : "Back to path"}
+            title={nextModule ? `Continue · ${nextModule.title}` : "Back to path"}
+          >
+            {nextModule ? "Continue" : "Path"}
+          </button>
+        ) : (
+          <button
+            className="mc-ctrl mc-ctrl--primary"
+            onClick={onTogglePlay}
+            aria-label={playerState.playing ? "Pause" : "Play"}
+            title={playerState.playing ? "Pause" : "Play"}
+          >
+            {playerState.playing ? "❚❚" : "▶"}
+          </button>
+        )}
         <button
-          className="mc-ctrl mc-ctrl--primary"
-          onClick={() => setPlaying((p) => !p)}
-          aria-label={playing ? "Pause" : "Play"}
-          title={playing ? "Pause" : "Play"}
+          className="mc-ctrl"
+          onClick={() => {
+            // › is step control only while learning; module jump only after the lesson ends
+            if (playerState.finished) onNextModule?.();
+            else onNext();
+          }}
+          aria-label={playerState.finished ? (nextModule ? "Next topic" : "Back to path") : "Next step"}
+          title={playerState.finished ? (nextModule ? `Next: ${nextModule.title}` : "Back to path") : "Next step"}
         >
-          {playing ? "❚❚" : "▶"}
+          ›
         </button>
-        <button className="mc-ctrl" onClick={onNext} disabled={stepIndex >= total - 1 && stepDone} aria-label="Next step" title="Next">›</button>
         <span className="mc-ctrl-sep" />
         <div className="mc-progress">
           {script.steps.map((s, i) => (
@@ -253,48 +399,70 @@ export function MathCanvas(props: MathCanvasProps) {
           ))}
         </div>
         <div className="mc-count">{stepIndex + 1} / {total}</div>
-        <span className="mc-ctrl-sep" />
+        {playerState.finished && nextModule ? (
+          <span className="mc-continue-hint" title={nextModule.title}>
+            <span className="mc-continue-hint-label">up next</span>
+            <span className="mc-continue-hint-title">{nextModule.title}</span>
+          </span>
+        ) : null}
+        <span className="mc-ctrl-sep mc-ctrl-sep--end" />
         <button className="mc-ctrl mc-ctrl--ghost" onClick={onWriteMath}>✏️ write math</button>
       </div>
 
       {/* Zoom */}
       <div className="mc-zoom" data-no-pan>
-        <button onClick={() => zoomBy(1 / 1.2)} title="Zoom out">−</button>
-        <button onClick={resetView} title="Fit">{Math.round(view.scale * 100)}%</button>
-        <button onClick={() => zoomBy(1.2)} title="Zoom in">+</button>
+        <button type="button" onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out" title="Zoom out">−</button>
+        <button type="button" className="mc-zoom-fit" onClick={resetView} aria-label="Fit board" title="Fit">
+          {Math.round(view.scale * 100)}%
+        </button>
+        <button type="button" onClick={() => zoomBy(1.2)} aria-label="Zoom in" title="Zoom in">+</button>
       </div>
     </div>
   );
 }
 
-function BeatView({ beat, beatIndex, charsRevealed, picked, onPick }: {
-  beat: Beat; beatIndex: number; charsRevealed: number;
+function revealText(full: string, charsRevealed: number, active: boolean): { shown: string; showCaret: boolean } {
+  // Completed / inactive beats always show the full string — never leave an
+  // odd-length title stuck mid-word (the old +2 typewriter bug).
+  if (!active || !Number.isFinite(charsRevealed) || charsRevealed >= full.length) {
+    return { shown: full, showCaret: false };
+  }
+  return { shown: full.slice(0, Math.max(0, charsRevealed)), showCaret: true };
+}
+
+function BeatView({ beat, beatIndex, charsRevealed, active, picked, onPick }: {
+  beat: Beat; beatIndex: number; charsRevealed: number; active: boolean;
   picked: Record<number, number>; onPick: (bi: number, oi: number) => void;
 }) {
   const base = { position: "absolute" as const, left: beat.x, top: beat.y };
   if (beat.kind === "title") {
-    const shown = beat.text.slice(0, charsRevealed);
+    const { shown, showCaret } = revealText(beat.text, charsRevealed, active);
     return (
-      <div style={base} className={`mc-title mc-title--${beat.size} tutor-serif`}>
+      <div
+        style={base}
+        className={`mc-title mc-title--${beat.size}`}
+      >
         {shown}
-        {charsRevealed < beat.text.length && <Caret />}
+        {showCaret && <Caret />}
       </div>
     );
   }
   if (beat.kind === "text") {
-    const shown = beat.text.slice(0, charsRevealed);
+    const { shown, showCaret } = revealText(beat.text, charsRevealed, active);
     return (
       <div style={base} className="mc-text">
         {shown}
-        {charsRevealed < beat.text.length && <Caret />}
+        {showCaret && <Caret />}
       </div>
     );
   }
   if (beat.kind === "math") {
-    const shown = beat.latex.slice(0, charsRevealed);
+    const hand = toHandMath(beat.latex);
+    const { shown, showCaret } = revealText(hand, charsRevealed, active);
     return (
-      <div style={base} className="mc-math tutor-fade-in">
-        {shown.trim() ? <InlineMath math={shown} /> : null}
+      <div style={base} className="mc-math">
+        {shown ? <Equation>{shown}</Equation> : null}
+        {showCaret && <Caret />}
       </div>
     );
   }
@@ -313,7 +481,7 @@ function BeatView({ beat, beatIndex, charsRevealed, picked, onPick }: {
               onClick={() => onPick(beatIndex, i)}
             >
               <span className="mc-option-key">{String.fromCharCode(65 + i)}</span>
-              <InlineMath math={o} />
+              <Equation>{toHandMath(o)}</Equation>
             </button>
           );
         })}

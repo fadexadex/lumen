@@ -15,6 +15,9 @@ export interface ConceptProps {
   demoActive: boolean;
   onWriteMath: () => void;
   onOpenLive: () => void;
+  /** Next roadmap module, if any — used for end-of-lesson navigation. */
+  nextModule?: { id: string; title: string } | null;
+  onNextModule?: () => void;
 }
 
 export interface ConceptDef {
@@ -64,7 +67,7 @@ function useReveal(text: string, active: boolean, speed = 22) {
     if (!active) { setN(text.length); return; }
     setN(0);
     const id = setInterval(() => {
-      setN((v) => (v >= text.length ? (clearInterval(id), v) : v + 2));
+      setN((v) => (v >= text.length ? (clearInterval(id), v) : v + 1));
     }, speed);
     return () => clearInterval(id);
   }, [text, active, speed]);

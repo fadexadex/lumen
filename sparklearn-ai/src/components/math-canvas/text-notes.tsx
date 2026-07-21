@@ -21,13 +21,17 @@ export function TextNotes({
 
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (tool !== "text" || e.target !== e.currentTarget) return;
+    e.stopPropagation();
     const el = e.currentTarget;
     const r = el.getBoundingClientRect();
+    // Map into the layer's local CSS pixel space (full viewport, not the board)
+    const sx = el.offsetWidth / r.width;
+    const sy = el.offsetHeight / r.height;
     const id = crypto.randomUUID();
     setNotes((n) => [...n, {
       id,
-      x: ((e.clientX - r.left) / r.width) * el.offsetWidth,
-      y: ((e.clientY - r.top) / r.height) * el.offsetHeight,
+      x: (e.clientX - r.left) * sx,
+      y: (e.clientY - r.top) * sy,
       text: "",
     }]);
     setEditing(id);
@@ -41,11 +45,22 @@ export function TextNotes({
   return (
     <div
       className="mc-notes"
-      style={{ width, height, pointerEvents: tool === "text" ? "auto" : "none", cursor: tool === "text" ? "text" : "default" }}
+      style={{
+        width,
+        height,
+        pointerEvents: tool === "text" ? "auto" : "none",
+        cursor: tool === "text" ? "text" : "default",
+      }}
       onClick={onClick}
+      data-no-pan
     >
       {notes.map((n) => (
-        <div key={n.id} className="mc-note" style={{ left: n.x, top: n.y }}>
+        <div
+          key={n.id}
+          className="mc-note"
+          style={{ left: n.x, top: n.y, pointerEvents: "auto" }}
+          data-no-pan
+        >
           {editing === n.id ? (
             <textarea
               ref={inputRef}
@@ -57,7 +72,12 @@ export function TextNotes({
               rows={1}
             />
           ) : (
-            <div className="mc-note-text" onDoubleClick={() => setEditing(n.id)}>{n.text}</div>
+            <div
+              className="mc-note-text"
+              onDoubleClick={() => setEditing(n.id)}
+            >
+              {n.text}
+            </div>
           )}
         </div>
       ))}

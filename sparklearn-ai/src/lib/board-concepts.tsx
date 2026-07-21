@@ -13,6 +13,8 @@ export interface ConceptProps {
   demoActive: boolean;
   onWriteMath: () => void;
   onOpenLive: () => void;
+  nextModule?: { id: string; title: string } | null;
+  onNextModule?: () => void;
 }
 export interface ConceptDef {
   id: string;
@@ -656,6 +658,8 @@ export const BOARD_CONCEPTS: ConceptDef[] = [
         demoActive={p.demoActive}
         onWriteMath={p.onWriteMath}
         onOpenLive={p.onOpenLive}
+        nextModule={p.nextModule}
+        onNextModule={p.onNextModule}
       />
     ),
   },
