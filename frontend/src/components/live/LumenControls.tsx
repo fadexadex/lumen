@@ -2,11 +2,13 @@ export function LumenControls({
   status,
   muted,
   onToggleMute,
+  onOpenTranscript,
   onEnd,
 }: {
   status: string;
   muted: boolean;
   onToggleMute: () => void;
+  onOpenTranscript?: () => void;
   onEnd: () => void;
 }) {
   const label =
@@ -31,6 +33,16 @@ export function LumenControls({
         {muted ? "🔇" : "🎙️"}
       </button>
       <span className="lumen-status">{label}</span>
+      {onOpenTranscript && (
+        <button
+          type="button"
+          className="lumen-btn"
+          onClick={onOpenTranscript}
+          aria-label="Open transcript"
+        >
+          💬
+        </button>
+      )}
       <button
         type="button"
         className="lumen-btn lumen-btn--end"

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LumenOrb } from "./LumenOrb";
 import { LumenTranscript } from "./LumenTranscript";
 import { LumenControls } from "./LumenControls";
@@ -16,11 +16,21 @@ function isToastWorthy(error: string): boolean {
 export function LumenOverlay({ session }: { session: ReturnType<typeof useLumenSession> }) {
   const { status, turns, amplitude, error, stop, setMuted } = session;
   const [muted, setMutedState] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(true);
+  useEffect(() => {
+    if (status === "connecting") setTranscriptOpen(true);
+  }, [status]);
   if (status === "idle") return null;
   const toast = error && isToastWorthy(error) ? error : null;
   return (
     <div className="lumen-overlay">
-      <LumenTranscript turns={turns} thinking={status === "thinking"} />
+      {transcriptOpen && (
+        <LumenTranscript
+          turns={turns}
+          thinking={status === "thinking"}
+          onClose={() => setTranscriptOpen(false)}
+        />
+      )}
       <div className="lumen-dock" data-no-pan>
         <LumenOrb amplitude={amplitude} status={status} />
         <LumenControls
@@ -31,6 +41,7 @@ export function LumenOverlay({ session }: { session: ReturnType<typeof useLumenS
             setMutedState(m);
             setMuted(m);
           }}
+          onOpenTranscript={transcriptOpen ? undefined : () => setTranscriptOpen(true)}
           onEnd={stop}
         />
       </div>

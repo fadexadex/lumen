@@ -813,7 +813,7 @@
     0 -2px oklch(0.99 0.01 95);
 }
 .mc-write-line .katex {
-  font-size: 1.08em;
+  font-size: 1em;
 }
 .mc-write-caret {
   margin-left: 2px;

@@ -90,7 +90,6 @@ VITE_LUMEN_TOKEN_URL=/api/lumen-token
 # MONNIFY_WALLET_ACCOUNT_NUMBER=...
 # SUBSCRIPTION_AMOUNT_NGN=2000
 # SUBSCRIPTION_CREDITS=100
-# VITE_LUMEN_PAYMENT_URL=   # empty = same-origin /api/payments/*
 ```
 
 **LiveKit keys:** Cloud project → Settings → Keys → copy URL, API Key, API Secret into the vars above.
@@ -125,46 +124,11 @@ npm run dev
 
 Keep port **8080** free (`dev-all.sh` aborts if it’s taken).
 
-### Smoke checks
-
-```bash
-# Token mint (frontend must be running)
-curl -s "http://localhost:8080/api/lumen-token?room=test&identity=me"
-# → {"token":"eyJ...","url":"wss://..."}
-
-# Voice-only agent (no browser)
-cd agent && uv run agent.py console
-```
-
 ### Use the app
 
 1. Open http://localhost:8080  
 2. Open a lesson → click **Live** → allow mic  
 3. Speak — agent should greet; board stays interactive  
-
----
-
-## Deploy
-
-| Piece | Where | Notes |
-| --- | --- | --- |
-| **Frontend** (+ `/api/*`) | Vercel, Cloudflare, etc. | Short HTTP; fine on serverless |
-| **Agent** | Railway (or similar always-on host) | Long-running LiveKit worker — **not** Vercel |
-
-### Agent on Railway
-
-1. New service from this repo, **root directory = `agent`**
-2. Start command: `python agent.py start` (also in `agent/railway.toml`)
-3. Set variables (same values as local):
-
-   - `LIVEKIT_URL`
-   - `LIVEKIT_API_KEY`
-   - `LIVEKIT_API_SECRET`
-   - `GEMINI_API_KEY`
-
-4. Optional public domain: target port **8081** (health check only). Not required for tutoring — the worker dials out to LiveKit Cloud.
-
-Frontend deploy: set the same LiveKit + Gemini/Monnify vars your server routes need, plus `VITE_LIVEKIT_URL` and `VITE_LUMEN_TOKEN_URL=/api/lumen-token`.
 
 ---
 
@@ -208,11 +172,9 @@ cd tests/live && npm install && node browser-e2e.mjs
 ```
 teacher-ai/
 ├── frontend/       # Web app + /api/lumen-token + /api/payments/*
-├── agent/          # Python LiveKit voice worker (Railway)
+├── agent/          # Python LiveKit voice worker
 ├── tests/live/     # Live / browser checks
 ├── math-canvas-ai/ # Earlier canvas prototype (optional)
 ├── dev-all.sh      # Start frontend + agent
 └── README.md
 ```
-
-Design notes: `frontend/plan/`. Generative courses: `frontend/plan-generative-courses/`.

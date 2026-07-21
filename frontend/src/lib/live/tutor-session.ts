@@ -1,6 +1,7 @@
 import { createRoom, fetchToken, makeIdentity, roomName, RoomEvent, Track } from "./livekit-client";
 import type { Room, RemoteTrack } from "./livekit-client";
 import type { CanvasCommand } from "./canvas-commands";
+import { loadTranscriptHistory, saveTranscriptHistory } from "./transcript-history";
 
 export type SessionStatus = "idle" | "connecting" | "listening" | "speaking" | "thinking" | "error";
 
@@ -70,6 +71,7 @@ export class TutorSession {
   private lastTutorAt = 0;
   private speakQuietMs = 0;
   private lastAmpTs = 0;
+  private activeModuleId: string | null = null;
 
   on<K extends keyof Listeners>(ev: K, fn: Listeners[K]) {
     this.listeners[ev] = fn;
@@ -81,6 +83,7 @@ export class TutorSession {
     this.listeners.status?.(s);
   }
   private emitTurns() {
+    if (this.activeModuleId) saveTranscriptHistory(this.activeModuleId, this.turns);
     this.listeners.transcript?.([...this.turns]);
   }
   private emitError(message: string | null) {
@@ -92,6 +95,14 @@ export class TutorSession {
     // synchronously too — otherwise two quick starts each open a room and we
     // subscribe to (and play) the agent's audio twice.
     if (this.room || this.starting) return;
+    if (this.activeModuleId !== moduleId) {
+      this.activeModuleId = moduleId;
+      this.turns = loadTranscriptHistory(moduleId);
+      this.emitTurns();
+    } else if (!this.turns.length) {
+      this.turns = loadTranscriptHistory(moduleId);
+      this.emitTurns();
+    }
     this.starting = true;
     this.intentionalStop = false;
     this.emitError(null);
@@ -277,7 +288,11 @@ export class TutorSession {
       const now = performance.now();
       const lastIdx = this.turns.length - 1;
       const last = lastIdx >= 0 ? this.turns[lastIdx] : null;
-      if (last?.from === "tutor" && shouldMergeTutor(last, now - this.lastTutorAt, this.status)) {
+      if (
+        last?.from === "tutor" &&
+        !last.final &&
+        shouldMergeTutor(last, now - this.lastTutorAt, this.status)
+      ) {
         const merged = mergeTutorText(last.text, text);
         this.turns[lastIdx] = {
           id: last.id,
@@ -374,7 +389,7 @@ export class TutorSession {
     this.lastAmpTs = 0;
     this.lastTutorAt = 0;
     this.room = null;
-    this.turns = [];
+    this.turns = this.turns.map((turn) => (turn.final ? turn : { ...turn, final: true }));
     this.emitTurns();
     this.set("idle");
   }

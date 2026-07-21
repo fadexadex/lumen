@@ -33,4 +33,9 @@ describe("math-aware tutor text", () => {
     expect(html).toContain('class="katex"');
     expect(html).toContain('class="mfrac"');
   });
+
+  it("marks mixed content to inherit the surrounding transcript or board size", () => {
+    const html = renderToStaticMarkup(createElement(MathText, { text: "The value is x^2." }));
+    expect(html).toContain('class="math-text"');
+  });
 });

@@ -78,7 +78,7 @@ export function splitMathText(input: string): MathTextSegment[] {
 
 export function MathText({ text, className }: { text: string; className?: string }) {
   return (
-    <span className={className}>
+    <span className={["math-text", className].filter(Boolean).join(" ")}>
       {splitMathText(text).map((segment, index) => (
         // Streaming/typewriter text can temporarily contain incomplete LaTeX. Include
         // the value in the key so a completed expression replaces its temporary fallback.
