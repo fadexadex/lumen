@@ -1,7 +1,8 @@
 /**
  * Browser Live E2E via gstack browse (headless Chromium).
  *
- * Prerequisites: vite :8080, token-server :8787, agent.py dev.
+ * Prerequisites: vite (frontend) + agent.py dev.
+ * Token minting is same-origin via TanStack Start `/api/lumen-token`.
  *
  * Usage:
  *   B=~/.claude/skills/gstack/browse/dist/browse

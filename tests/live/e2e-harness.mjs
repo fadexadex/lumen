@@ -39,7 +39,9 @@ function fail(name, detail) {
 }
 
 async function testToken(env) {
-  const tokenUrl = env.VITE_LUMEN_TOKEN_URL || "http://localhost:8787/token";
+  const tokenUrl = env.VITE_LUMEN_TOKEN_URL?.startsWith("http")
+    ? env.VITE_LUMEN_TOKEN_URL
+    : `http://localhost:8080${env.VITE_LUMEN_TOKEN_URL || "/api/lumen-token"}`;
   const res = await fetch(
     `${tokenUrl}?room=${encodeURIComponent("lumen-e2e-harness")}&identity=e2e-learner`,
   );
@@ -52,7 +54,9 @@ async function testToken(env) {
 }
 
 async function testAgentJoinsRoom(env) {
-  const tokenUrl = env.VITE_LUMEN_TOKEN_URL || "http://localhost:8787/token";
+  const tokenUrl = env.VITE_LUMEN_TOKEN_URL?.startsWith("http")
+    ? env.VITE_LUMEN_TOKEN_URL
+    : `http://localhost:8080${env.VITE_LUMEN_TOKEN_URL || "/api/lumen-token"}`;
   const identity = `e2e-${Math.random().toString(36).slice(2, 8)}`;
   const roomName = `lumen-quad-1-${identity}`;
   const res = await fetch(

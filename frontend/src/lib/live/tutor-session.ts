@@ -34,19 +34,22 @@ function transcriptionAttrs(reader: { info: { attributes?: Record<string, unknow
   return reader.info.attributes ?? {};
 }
 
-function transcriptionSegmentId(
-  reader: { info: { id: string; attributes?: Record<string, unknown> } },
-): string {
+function transcriptionSegmentId(reader: {
+  info: { id: string; attributes?: Record<string, unknown> };
+}): string {
   const attrs = transcriptionAttrs(reader);
   const seg = attrs["lk.segment_id"];
   return typeof seg === "string" && seg.length > 0 ? seg : reader.info.id;
 }
 
-function transcriptionIsFinal(reader: {
-  info: { attributes?: Record<string, unknown> };
-}): boolean {
+function transcriptionIsFinal(reader: { info: { attributes?: Record<string, unknown> } }): boolean {
   const v = transcriptionAttrs(reader)["lk.transcription_final"];
   return v === true || v === "true";
+}
+
+/** LiveKit yields incremental UTF-8 chunks, not cumulative transcript snapshots. */
+function appendTranscriptionChunk(text: string, chunk: string): string {
+  return text + chunk;
 }
 
 export class TutorSession {
@@ -54,8 +57,12 @@ export class TutorSession {
   private turns: TranscriptTurn[] = [];
   private listeners: Partial<Listeners> = {};
   private audioEl: HTMLAudioElement | null = null;
+  private audioCtx: AudioContext | null = null;
+  private attachedTrackSid: string | null = null;
   private raf = 0;
   private intentionalStop = false;
+  /** Synchronous guard: set before the first await so rapid double-starts can't open two rooms. */
+  private starting = false;
   status: SessionStatus = "idle";
   /** Last time we appended tutor transcript — used to keep one reply in one bubble. */
   private lastTutorAt = 0;
@@ -79,7 +86,11 @@ export class TutorSession {
   }
 
   async start(moduleId: string, opts?: { mic?: boolean }) {
-    if (this.room) return;
+    // `this.room` isn't set until after the async token fetch below, so guard
+    // synchronously too — otherwise two quick starts each open a room and we
+    // subscribe to (and play) the agent's audio twice.
+    if (this.room || this.starting) return;
+    this.starting = true;
     this.intentionalStop = false;
     this.emitError(null);
     this.set("connecting");
@@ -105,7 +116,7 @@ export class TutorSession {
           participantInfo?.identity === identity ? "you" : "tutor";
         let text = "";
         for await (const chunk of reader) {
-          text = chunk;
+          text = appendTranscriptionChunk(text, chunk);
           const id = transcriptionSegmentId(reader);
           this.upsertTurn(id, from, text, transcriptionIsFinal(reader));
         }
@@ -141,6 +152,7 @@ export class TutorSession {
       if (opts?.mic !== false) {
         await r.localParticipant.setMicrophoneEnabled(true);
       }
+      this.starting = false;
       this.set("listening");
     } catch (e) {
       const msg = (e as Error).message || String(e);
@@ -184,6 +196,12 @@ export class TutorSession {
 
   // ---- audio → amplitude (orb) + stable speaking status ----
   private attachAgentAudio(track: RemoteTrack) {
+    // Idempotent: a re-subscribe (auto-reconnect) or a duplicate agent track must
+    // never leave two <audio> elements playing at once — that's the "echo twice".
+    if (track.sid && this.attachedTrackSid === track.sid) return;
+    this.teardownAudio();
+    this.attachedTrackSid = track.sid ?? null;
+
     const el = track.attach() as HTMLAudioElement;
     el.autoplay = true;
     el.style.display = "none";
@@ -197,6 +215,7 @@ export class TutorSession {
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ac = new AC();
+    this.audioCtx = ac;
     const src = ac.createMediaStreamSource(new MediaStream([track.mediaStreamTrack]));
     const analyser = ac.createAnalyser();
     analyser.fftSize = 256;
@@ -330,15 +349,27 @@ export class TutorSession {
     if (this.turns.length > 12) this.turns = this.turns.slice(-12);
   }
 
-  private cleanup() {
+  /** Tear down the current agent audio element + analyser graph (safe to call repeatedly). */
+  private teardownAudio() {
     cancelAnimationFrame(this.raf);
-    this.speakQuietMs = 0;
-    this.lastAmpTs = 0;
-    this.lastTutorAt = 0;
+    this.raf = 0;
     if (this.audioEl) {
       this.audioEl.remove();
       this.audioEl = null;
     }
+    if (this.audioCtx) {
+      void this.audioCtx.close().catch(() => {});
+      this.audioCtx = null;
+    }
+    this.attachedTrackSid = null;
+  }
+
+  private cleanup() {
+    this.teardownAudio();
+    this.starting = false;
+    this.speakQuietMs = 0;
+    this.lastAmpTs = 0;
+    this.lastTutorAt = 0;
     this.room = null;
     this.turns = [];
     this.emitTurns();
@@ -349,11 +380,7 @@ export class TutorSession {
 /** Keep merging tutor chunks into one paragraph unless the reply turn clearly ended. */
 const TUTOR_TURN_GAP_MS = 2800;
 
-function shouldMergeTutor(
-  last: TranscriptTurn,
-  gapMs: number,
-  status: SessionStatus,
-): boolean {
+function shouldMergeTutor(last: TranscriptTurn, gapMs: number, status: SessionStatus): boolean {
   if (last.from !== "tutor") return false;
   // Still audibly speaking — always same reply, even across sentence finals.
   if (status === "speaking") return true;
@@ -418,6 +445,7 @@ function isNewTutorUtterance(prev: string, next: string): boolean {
 /** Exported for unit tests — same helpers used by TutorSession.upsertTurn. */
 export const __transcriptTest = {
   isNoiseTranscript,
+  appendTranscriptionChunk,
   mergeTutorText,
   isNewTutorUtterance,
   shouldMergeTutor,

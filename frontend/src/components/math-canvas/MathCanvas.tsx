@@ -8,7 +8,7 @@ import { Equation, toHandMath } from "./equation";
 import { useBeatPlayer } from "./use-beat-player";
 import { AnnotationLayer, type LumenCanvasController } from "./annotation-layer";
 import { setCanvasController } from "@/lib/live/canvas-agent-bridge";
-import { resolveTargets } from "@/lib/live/board-targets";
+import { estimateBeatRect, resolveTargets } from "@/lib/live/board-targets";
 import { emitLiveParabola } from "@/lib/live/board-live";
 
 const MIN_SCALE = 0.25;
@@ -126,6 +126,7 @@ export function MathCanvas(props: MathCanvasProps) {
   viewRef.current = view;
   const fittedKeyRef = useRef<string | null>(null);
   const lastFitVpRef = useRef({ w: 0, h: 0 });
+  const lessonFollowPausedUntilRef = useRef(0);
   const panning = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const annoRef = useRef<LumenCanvasController | null>(null);
   const boardElRef = useRef<HTMLDivElement | null>(null);
@@ -151,6 +152,13 @@ export function MathCanvas(props: MathCanvasProps) {
       setView,
       viewportEl: () => viewportRef.current,
       boardEl: () => boardElRef.current,
+      lessonRects: beats.map(estimateBeatRect),
+      suspendLessonFollow: (ms) => {
+        lessonFollowPausedUntilRef.current = Math.max(
+          lessonFollowPausedUntilRef.current,
+          performance.now() + ms,
+        );
+      },
       screenToWorld: (sx, sy) => {
         const v = viewRef.current;
         return { x: (sx - v.x) / v.scale, y: (sy - v.y) / v.scale };
@@ -167,7 +175,7 @@ export function MathCanvas(props: MathCanvasProps) {
       },
     });
     return () => setCanvasController(null);
-  }, [script, BOARD_H, paraParams]);
+  }, [script, beats, BOARD_H, paraParams]);
 
   // Reset the idle countdown on any interaction; ~2.6s of stillness fades chrome.
   const bumpActivity = useCallback(() => {
@@ -242,6 +250,7 @@ export function MathCanvas(props: MathCanvasProps) {
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
+    if (performance.now() < lessonFollowPausedUntilRef.current) return;
     const first = activeBeats[0];
     if (!first) return;
     // Skip until the initial overview has been applied
@@ -365,11 +374,7 @@ export function MathCanvas(props: MathCanvasProps) {
         className="mc-world"
         style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}
       >
-        <div
-          ref={boardElRef}
-          className="mc-board"
-          style={{ width: BOARD_W, height: BOARD_H }}
-        >
+        <div ref={boardElRef} className="mc-board" style={{ width: BOARD_W, height: BOARD_H }}>
           <div className="mc-lesson-layer" style={{ pointerEvents: "none" }}>
             {visibleBeats.map((b) => {
               const beatIndex = beats.indexOf(b);

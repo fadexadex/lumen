@@ -1,4 +1,4 @@
-import { BlockMath, InlineMath } from "react-katex";
+import { BlockMath, InlineMath } from "@/lib/katex";
 import { useEffect, useState } from "react";
 import type { LessonStep } from "@/lib/types";
 

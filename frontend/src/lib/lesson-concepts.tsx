@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BlockMath, InlineMath } from "react-katex";
+import { BlockMath, InlineMath } from "@/lib/katex";
 import type { LessonScript, LessonStep } from "@/lib/types";
 import { insertMathOnBoard } from "@/lib/whiteboard-bridge";
 

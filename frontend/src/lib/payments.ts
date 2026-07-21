@@ -1,8 +1,10 @@
-/** Prefer VITE_LUMEN_PAYMENT_URL; fall back to local token-server. */
+/**
+ * Payment API — same-origin TanStack Start routes under /api/payments/*.
+ * Optional VITE_LUMEN_PAYMENT_URL overrides the base (empty = same origin).
+ */
 const ENV_PAYMENT_URL = (
   (import.meta.env.VITE_LUMEN_PAYMENT_URL as string | undefined) ?? ""
 ).replace(/\/$/, "");
-const FALLBACK_PAYMENT_URL = "http://127.0.0.1:8787";
 
 export const STARTER_PACK = {
   amountNaira: 2000,
@@ -39,59 +41,36 @@ export type CheckoutPublicConfig = {
   configured: boolean;
 };
 
-function apiBases() {
-  const bases = [ENV_PAYMENT_URL, FALLBACK_PAYMENT_URL].filter(
-    (b, i, arr) => b !== undefined && b !== null && arr.indexOf(b) === i,
-  );
-  // Same-origin proxy first when env is empty string
-  if (!ENV_PAYMENT_URL) return ["", FALLBACK_PAYMENT_URL];
-  return bases.length ? bases : [FALLBACK_PAYMENT_URL];
-}
-
-function paymentUrls(path: string) {
-  return apiBases().map((base) => `${base}${path}`);
+function paymentUrl(path: string) {
+  // path is like /api/payments/config
+  return `${ENV_PAYMENT_URL}${path}`;
 }
 
 function friendlyFetchError(err: unknown) {
   const msg = err instanceof Error ? err.message : String(err);
   if (/failed to fetch|networkerror|load failed|err_connection/i.test(msg)) {
-    return "Payment server isn't reachable. In another terminal run: cd token-server && npm start";
+    return "Payment API isn't reachable. Is the frontend/dev server running?";
   }
   return msg;
 }
 
 async function paymentFetch(path: string, init?: RequestInit): Promise<Response> {
-  let lastErr: unknown = null;
-  for (const url of paymentUrls(path)) {
-    try {
-      const res = await fetch(url, init);
-      // Proxy returns HTML 502 when token-server is down — try the next base.
-      if (res.status === 502 || res.status === 503 || res.status === 504) {
-        lastErr = new Error(`Upstream ${res.status} from ${url || "same-origin"}`);
-        continue;
-      }
-      return res;
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  throw lastErr instanceof Error ? lastErr : new Error(friendlyFetchError(lastErr));
-}
-
-export async function fetchCheckoutConfig(): Promise<CheckoutPublicConfig> {
-  let res: Response;
   try {
-    res = await paymentFetch("/payments/config");
+    return await fetch(paymentUrl(path), init);
   } catch (err) {
     throw new Error(friendlyFetchError(err));
   }
+}
+
+export async function fetchCheckoutConfig(): Promise<CheckoutPublicConfig> {
+  const res = await paymentFetch("/api/payments/config");
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error((data as { error?: string }).error || `Config failed (${res.status})`);
   }
   const body = data as Partial<CheckoutPublicConfig>;
   if (!body.apiKey || !body.contractCode) {
-    throw new Error("Monnify checkout is not configured on the payment server.");
+    throw new Error("Monnify checkout is not configured (check MONNIFY_* in frontend/.env).");
   }
   return {
     apiKey: body.apiKey,
@@ -108,22 +87,15 @@ export async function initSubscriptionPayment(input: {
   customerEmail: string;
   redirectUrl: string;
 }): Promise<PaymentInitResult> {
-  let res: Response;
-  try {
-    res = await paymentFetch("/payments/init", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(input),
-    });
-  } catch (err) {
-    throw new Error(friendlyFetchError(err));
-  }
+  const res = await paymentFetch("/api/payments/init", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(
-      (data as { error?: string }).error || `Payment init failed (${res.status})`,
-    );
+    throw new Error((data as { error?: string }).error || `Payment init failed (${res.status})`);
   }
   return data as PaymentInitResult;
 }
@@ -138,7 +110,7 @@ export async function verifySubscriptionPayment(opts: {
 
   let res: Response;
   try {
-    res = await paymentFetch(`/payments/verify?${q}`);
+    res = await paymentFetch(`/api/payments/verify?${q}`);
   } catch (err) {
     return {
       paid: false,

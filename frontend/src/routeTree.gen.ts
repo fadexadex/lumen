@@ -9,15 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SubscribeRouteImport } from './routes/subscribe'
-import { Route as RoadmapRouteImport } from './routes/roadmap'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as PaymentCallbackRouteImport } from './routes/payment.callback'
+import { Route as RoadmapRouteImport } from './routes/roadmap'
+import { Route as SubscribeRouteImport } from './routes/subscribe'
+import { Route as ApiLumenTokenRouteImport } from './routes/api/lumen-token'
 import { Route as LessonModuleIdRouteImport } from './routes/lesson.$moduleId'
+import { Route as PaymentCallbackRouteImport } from './routes/payment.callback'
+import { Route as ApiPaymentsConfigRouteImport } from './routes/api/payments/config'
+import { Route as ApiPaymentsInitRouteImport } from './routes/api/payments/init'
+import { Route as ApiPaymentsVerifyRouteImport } from './routes/api/payments/verify'
 
-const SubscribeRoute = SubscribeRouteImport.update({
-  id: '/subscribe',
-  path: '/subscribe',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RoadmapRoute = RoadmapRouteImport.update({
@@ -25,14 +29,14 @@ const RoadmapRoute = RoadmapRouteImport.update({
   path: '/roadmap',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const SubscribeRoute = SubscribeRouteImport.update({
+  id: '/subscribe',
+  path: '/subscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PaymentCallbackRoute = PaymentCallbackRouteImport.update({
-  id: '/payment/callback',
-  path: '/payment/callback',
+const ApiLumenTokenRoute = ApiLumenTokenRouteImport.update({
+  id: '/api/lumen-token',
+  path: '/api/lumen-token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LessonModuleIdRoute = LessonModuleIdRouteImport.update({
@@ -40,28 +44,60 @@ const LessonModuleIdRoute = LessonModuleIdRouteImport.update({
   path: '/lesson/$moduleId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PaymentCallbackRoute = PaymentCallbackRouteImport.update({
+  id: '/payment/callback',
+  path: '/payment/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPaymentsConfigRoute = ApiPaymentsConfigRouteImport.update({
+  id: '/api/payments/config',
+  path: '/api/payments/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPaymentsInitRoute = ApiPaymentsInitRouteImport.update({
+  id: '/api/payments/init',
+  path: '/api/payments/init',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPaymentsVerifyRoute = ApiPaymentsVerifyRouteImport.update({
+  id: '/api/payments/verify',
+  path: '/api/payments/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/roadmap': typeof RoadmapRoute
   '/subscribe': typeof SubscribeRoute
+  '/api/lumen-token': typeof ApiLumenTokenRoute
   '/lesson/$moduleId': typeof LessonModuleIdRoute
   '/payment/callback': typeof PaymentCallbackRoute
+  '/api/payments/config': typeof ApiPaymentsConfigRoute
+  '/api/payments/init': typeof ApiPaymentsInitRoute
+  '/api/payments/verify': typeof ApiPaymentsVerifyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/roadmap': typeof RoadmapRoute
   '/subscribe': typeof SubscribeRoute
+  '/api/lumen-token': typeof ApiLumenTokenRoute
   '/lesson/$moduleId': typeof LessonModuleIdRoute
   '/payment/callback': typeof PaymentCallbackRoute
+  '/api/payments/config': typeof ApiPaymentsConfigRoute
+  '/api/payments/init': typeof ApiPaymentsInitRoute
+  '/api/payments/verify': typeof ApiPaymentsVerifyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/roadmap': typeof RoadmapRoute
   '/subscribe': typeof SubscribeRoute
+  '/api/lumen-token': typeof ApiLumenTokenRoute
   '/lesson/$moduleId': typeof LessonModuleIdRoute
   '/payment/callback': typeof PaymentCallbackRoute
+  '/api/payments/config': typeof ApiPaymentsConfigRoute
+  '/api/payments/init': typeof ApiPaymentsInitRoute
+  '/api/payments/verify': typeof ApiPaymentsVerifyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -69,39 +105,55 @@ export interface FileRouteTypes {
     | '/'
     | '/roadmap'
     | '/subscribe'
+    | '/api/lumen-token'
     | '/lesson/$moduleId'
     | '/payment/callback'
+    | '/api/payments/config'
+    | '/api/payments/init'
+    | '/api/payments/verify'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/roadmap'
     | '/subscribe'
+    | '/api/lumen-token'
     | '/lesson/$moduleId'
     | '/payment/callback'
+    | '/api/payments/config'
+    | '/api/payments/init'
+    | '/api/payments/verify'
   id:
     | '__root__'
     | '/'
     | '/roadmap'
     | '/subscribe'
+    | '/api/lumen-token'
     | '/lesson/$moduleId'
     | '/payment/callback'
+    | '/api/payments/config'
+    | '/api/payments/init'
+    | '/api/payments/verify'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   RoadmapRoute: typeof RoadmapRoute
   SubscribeRoute: typeof SubscribeRoute
+  ApiLumenTokenRoute: typeof ApiLumenTokenRoute
   LessonModuleIdRoute: typeof LessonModuleIdRoute
   PaymentCallbackRoute: typeof PaymentCallbackRoute
+  ApiPaymentsConfigRoute: typeof ApiPaymentsConfigRoute
+  ApiPaymentsInitRoute: typeof ApiPaymentsInitRoute
+  ApiPaymentsVerifyRoute: typeof ApiPaymentsVerifyRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/subscribe': {
-      id: '/subscribe'
-      path: '/subscribe'
-      fullPath: '/subscribe'
-      preLoaderRoute: typeof SubscribeRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/roadmap': {
@@ -111,18 +163,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RoadmapRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/subscribe': {
+      id: '/subscribe'
+      path: '/subscribe'
+      fullPath: '/subscribe'
+      preLoaderRoute: typeof SubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/payment/callback': {
-      id: '/payment/callback'
-      path: '/payment/callback'
-      fullPath: '/payment/callback'
-      preLoaderRoute: typeof PaymentCallbackRouteImport
+    '/api/lumen-token': {
+      id: '/api/lumen-token'
+      path: '/api/lumen-token'
+      fullPath: '/api/lumen-token'
+      preLoaderRoute: typeof ApiLumenTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lesson/$moduleId': {
@@ -132,6 +184,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LessonModuleIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/payment/callback': {
+      id: '/payment/callback'
+      path: '/payment/callback'
+      fullPath: '/payment/callback'
+      preLoaderRoute: typeof PaymentCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/payments/config': {
+      id: '/api/payments/config'
+      path: '/api/payments/config'
+      fullPath: '/api/payments/config'
+      preLoaderRoute: typeof ApiPaymentsConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/payments/init': {
+      id: '/api/payments/init'
+      path: '/api/payments/init'
+      fullPath: '/api/payments/init'
+      preLoaderRoute: typeof ApiPaymentsInitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/payments/verify': {
+      id: '/api/payments/verify'
+      path: '/api/payments/verify'
+      fullPath: '/api/payments/verify'
+      preLoaderRoute: typeof ApiPaymentsVerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -139,8 +219,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   RoadmapRoute: RoadmapRoute,
   SubscribeRoute: SubscribeRoute,
+  ApiLumenTokenRoute: ApiLumenTokenRoute,
   LessonModuleIdRoute: LessonModuleIdRoute,
   PaymentCallbackRoute: PaymentCallbackRoute,
+  ApiPaymentsConfigRoute: ApiPaymentsConfigRoute,
+  ApiPaymentsInitRoute: ApiPaymentsInitRoute,
+  ApiPaymentsVerifyRoute: ApiPaymentsVerifyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

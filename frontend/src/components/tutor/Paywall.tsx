@@ -61,6 +61,7 @@ export function Paywall() {
   const setSubscription = useTutorStore((s) => s.setSubscription);
   const ensureRoadmap = useTutorStore((s) => s.ensureRoadmap);
 
+  const [hydrated, setHydrated] = useState(() => useTutorStore.persist.hasHydrated());
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -69,15 +70,22 @@ export function Paywall() {
   const verifiedOnce = useRef(false);
 
   useEffect(() => {
+    setHydrated(useTutorStore.persist.hasHydrated());
+    return useTutorStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     if (subscription?.status === "active") {
       ensureRoadmap();
       navigate({ to: "/roadmap" });
     }
-  }, [subscription, ensureRoadmap, navigate]);
+  }, [hydrated, subscription, ensureRoadmap, navigate]);
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!profile) navigate({ to: "/" });
-  }, [profile, navigate]);
+  }, [hydrated, profile, navigate]);
 
   useEffect(() => {
     if (profile && !email) setEmail(emailFromName(profile.name));
@@ -219,6 +227,16 @@ export function Paywall() {
     }
     await unlockFromPayment({ paymentReference, transactionReference });
   };
+
+  if (!hydrated) {
+    return (
+      <div className="tutor-app paywall-shell min-h-screen flex flex-col">
+        <main className="paywall-stage">
+          <p className="paywall-lede">Loading…</p>
+        </main>
+      </div>
+    );
+  }
 
   if (!profile || subscription?.status === "active") return null;
 

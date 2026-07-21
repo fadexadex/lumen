@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BlockMath, InlineMath } from "react-katex";
+import { BlockMath, InlineMath } from "@/lib/katex";
 import type { LessonDiagram, LessonScript, LessonStep } from "./types";
 import { getHints } from "./mock-live-hints";
 import { MathCanvas } from "@/components/math-canvas/MathCanvas";

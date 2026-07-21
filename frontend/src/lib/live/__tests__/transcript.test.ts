@@ -3,11 +3,19 @@ import { __transcriptTest, type TranscriptTurn } from "@/lib/live/tutor-session"
 
 const {
   isNoiseTranscript,
+  appendTranscriptionChunk,
   mergeTutorText,
   shouldMergeTutor,
   suffixPrefixOverlap,
   TUTOR_TURN_GAP_MS,
 } = __transcriptTest;
+
+describe("LiveKit transcription stream assembly", () => {
+  it("accumulates the incremental chunks from one text stream", () => {
+    const chunks = ["Hello!", " What", " can", " we", " explore", " today?"];
+    expect(chunks.reduce(appendTranscriptionChunk, "")).toBe("Hello! What can we explore today?");
+  });
+});
 
 describe("transcript noise filter", () => {
   it("drops Gemini noise tokens and bare punctuation", () => {
@@ -62,10 +70,7 @@ describe("tutor transcript merge (word-stream → one bubble)", () => {
 
   it("joins consecutive sentences into one paragraph", () => {
     expect(
-      mergeTutorText(
-        "The parabola opens upward.",
-        "Since a is positive, that makes sense.",
-      ),
+      mergeTutorText("The parabola opens upward.", "Since a is positive, that makes sense."),
     ).toBe("The parabola opens upward. Since a is positive, that makes sense.");
   });
 });
@@ -79,15 +84,9 @@ describe("shouldMergeTutor (stable paragraphs)", () => {
   });
 
   it("merges while status is speaking even across sentence finals", () => {
+    expect(shouldMergeTutor(tutor("The parabola opens upward."), 50, "speaking")).toBe(true);
     expect(
-      shouldMergeTutor(tutor("The parabola opens upward."), 50, "speaking"),
-    ).toBe(true);
-    expect(
-      shouldMergeTutor(
-        tutor("The parabola opens upward."),
-        TUTOR_TURN_GAP_MS + 500,
-        "speaking",
-      ),
+      shouldMergeTutor(tutor("The parabola opens upward."), TUTOR_TURN_GAP_MS + 500, "speaking"),
     ).toBe(true);
   });
 
