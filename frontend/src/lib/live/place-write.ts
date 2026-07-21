@@ -5,7 +5,7 @@ export type WPoint = { x: number; y: number };
 export type Place = "above" | "below" | "left" | "right";
 
 const PAD = 16;
-const LINE_H = 28;
+const LINE_H = 40;
 const CHAR_W = 11;
 
 export function estimateWriteSize(lines: string[]): { w: number; h: number } {
@@ -39,7 +39,11 @@ export function offsetPlace(at: WPoint, place: Place): WPoint {
   return at;
 }
 
-function clampPoint(at: WPoint, size: { w: number; h: number }, board: { w: number; h: number }): WPoint {
+function clampPoint(
+  at: WPoint,
+  size: { w: number; h: number },
+  board: { w: number; h: number },
+): WPoint {
   const margin = 24;
   const minX = margin + 12;
   const minY = margin + 8;
@@ -114,7 +118,11 @@ export function findFreeWriteSpot(opts: {
     }
   }
 
-  return clampPoint({ x: readingX, y: Math.max(contentBottom + 32, opts.board.h - size.h - 40) }, size, opts.board);
+  return clampPoint(
+    { x: readingX, y: Math.max(contentBottom + 32, opts.board.h - size.h - 40) },
+    size,
+    opts.board,
+  );
 }
 
 /**

@@ -89,7 +89,7 @@ async def write_on_board(
     place: str = "below",
     job_id: str | None = None,
 ) -> str:
-    """Write a worked example or steps on the board (typewriter). Use short lines. Same job_id replaces the block (safe after interrupt/continue)."""
+    """Write worked steps on the board. Wrap math in $...$ with valid LaTeX; keep prose outside. Use short lines. Same job_id continues in place."""
     return await _send(ctx, C.write_block(lines, target, place, job_id))
 
 

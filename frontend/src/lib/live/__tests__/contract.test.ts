@@ -23,6 +23,7 @@ describe("LiveKit session room naming", () => {
  */
 function makeMockAnno() {
   const calls: { method: string; args: unknown[] }[] = [];
+  const writePositions = new Map<string, { x: number; y: number }>();
   let seq = 0;
   const anno: LumenCanvasController = {
     highlight: (...args) => {
@@ -51,8 +52,15 @@ function makeMockAnno() {
     },
     writeBlock: (...args) => {
       calls.push({ method: "writeBlock", args });
+      const [at, , options] = args as [
+        { x: number; y: number },
+        string[],
+        { jobId?: string } | undefined,
+      ];
+      if (options?.jobId) writePositions.set(options.jobId, at);
       return `mock-${++seq}`;
     },
+    writeBlockPosition: (jobId) => writePositions.get(jobId) ?? null,
     cancelWriting: (...args) => {
       calls.push({ method: "cancelWriting", args });
     },
@@ -223,5 +231,43 @@ describe("canvas-commands contract (TS<->Py dispatch + resolver guard)", () => {
     expect(views.length).toBeGreaterThan(0);
     expect(views.at(-1)!.scale).toBeGreaterThan(1);
     expect(followSuspendedFor).toBeGreaterThanOrEqual(5000);
+  });
+
+  it("keeps a continued calculation at the same board position and camera scale", () => {
+    const views: Array<{ x: number; y: number; scale: number }> = [];
+    let currentView = { x: 0, y: 0, scale: 1 };
+    handle.boardSize = { w: 900, h: 360 };
+    handle.viewportEl = () => ({ clientWidth: 900, clientHeight: 600 }) as HTMLElement;
+    handle.getView = () => currentView;
+    handle.setView = (view) => {
+      currentView = view;
+      views.push(view);
+    };
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(performance.now() + 1000);
+      return 1;
+    });
+
+    applyCommand(handle, {
+      id: "first-command",
+      op: "writeBlock",
+      args: { jobId: "quadratic-work", lines: ["$x^2 + 4x = 0$"] },
+    });
+    const firstAt = calls.filter((call) => call.method === "writeBlock").at(-1)!.args[0];
+    const focusedScale = currentView.scale;
+
+    applyCommand(handle, {
+      id: "continued-command",
+      op: "writeBlock",
+      args: {
+        jobId: "quadratic-work",
+        lines: Array.from({ length: 10 }, (_, i) => `$x_${i} = ${i}$`),
+      },
+    });
+    const secondAt = calls.filter((call) => call.method === "writeBlock").at(-1)!.args[0];
+
+    expect(secondAt).toEqual(firstAt);
+    expect(currentView.scale).toBe(focusedScale);
+    expect(views.length).toBeGreaterThan(0);
   });
 });

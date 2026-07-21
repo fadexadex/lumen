@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { TranscriptTurn } from "@/lib/live/tutor-session";
+import { MathText } from "@/lib/math-text";
 
 export function LumenTranscript({
   turns,
@@ -22,7 +23,9 @@ export function LumenTranscript({
           data-partial={!t.final || undefined}
         >
           <span className="lumen-line-role">{t.from === "tutor" ? "Lumen" : "You"}</span>
-          <p className="lumen-line-text">{t.text}</p>
+          <p className="lumen-line-text">
+            <MathText text={t.text} />
+          </p>
         </div>
       ))}
       {thinking && (

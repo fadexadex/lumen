@@ -154,6 +154,9 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.lumen-line-text .katex {
+  font-size: 1.03em;
+}
 .lumen-line--you .lumen-line-text {
   color: var(--tutor-muted);
   font-style: italic;

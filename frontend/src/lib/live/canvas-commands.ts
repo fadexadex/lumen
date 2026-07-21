@@ -1,6 +1,6 @@
 import type { CanvasControllerHandle } from "./canvas-agent-bridge";
 import type { ParabolaGeom } from "./board-targets";
-import { panToRect } from "./pan";
+import { keepRectInView, panToRect } from "./pan";
 import {
   findFreeWriteSpot,
   measureLessonOccupied,
@@ -93,6 +93,7 @@ export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): 
       const lines = cmd.args.lines.filter((l) => typeof l === "string");
       if (!lines.length) return "empty-write";
       const jobId = cmd.args.jobId ?? cmd.id;
+      const existingAt = anno.writeBlockPosition(jobId);
       const place = cmd.args.place ?? "below";
       const anchor =
         (cmd.args.target
@@ -105,17 +106,21 @@ export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): 
         ...anno.occupiedRects(jobId),
       ];
 
-      const at = findFreeWriteSpot({
-        anchor,
-        place,
-        lines,
-        board: ctrl.boardSize,
-        occupied,
-      });
+      const at =
+        existingAt ??
+        findFreeWriteSpot({
+          anchor,
+          place,
+          lines,
+          board: ctrl.boardSize,
+          occupied,
+        });
       anno.writeBlock(at, lines, { jobId });
       const writeDurationMs = lines.join("\n").length * 36;
       ctrl.suspendLessonFollow?.(Math.min(15_000, Math.max(5_000, writeDurationMs + 2_500)));
-      panToRect(ctrl, writeBlockRect(at, lines), 140);
+      const blockRect = writeBlockRect(at, lines);
+      if (existingAt) keepRectInView(ctrl, blockRect);
+      else panToRect(ctrl, blockRect, 140);
       return `ok:${jobId}`;
     }
     case "cancelWriting": {

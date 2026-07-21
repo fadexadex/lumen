@@ -1,15 +1,39 @@
-/**
- * react-katex is CJS — named ESM imports break Vite SSR ("Named export not found").
- * Re-export via default interop so lesson routes stay SSR-safe.
- */
-import type { ComponentType } from "react";
-import Katex from "react-katex";
+import type { ReactNode } from "react";
+import katex from "katex";
 
-type KatexComponents = {
-  BlockMath: ComponentType<{ math: string; children?: string }>;
-  InlineMath: ComponentType<{ math: string; children?: string }>;
+type KatexProps = {
+  math?: string;
+  children?: string;
+  errorColor?: string;
+  renderError?: (error: Error) => ReactNode;
 };
 
-const k = Katex as unknown as KatexComponents;
-export const BlockMath = k.BlockMath;
-export const InlineMath = k.InlineMath;
+export function renderKatexToString(math: string, displayMode = false): string {
+  return katex.renderToString(math, { displayMode, throwOnError: true });
+}
+
+export function InlineMath(props: KatexProps) {
+  return <KatexMath {...props} displayMode={false} />;
+}
+
+export function BlockMath(props: KatexProps) {
+  return <KatexMath {...props} displayMode />;
+}
+
+function KatexMath({
+  math,
+  children,
+  errorColor,
+  renderError,
+  displayMode,
+}: KatexProps & { displayMode: boolean }) {
+  const value = math ?? children ?? "";
+  try {
+    const html = renderKatexToString(value, displayMode);
+    const Component = displayMode ? "div" : "span";
+    return <Component data-testid="react-katex" dangerouslySetInnerHTML={{ __html: html }} />;
+  } catch (error) {
+    if (error instanceof Error && renderError) return <>{renderError(error)}</>;
+    return <span style={{ color: errorColor }}>{value}</span>;
+  }
+}

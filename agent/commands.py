@@ -48,8 +48,15 @@ def set_parabola(a: float, b: float, c: float) -> str:
     return _cmd("setParabola", a=a, b=b, c=c)
 
 
-def write_block(lines: list[str], target: Optional[str] = None, place: str = "below", job_id: Optional[str] = None) -> str:
-    return _cmd("writeBlock", lines=lines, target=target, place=place, jobId=job_id)
+def write_block(
+    lines: list[str],
+    target: Optional[str] = None,
+    place: str = "below",
+    job_id: Optional[str] = None,
+) -> str:
+    # Keep ordinary follow-up steps in one stable work area even if the model omits job_id.
+    # A distinct explicit job_id still creates an independent block when requested.
+    return _cmd("writeBlock", lines=lines, target=target, place=place, jobId=job_id or "active-work")
 
 
 def cancel_writing(job_id: Optional[str] = None) -> str:
