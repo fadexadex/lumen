@@ -34,12 +34,12 @@ export type ModuleGenStatus = "pending" | "generating" | "ready" | "failed";
 export interface CourseModule extends RoadmapModule {
   status: ModuleGenStatus;
   error?: string;
-  script?: LessonScript;          // present when ready
-  curatedBriefId?: string;        // optional link to curator output
+  script?: LessonScript; // present when ready
+  curatedBriefId?: string; // optional link to curator output
 }
 
 export interface Course {
-  id: string;                     // uuid
+  id: string; // uuid
   profile: LearnerProfile;
   topic: string;
   modules: CourseModule[];
@@ -52,13 +52,13 @@ Zustand (`tutor-store`) grows to hold `course: Course | null` instead of bare `r
 
 ## 3. Processes
 
-| Process | Role |
-|---------|------|
-| TanStack Start API routes | SSE streams for roadmap/lesson; start/retry endpoints |
-| CourseOrchestrator | Priority queue: module 0 first, then parallel rest |
-| LessonGenerator | `streamObject(lessonScriptSchema)` + validation + repair |
+| Process                        | Role                                                      |
+| ------------------------------ | --------------------------------------------------------- |
+| TanStack Start API routes      | SSE streams for roadmap/lesson; start/retry endpoints     |
+| CourseOrchestrator             | Priority queue: module 0 first, then parallel rest        |
+| LessonGenerator                | `streamObject(lessonScriptSchema)` + validation + repair  |
 | UI Tool Router (optional path) | `streamText` + generative UI tools during lesson / studio |
-| Curator (optional) | Web research → `CuratedBrief` before lesson gen |
+| Curator (optional)             | Web research → `CuratedBrief` before lesson gen           |
 
 Demo: all in one Node process. Later: extract orchestrator to a worker.
 

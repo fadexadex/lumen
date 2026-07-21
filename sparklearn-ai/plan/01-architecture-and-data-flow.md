@@ -29,6 +29,7 @@ topology, the **full real-time loop**, and the exact sequence for "AI draws whil
 ```
 
 Three things you run locally for the demo:
+
 1. **`sparklearn-ai`** (already: `npm run dev`).
 2. **Token server** (`node token-server/server.mjs`) — mints LiveKit JWTs. See `03`.
 3. **Agent worker** (`uv run agent.py dev`) — joins rooms, runs Gemini. See `02`.
@@ -46,11 +47,12 @@ Two agent→client paths exist:
 - **RPC** (`performRpc` / `registerRpcMethod`): request/response with an ack + error surface.
 
 We use **RPC** for canvas commands because:
+
 - We get an **ack** ("command applied") so the agent's async tool can resolve cleanly.
 - Errors (e.g. "target not found") propagate back to the model → it can self-correct verbally.
 - It's 1:1 (agent → the specific learner), which matches our single-user demo.
 
-We use **data messages** only for the *client→agent* board-state deltas (slider moved, step
+We use **data messages** only for the _client→agent_ board-state deltas (slider moved, step
 changed) where no response is needed. See `08`.
 
 ---
@@ -79,7 +81,7 @@ changed) where no response is needed. See `08`.
 
 Key property: **(a) audio, (b) tool call, (c) transcript are concurrent.** Because the tool
 is `async` and returns before the animation finishes, Gemini's speech ("…notice how the
-parabola — *[vertex gets circled]* — opens upward…") is not blocked by the draw.
+parabola — _[vertex gets circled]_ — opens upward…") is not blocked by the draw.
 
 ---
 
@@ -145,15 +147,15 @@ Implementation of the amplitude tap and CSS states is in `07`.
 
 ## 7. Threading model / who owns what
 
-| Concern | Owner | Notes |
-|--------|-------|------|
-| Mic capture, echo cancel, playback | LiveKit client | `setMicrophoneEnabled`, auto-plays agent track |
-| STT + reasoning + TTS | Gemini Live (via agent) | single speech-to-speech model |
-| Turn-taking / interruption | LiveKit Agents + Gemini | built-in VAD + barge-in |
-| Deciding WHAT to draw | Gemini (tool calls) | guided by system prompt + board context |
-| Resolving "vertex" → coords | **Client** (`board-targets.ts`) | model never sees pixel coords |
-| Rendering + animating marks | **Client** (`LumenCanvasController`) | world-space SVG |
-| Board state summary | Client builds, agent consumes | `board-context.ts` ⇄ `board_context.py` |
+| Concern                            | Owner                                | Notes                                          |
+| ---------------------------------- | ------------------------------------ | ---------------------------------------------- |
+| Mic capture, echo cancel, playback | LiveKit client                       | `setMicrophoneEnabled`, auto-plays agent track |
+| STT + reasoning + TTS              | Gemini Live (via agent)              | single speech-to-speech model                  |
+| Turn-taking / interruption         | LiveKit Agents + Gemini              | built-in VAD + barge-in                        |
+| Deciding WHAT to draw              | Gemini (tool calls)                  | guided by system prompt + board context        |
+| Resolving "vertex" → coords        | **Client** (`board-targets.ts`)      | model never sees pixel coords                  |
+| Rendering + animating marks        | **Client** (`LumenCanvasController`) | world-space SVG                                |
+| Board state summary                | Client builds, agent consumes        | `board-context.ts` ⇄ `board_context.py`        |
 
 Design rule that makes this tractable: **the model speaks in semantic targets** ("vertex",
 "axis", "the x² term"), and the **client owns all geometry**. This keeps the model prompt

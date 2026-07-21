@@ -8,12 +8,12 @@ Wire generation into the existing screens without inventing a new app shell.
 
 Extend `RoadmapView.tsx` cards:
 
-| Status | UI |
-|--------|-----|
-| `pending` | Dim card, lock icon, “Waiting…” |
-| `generating` | Soft pulse / shimmer, “Writing lesson…” |
-| `ready` | Full card, primary CTA “Open” |
-| `failed` | Warning chip + “Retry” button → `POST /api/course/:id/modules/:mid/retry` |
+| Status       | UI                                                                        |
+| ------------ | ------------------------------------------------------------------------- |
+| `pending`    | Dim card, lock icon, “Waiting…”                                           |
+| `generating` | Soft pulse / shimmer, “Writing lesson…”                                   |
+| `ready`      | Full card, primary CTA “Open”                                             |
+| `failed`     | Warning chip + “Retry” button → `POST /api/course/:id/modules/:mid/retry` |
 
 Module 1: when it becomes `ready`, emphasize with a short motion (reuse `tutor-fade-in`).
 
@@ -97,9 +97,21 @@ lesson mid-play (confusing). Treat open lessons as immutable snapshots; regen = 
 
 ---
 
-## 7. Onboarding fake delay
+## 7. Onboarding → the "planning" animation
 
-Remove or shorten the cosmetic “building your path” delay; replace with real SSE progress
-(“Outlining path…”, “Writing lesson 1…”).
+Remove the cosmetic “building your path” delay entirely. Replace it with the **real** planning
+moment: `streamObject(roadmapSchema)` (`02 §2`) drives a live animation where Lumen decides the
+**number and shape of modules** and cards **pop in one at a time** as they're emitted
+(`roadmap_partial` events). This is the learner's first signal that the course is genuinely being
+thought through for them, not pulled off a shelf.
+
+Sequence:
+
+1. Submit onboarding → `POST /api/course/start`.
+2. Show a "Planning your path…" state that renders each module card as it streams in.
+3. When the outline resolves, module-0 generation (already streaming) fills the first card to
+   `ready`; the rest flip `generating → ready` in the background (`05`).
+
+Only the outline needs the pop-in animation; lesson bodies use the status/skeleton UX above.
 
 Next: `07` — integration with the Live tutor plan.

@@ -9,10 +9,10 @@ Official docs: [AI SDK UI — Generative User Interfaces](https://ai-sdk.dev/doc
 
 ## 1. Recommended approach for Lumen
 
-| Approach | Status | Fit for sparklearn-ai |
-|----------|--------|------------------------|
-| **AI SDK UI** (`streamText` + tools + `useChat` / message parts) | **Production** | ✅ TanStack Start friendly |
-| AI SDK RSC (`streamUI`, `createStreamableUI`) | Experimental; Next.js RSC | ❌ Skip for now |
+| Approach                                                         | Status                    | Fit for sparklearn-ai      |
+| ---------------------------------------------------------------- | ------------------------- | -------------------------- |
+| **AI SDK UI** (`streamText` + tools + `useChat` / message parts) | **Production**            | ✅ TanStack Start friendly |
+| AI SDK RSC (`streamUI`, `createStreamableUI`)                    | Experimental; Next.js RSC | ❌ Skip for now            |
 
 We implement Generative UI as:
 
@@ -32,15 +32,16 @@ Render <ParabolaWidget {...args} />   // existing component
 
 Define tools that map 1:1 onto existing board concepts / widgets:
 
-| Tool name | Args (Zod) | React component | When the model should call it |
-|-----------|------------|-----------------|-------------------------------|
-| `showParabola` | `{ a,b,c }` | `ParabolaWidget` | Graph intuition, vertex/roots |
-| `showAlgebraTiles` | `{ xSquared,x,unit,factored? }` | Tiles concept | Factoring |
-| `showNumberLine` | `{ points, range }` | NumberLine | Roots / intervals |
-| `showPracticeCard` | `{ prompt, options, answer, hint? }` | new `PracticeCard` | Check understanding |
-| `showWorkedExample` | `{ lines: {text?,math?}[] }` | new `WorkedExample` | Step-by-step reveal |
-| `showEquation` | `{ latex, caption? }` | KaTeX block | Emphasize a formula |
-| `updateLessonDiagram` | same as diagram schema | writes into `LessonScript.diagram` | Persist into the course board |
+| Tool name             | Args (Zod)                           | React component                    | When the model should call it |
+| --------------------- | ------------------------------------ | ---------------------------------- | ----------------------------- |
+| `showParabola`        | `{ a,b,c }`                          | `ParabolaWidget`                   | Graph intuition, vertex/roots |
+| `showAlgebraTiles`    | `{ xSquared,x,unit,factored? }`      | Tiles concept                      | Factoring                     |
+| `showNumberLine`      | `{ points, range }`                  | NumberLine                         | Roots / intervals             |
+| `showPracticeCard`    | `{ prompt, options, answer, hint? }` | new `PracticeCard`                 | Check understanding           |
+| `showWorkedExample`   | `{ lines: {text?,math?}[] }`         | new `WorkedExample`                | Step-by-step reveal           |
+| `showEquation`        | `{ latex, caption? }`                | KaTeX block                        | Emphasize a formula           |
+| `showConceptAnimation`| `conceptAnimationSchema` (`09`)      | `ConceptAnimationPlayer`           | Break a concept down visually (dynamic board) |
+| `updateLessonDiagram` | same as diagram schema               | writes into `LessonScript.diagram` | Persist into the course board |
 
 `updateLessonDiagram` is special: it **mutates the stored script** so MathCanvas / Live targets
 update — generative UI that becomes durable course content.
@@ -52,15 +53,23 @@ update — generative UI that becomes durable course content.
 `src/routes/api/course/gen-ui.ts` (or `api/gen-ui`):
 
 ```ts
-import { streamText, tool, convertToModelMessages, createUIMessageStreamResponse, toUIMessageStream } from "ai";
-import { google } from "@ai-sdk/google";
+import {
+  streamText,
+  tool,
+  convertToModelMessages,
+  createUIMessageStreamResponse,
+  toUIMessageStream,
+} from "ai";
+import { mistral } from "@ai-sdk/mistral";
 import { z } from "zod";
 import { enrichParabola } from "@/lib/course-gen/math";
 
 const showParabola = tool({
   description: "Show an interactive parabola y=ax²+bx+c the learner can explore.",
   inputSchema: z.object({
-    a: z.number(), b: z.number(), c: z.number(),
+    a: z.number(),
+    b: z.number(),
+    c: z.number(),
     caption: z.string().optional(),
   }),
   execute: async (input) => enrichParabola(input), // return data only — UI on client
@@ -82,7 +91,7 @@ export async function POST({ request }: { request: Request }) {
   // context: { moduleId, stepTitle, equation, grade, style }
 
   const result = streamText({
-    model: google("gemini-2.5-flash"),
+    model: mistral("mistral-small-latest"),
     system: `You are Lumen teaching on a whiteboard. Prefer calling UI tools over long prose.
 Context: ${JSON.stringify(context)}`,
     messages: await convertToModelMessages(messages),
@@ -118,10 +127,16 @@ export function GenUIRail({ context }: { context: object }) {
       {messages.map((m) => (
         <div key={m.id}>
           {m.parts.map((part, i) => {
-            if (part.type === "text") return <p key={i} className="tutor-serif">{part.text}</p>;
+            if (part.type === "text")
+              return (
+                <p key={i} className="tutor-serif">
+                  {part.text}
+                </p>
+              );
 
             if (part.type === "tool-showParabola") {
-              if (part.state === "input-available") return <Skeleton key={i} label="Sketching graph…" />;
+              if (part.state === "input-available")
+                return <Skeleton key={i} label="Sketching graph…" />;
               if (part.state === "output-available") {
                 const { a, b, c } = part.output;
                 return (
@@ -155,7 +170,7 @@ Two placements (pick for demo; both valid):
    (shared catalog). Prefer one component registry: `src/lib/course-gen/ui-registry.ts`.
 
 MathCanvas-primary path for durable content remains **schema generation** (`02`). Generative UI
-is for *ephemeral / conversational* interactivity and for writing diagram updates into the script.
+is for _ephemeral / conversational_ interactivity and for writing diagram updates into the script.
 
 ---
 
@@ -187,12 +202,12 @@ Server tools and client switch statements both import from here — prevents dri
 
 ## 7. How this differs from “generative courses” content
 
-| | LessonScript generation (`02`) | Generative UI (`03`) |
-|--|-------------------------------|----------------------|
-| Output | Full module JSON | Tool results mid-conversation |
-| Persistence | Saved on Course | Ephemeral unless `updateLessonDiagram` |
-| Primary consumer | MathCanvas / roadmap | Rails, Live, studio chat |
-| Latency | Seconds–tens of seconds | Sub-second streaming parts |
+|                  | LessonScript generation (`02`) | Generative UI (`03`)                   |
+| ---------------- | ------------------------------ | -------------------------------------- |
+| Output           | Full module JSON               | Tool results mid-conversation          |
+| Persistence      | Saved on Course                | Ephemeral unless `updateLessonDiagram` |
+| Primary consumer | MathCanvas / roadmap           | Rails, Live, studio chat               |
+| Latency          | Seconds–tens of seconds        | Sub-second streaming parts             |
 
 A complete product uses **both**: courses are generated as scripts; the tutor/studio can still
 drop live widgets.

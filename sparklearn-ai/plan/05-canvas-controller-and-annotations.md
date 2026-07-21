@@ -5,6 +5,7 @@ is what makes "AI **draws on the board while talking, and the marks stay pinned 
 zooms**." It's 100% our code.
 
 Three sub-systems:
+
 1. **World-space annotation layer** — an SVG inside `.mc-world` so marks transform with content.
 2. **`LumenCanvasController`** — imperative API (`circle`, `highlight`, `label`, `drawAxis`,
    `plotParabola`, `panTo`, `clear`) with animations.
@@ -26,7 +27,7 @@ Today in `MathCanvas.tsx`:
   .mc-notes-layer                 (SCREEN space)
 ```
 
-The ink/notes layers sit *outside* `.mc-world`, sized to the raw viewport. If AI drew there,
+The ink/notes layers sit _outside_ `.mc-world`, sized to the raw viewport. If AI drew there,
 its marks would **detach on pan/zoom** — fatal for "circle the vertex then zoom in."
 
 **Fix:** add ONE child inside `.mc-board`:
@@ -38,7 +39,7 @@ its marks would **detach on pan/zoom** — fatal for "circle the vertex then zoo
 ```
 
 Because it's inside `.mc-world`, it inherits the exact same `translate+scale`. An ellipse at
-world `(x,y)` is *always* over the same board content, at any zoom. Zero per-frame reprojection
+world `(x,y)` is _always_ over the same board content, at any zoom. Zero per-frame reprojection
 needed. Line thickness scales too — we counter that with `vector-effect="non-scaling-stroke"`
 where we want crisp strokes regardless of zoom.
 
@@ -65,7 +66,7 @@ type Anno =
   | { id: string; kind: "label"; at: WPoint; text: string; place: Place }
   | { id: string; kind: "arrow"; from: WPoint; to: WPoint; text?: string }
   | { id: string; kind: "axis"; x: number; y0: number; y1: number; label?: string }
-  | { id: string; kind: "path"; d: string; color: string };   // e.g. overlaid parabola
+  | { id: string; kind: "path"; d: string; color: string }; // e.g. overlaid parabola
 
 export type Place = "above" | "below" | "left" | "right";
 
@@ -82,51 +83,78 @@ export interface LumenCanvasController {
 
 const COLORS: Record<string, string> = {
   amber: "oklch(0.83 0.16 80)",
-  ink:   "oklch(0.2 0 0)",
-  rose:  "oklch(0.62 0.19 20)",
-  teal:  "oklch(0.7 0.12 190)",
+  ink: "oklch(0.2 0 0)",
+  rose: "oklch(0.62 0.19 20)",
+  teal: "oklch(0.7 0.12 190)",
 };
 
-export const AnnotationLayer = forwardRef<LumenCanvasController>(function AnnotationLayer(_props, ref) {
-  const [annos, setAnnos] = useState<Anno[]>([]);
-  const seq = useRef(0);
-  const newId = () => `ai-${++seq.current}`;
+export const AnnotationLayer = forwardRef<LumenCanvasController>(
+  function AnnotationLayer(_props, ref) {
+    const [annos, setAnnos] = useState<Anno[]>([]);
+    const seq = useRef(0);
+    const newId = () => `ai-${++seq.current}`;
 
-  const add = useCallback((a: Anno) => { setAnnos((xs) => [...xs, a]); return a.id; }, []);
+    const add = useCallback((a: Anno) => {
+      setAnnos((xs) => [...xs, a]);
+      return a.id;
+    }, []);
 
-  useImperativeHandle(ref, (): LumenCanvasController => ({
-    highlight: (rect, o) => add({ id: newId(), kind: "highlight", rect, color: COLORS[o?.color ?? "amber"], label: o?.label }),
-    circle:    (at, o)   => add({ id: newId(), kind: "circle", at, r: o?.r ?? 46, label: o?.label }),
-    label:     (at, text, place = "above") => add({ id: newId(), kind: "label", at, text, place }),
-    arrow:     (from, to, text) => add({ id: newId(), kind: "arrow", from, to, text }),
-    drawAxis:  (x, y0, y1, label) => add({ id: newId(), kind: "axis", x, y0, y1, label }),
-    drawPath:  (d, color = "teal") => add({ id: newId(), kind: "path", d, color: COLORS[color] ?? color }),
-    remove:    (id) => setAnnos((xs) => xs.filter((a) => a.id !== id)),
-    clear:     () => setAnnos([]),
-  }), [add]);
+    useImperativeHandle(
+      ref,
+      (): LumenCanvasController => ({
+        highlight: (rect, o) =>
+          add({
+            id: newId(),
+            kind: "highlight",
+            rect,
+            color: COLORS[o?.color ?? "amber"],
+            label: o?.label,
+          }),
+        circle: (at, o) => add({ id: newId(), kind: "circle", at, r: o?.r ?? 46, label: o?.label }),
+        label: (at, text, place = "above") => add({ id: newId(), kind: "label", at, text, place }),
+        arrow: (from, to, text) => add({ id: newId(), kind: "arrow", from, to, text }),
+        drawAxis: (x, y0, y1, label) => add({ id: newId(), kind: "axis", x, y0, y1, label }),
+        drawPath: (d, color = "teal") =>
+          add({ id: newId(), kind: "path", d, color: COLORS[color] ?? color }),
+        remove: (id) => setAnnos((xs) => xs.filter((a) => a.id !== id)),
+        clear: () => setAnnos([]),
+      }),
+      [add],
+    );
 
-  return (
-    <svg
-      className="mc-annotation-layer"
-      width={BOARD_W}
-      height={BOARD_H}
-      viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
-      style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "visible" }}
-    >
-      <defs>
-        <marker id="lumen-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M0 0 L10 5 L0 10 z" fill={COLORS.ink} />
-        </marker>
-      </defs>
-      {annos.map((a) => <AnnoView key={a.id} a={a} />)}
-    </svg>
-  );
-});
+    return (
+      <svg
+        className="mc-annotation-layer"
+        width={BOARD_W}
+        height={BOARD_H}
+        viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
+        style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "visible" }}
+      >
+        <defs>
+          <marker
+            id="lumen-arrow"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="7"
+            markerHeight="7"
+            orient="auto-start-reverse"
+          >
+            <path d="M0 0 L10 5 L0 10 z" fill={COLORS.ink} />
+          </marker>
+        </defs>
+        {annos.map((a) => (
+          <AnnoView key={a.id} a={a} />
+        ))}
+      </svg>
+    );
+  },
+);
 ```
 
 ### 2a. The renderers + draw-on animation
 
-Each annotation renders as SVG and animates *on* using `stroke-dasharray/dashoffset`
+Each annotation renders as SVG and animates _on_ using `stroke-dasharray/dashoffset`
 (hand-drawn draw-in) or fade-rise (labels). We use a callback ref to run the Web Animations API
 once the node mounts.
 
@@ -137,10 +165,11 @@ function useDrawOn() {
     const len = (node as SVGGeometryElement).getTotalLength?.() ?? 200;
     node.style.strokeDasharray = String(len);
     node.style.strokeDashoffset = String(len);
-    node.animate(
-      [{ strokeDashoffset: len }, { strokeDashoffset: 0 }],
-      { duration: 520, easing: "cubic-bezier(0.22,1,0.36,1)", fill: "forwards" },
-    );
+    node.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], {
+      duration: 520,
+      easing: "cubic-bezier(0.22,1,0.36,1)",
+      fill: "forwards",
+    });
   }, []);
 }
 
@@ -151,12 +180,25 @@ function AnnoView({ a }: { a: Anno }) {
       return (
         <g className="mc-anno mc-anno--highlight">
           <rect
-            x={a.rect.x} y={a.rect.y} width={a.rect.w} height={a.rect.h} rx={10}
-            fill={a.color} fillOpacity={0.18} stroke={a.color} strokeWidth={2}
+            x={a.rect.x}
+            y={a.rect.y}
+            width={a.rect.w}
+            height={a.rect.h}
+            rx={10}
+            fill={a.color}
+            fillOpacity={0.18}
+            stroke={a.color}
+            strokeWidth={2}
             vectorEffect="non-scaling-stroke"
             style={{ transformBox: "fill-box", transformOrigin: "center" }}
           />
-          {a.label && <AnnoLabel at={{ x: a.rect.x + a.rect.w / 2, y: a.rect.y }} text={a.label} place="above" />}
+          {a.label && (
+            <AnnoLabel
+              at={{ x: a.rect.x + a.rect.w / 2, y: a.rect.y }}
+              text={a.label}
+              place="above"
+            />
+          )}
         </g>
       );
     case "circle":
@@ -165,12 +207,20 @@ function AnnoView({ a }: { a: Anno }) {
           {/* hand-drawn: slightly rotated ellipse, drawn on */}
           <ellipse
             ref={drawOn}
-            cx={a.at.x} cy={a.at.y} rx={a.r} ry={a.r * 0.82}
-            fill="none" stroke={COLORS.rose} strokeWidth={3} strokeLinecap="round"
+            cx={a.at.x}
+            cy={a.at.y}
+            rx={a.r}
+            ry={a.r * 0.82}
+            fill="none"
+            stroke={COLORS.rose}
+            strokeWidth={3}
+            strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
             transform={`rotate(-8 ${a.at.x} ${a.at.y})`}
           />
-          {a.label && <AnnoLabel at={{ x: a.at.x, y: a.at.y - a.r }} text={a.label} place="above" />}
+          {a.label && (
+            <AnnoLabel at={{ x: a.at.x, y: a.at.y - a.r }} text={a.label} place="above" />
+          )}
         </g>
       );
     case "axis":
@@ -179,7 +229,10 @@ function AnnoView({ a }: { a: Anno }) {
           <path
             ref={drawOn}
             d={`M ${a.x} ${a.y0} L ${a.x} ${a.y1}`}
-            stroke={COLORS.ink} strokeWidth={2} strokeDasharray="2 8" strokeLinecap="round"
+            stroke={COLORS.ink}
+            strokeWidth={2}
+            strokeDasharray="2 8"
+            strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
           />
           {a.label && <AnnoLabel at={{ x: a.x, y: a.y0 }} text={a.label} place="above" />}
@@ -191,17 +244,31 @@ function AnnoView({ a }: { a: Anno }) {
           <path
             ref={drawOn}
             d={`M ${a.from.x} ${a.from.y} L ${a.to.x} ${a.to.y}`}
-            stroke={COLORS.ink} strokeWidth={2.4} fill="none" markerEnd="url(#lumen-arrow)"
+            stroke={COLORS.ink}
+            strokeWidth={2.4}
+            fill="none"
+            markerEnd="url(#lumen-arrow)"
             vectorEffect="non-scaling-stroke"
           />
-          {a.text && <AnnoLabel at={{ x: (a.from.x + a.to.x) / 2, y: (a.from.y + a.to.y) / 2 }} text={a.text} place="above" />}
+          {a.text && (
+            <AnnoLabel
+              at={{ x: (a.from.x + a.to.x) / 2, y: (a.from.y + a.to.y) / 2 }}
+              text={a.text}
+              place="above"
+            />
+          )}
         </g>
       );
     case "path":
       return (
         <path
-          ref={drawOn} className="mc-anno mc-anno--path"
-          d={a.d} fill="none" stroke={a.color} strokeWidth={3} strokeLinecap="round"
+          ref={drawOn}
+          className="mc-anno mc-anno--path"
+          d={a.d}
+          fill="none"
+          stroke={a.color}
+          strokeWidth={3}
+          strokeLinecap="round"
           vectorEffect="non-scaling-stroke"
         />
       );
@@ -215,10 +282,14 @@ function AnnoLabel({ at, text, place }: { at: WPoint; text: string; place: Place
   const dy = place === "above" ? -14 : place === "below" ? 22 : 4;
   const anchor = place === "left" ? "end" : place === "right" ? "start" : "middle";
   return (
-    <g className="mc-anno mc-anno--label" style={{ /* fade-rise via CSS class below */ }}>
+    <g className="mc-anno mc-anno--label" style={{/* fade-rise via CSS class below */}}>
       <text
-        x={at.x + dx} y={at.y + dy} textAnchor={anchor as any}
-        fontSize={20} fontFamily="var(--font-serif)" fill={COLORS.ink}
+        x={at.x + dx}
+        y={at.y + dy}
+        textAnchor={anchor as any}
+        fontSize={20}
+        fontFamily="var(--font-serif)"
+        fill={COLORS.ink}
         style={{ paintOrder: "stroke", stroke: "white", strokeWidth: 4 }}
       >
         {text}
@@ -231,13 +302,39 @@ function AnnoLabel({ at, text, place }: { at: WPoint; text: string; place: Place
 ### 2b. Annotation CSS (add to `math-canvas.css`)
 
 ```css
-.mc-annotation-layer { z-index: 5; }             /* above lesson layer, below chrome */
-.mc-anno--highlight rect { animation: anno-pop 360ms var(--ease-tutor) both; }
-.mc-anno--label     { animation: anno-rise 340ms var(--ease-tutor) both; }
-@keyframes anno-pop  { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
-@keyframes anno-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.mc-annotation-layer {
+  z-index: 5;
+} /* above lesson layer, below chrome */
+.mc-anno--highlight rect {
+  animation: anno-pop 360ms var(--ease-tutor) both;
+}
+.mc-anno--label {
+  animation: anno-rise 340ms var(--ease-tutor) both;
+}
+@keyframes anno-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes anno-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 /* subtle breathing so a highlight keeps drawing the eye while Lumen talks */
-.mc-anno--highlight rect { will-change: transform; }
+.mc-anno--highlight rect {
+  will-change: transform;
+}
 ```
 
 ---
@@ -254,7 +351,7 @@ import type { LessonScript } from "@/lib/types";
 import type { WPoint, WRect } from "@/components/math-canvas/annotation-layer";
 
 export interface ResolvedTargets {
-  names: string[];                      // sent to the agent as board context
+  names: string[]; // sent to the agent as board context
   point(name: string): WPoint | null;
   rect(name: string): WRect | null;
   parabola: ParabolaGeom | null;
@@ -263,20 +360,30 @@ export interface ResolvedTargets {
 /** Mirror parabola-widget.tsx math so graph coords → board(world) coords. */
 interface ParabolaGeom {
   beat: Extract<Beat, { kind: "diagram" }>;
-  a: number; b: number; c: number;
-  X_MIN: number; X_MAX: number; Y_MIN: number; Y_MAX: number;
+  a: number;
+  b: number;
+  c: number;
+  X_MIN: number;
+  X_MAX: number;
+  Y_MIN: number;
+  Y_MAX: number;
   graphToWorld(gx: number, gy: number): WPoint;
   vertex: WPoint | null;
   roots: WPoint[];
 }
 
-const X_MIN = -10, X_MAX = 10, Y_MIN = -10, Y_MAX = 10;
+const X_MIN = -10,
+  X_MAX = 10,
+  Y_MIN = -10,
+  Y_MAX = 10;
 
 function estimateBeatRect(b: Beat): WRect {
   // Same estimates as MathCanvas.estimateBeatBox (keep in sync).
-  if (b.kind === "title") return { x: b.x, y: b.y, w: b.size === "h1" ? 980 : 720, h: b.size === "h1" ? 90 : 60 };
-  if (b.kind === "text")  return { x: b.x, y: b.y, w: 700, h: 44 * Math.max(1, Math.ceil(b.text.length / 58)) };
-  if (b.kind === "math")  return { x: b.x, y: b.y, w: 560, h: 96 };
+  if (b.kind === "title")
+    return { x: b.x, y: b.y, w: b.size === "h1" ? 980 : 720, h: b.size === "h1" ? 90 : 60 };
+  if (b.kind === "text")
+    return { x: b.x, y: b.y, w: 700, h: 44 * Math.max(1, Math.ceil(b.text.length / 58)) };
+  if (b.kind === "math") return { x: b.x, y: b.y, w: 560, h: 96 };
   if (b.kind === "options") return { x: b.x, y: b.y, w: 640, h: 110 };
   return { x: b.x, y: b.y, w: b.w, h: b.h };
 }
@@ -293,22 +400,26 @@ export function resolveTargets(script: LessonScript): ResolvedTargets {
     if (b.kind === "math" && stepMath[b.step] == null) stepMath[b.step] = b;
     if (b.kind === "title" && b.size === "h2") {
       const key = `step${b.step}.title`;
-      rects.set(key, estimateBeatRect(b)); names.push(key);
+      rects.set(key, estimateBeatRect(b));
+      names.push(key);
     }
   });
   Object.entries(stepMath).forEach(([step, b]) => {
     const key = `step${step}.equation`;
     const r = estimateBeatRect(b);
-    rects.set(key, r); points.set(key, { x: r.x + r.w / 2, y: r.y + r.h / 2 }); names.push(key);
+    rects.set(key, r);
+    points.set(key, { x: r.x + r.w / 2, y: r.y + r.h / 2 });
+    names.push(key);
   });
 
   // Parabola geometry (if this lesson has a diagram)
   let parabola: ParabolaGeom | null = null;
-  const dia = beats.find((b) => b.kind === "diagram") as Extract<Beat, { kind: "diagram" }> | undefined;
+  const dia = beats.find((b) => b.kind === "diagram") as
+    Extract<Beat, { kind: "diagram" }> | undefined;
   if (dia && dia.params) {
     const { a, b, c } = dia.params;
     const plotW = dia.w;
-    const plotH = dia.h - 130;               // matches ParabolaWidget
+    const plotH = dia.h - 130; // matches ParabolaWidget
     const graphToWorld = (gx: number, gy: number): WPoint => ({
       x: dia.x + ((gx - X_MIN) / (X_MAX - X_MIN)) * plotW,
       y: dia.y + (plotH - ((gy - Y_MIN) / (Y_MAX - Y_MIN)) * plotH),
@@ -319,12 +430,20 @@ export function resolveTargets(script: LessonScript): ResolvedTargets {
     const disc = b * b - 4 * a * c;
     const roots =
       disc >= 0 && a !== 0
-        ? [(-b + Math.sqrt(disc)) / (2 * a), (-b - Math.sqrt(disc)) / (2 * a)].map((r) => graphToWorld(r, 0))
+        ? [(-b + Math.sqrt(disc)) / (2 * a), (-b - Math.sqrt(disc)) / (2 * a)].map((r) =>
+            graphToWorld(r, 0),
+          )
         : [];
     parabola = { beat: dia, a, b, c, X_MIN, X_MAX, Y_MIN, Y_MAX, graphToWorld, vertex, roots };
 
-    if (vertex) { points.set("vertex", vertex); names.push("vertex"); }
-    roots.forEach((p, i) => { points.set(`root${i + 1}`, p); names.push(`root${i + 1}`); });
+    if (vertex) {
+      points.set("vertex", vertex);
+      names.push("vertex");
+    }
+    roots.forEach((p, i) => {
+      points.set(`root${i + 1}`, p);
+      names.push(`root${i + 1}`);
+    });
     // axis of symmetry handled specially in the controller (needs full height)
     if (a !== 0) names.push("axisOfSymmetry");
     // the graph area itself
@@ -354,12 +473,14 @@ const centerOf = (r: WRect): WPoint => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
 Three small edits. (Full diff-style guidance in `10`.)
 
 **(a) Mount the annotation layer inside `.mc-board`:**
+
 ```tsx
 // after <div className="mc-lesson-layer">…</div>, still inside .mc-board:
 <AnnotationLayer ref={annoRef} />
 ```
 
 **(b) Register the controller + coordinate helpers on mount** (mirrors `whiteboard-bridge`):
+
 ```tsx
 import { setCanvasController } from "@/lib/live/canvas-agent-bridge";
 import { AnnotationLayer, type LumenCanvasController } from "./annotation-layer";
@@ -403,11 +524,13 @@ zoom-around-point math already in `MathCanvas` (`cx - (cx - v.x) * k`).
 ```ts
 // inside canvas-agent-bridge.ts (or a helper the controller calls)
 export function panToRect(ctrl: CanvasControllerHandle, rect: WRect, pad = 120) {
-  const el = ctrl.viewportEl(); if (!el) return;
+  const el = ctrl.viewportEl();
+  if (!el) return;
   const availW = el.clientWidth - pad * 2;
   const availH = el.clientHeight - pad * 2;
   const targetScale = Math.max(0.4, Math.min(1.6, Math.min(availW / rect.w, availH / rect.h)));
-  const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+  const cx = rect.x + rect.w / 2,
+    cy = rect.y + rect.h / 2;
   const nx = el.clientWidth / 2 - cx * targetScale;
   const ny = el.clientHeight / 2 - cy * targetScale;
   animateView(ctrl, { x: nx, y: ny, scale: targetScale }, 620);
@@ -416,7 +539,7 @@ export function panToRect(ctrl: CanvasControllerHandle, rect: WRect, pad = 120) 
 function animateView(ctrl: CanvasControllerHandle, to: View, ms: number) {
   const from = ctrl.getView();
   const t0 = performance.now();
-  const ease = (t: number) => 1 - Math.pow(1 - t, 3);      // easeOutCubic
+  const ease = (t: number) => 1 - Math.pow(1 - t, 3); // easeOutCubic
   const step = (now: number) => {
     const t = Math.min(1, (now - t0) / ms);
     const k = ease(t);
@@ -428,7 +551,7 @@ function animateView(ctrl: CanvasControllerHandle, to: View, ms: number) {
     if (t < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
-};
+}
 ```
 
 Because annotations are inside `.mc-world`, they animate right along with this pan — the "camera

@@ -1,2 +1,14 @@
 # gstack browse / browser session (logs, cookies state, local ports)
 .gstack/
+
+# Secrets (Lumen Live)
+.env
+sparklearn-ai/.env
+agent/.env.local
+token-server/.env
+# Python
+agent/.venv/
+__pycache__/
+*.pyc
+
+node_modules/

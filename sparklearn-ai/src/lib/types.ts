@@ -43,10 +43,7 @@ export interface LessonStepPractice {
   answer: string;
   hint?: string;
 }
-export type LessonStep =
-  | LessonStepExplanation
-  | LessonStepExample
-  | LessonStepPractice;
+export type LessonStep = LessonStepExplanation | LessonStepExample | LessonStepPractice;
 
 export interface LessonScript {
   moduleId: string;

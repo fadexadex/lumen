@@ -3,13 +3,15 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { useTutorStore } from "@/lib/tutor-store";
 import { getLessonScript } from "@/lib/lesson-scripts";
 import { Whiteboard } from "./Whiteboard";
-import { LiveDrawer } from "./LiveDrawer";
 import { MathField, MATH_SHORTCUTS } from "./MathField";
 import { BlockMath } from "react-katex";
 import { insertMathOnBoard } from "@/lib/whiteboard-bridge";
 import { ConceptSwitcher } from "./ConceptSwitcher";
 import { getConcept, useDemoPlayer } from "@/lib/lesson-concepts";
 import { PathNavigator } from "@/components/tutor/PathNavigator";
+import { useLumenSession } from "@/lib/live/use-lumen-session";
+import { LumenOverlay } from "@/components/live/LumenOverlay";
+import { buildBoardState } from "@/lib/live/board-context";
 
 export function LessonRoute() {
   const { moduleId } = useParams({ from: "/lesson/$moduleId" });
@@ -17,12 +19,20 @@ export function LessonRoute() {
   const roadmap = useTutorStore((s) => s.roadmap);
   const stepByModule = useTutorStore((s) => s.stepByModule);
   const setStep = useTutorStore((s) => s.setStep);
+  const completed = useTutorStore((s) => s.completed);
+  const markComplete = useTutorStore((s) => s.markComplete);
+  const setLastModule = useTutorStore((s) => s.setLastModule);
 
   const mod = roadmap?.modules.find((m) => m.id === moduleId);
 
   useEffect(() => {
     if (!roadmap) navigate({ to: "/" });
   }, [roadmap, navigate]);
+
+  // Remember this as the module to resume from.
+  useEffect(() => {
+    if (roadmap) setLastModule(moduleId);
+  }, [roadmap, moduleId, setLastModule]);
 
   const script = useMemo(
     () => getLessonScript(moduleId, mod?.title ?? "Lesson"),
@@ -32,7 +42,12 @@ export function LessonRoute() {
   const stepIndex = stepByModule[moduleId] ?? 0;
   const safeIndex = Math.min(stepIndex, script.steps.length - 1);
 
-  const [liveOpen, setLiveOpen] = useState(false);
+  // Reaching the last step counts as finishing the module.
+  useEffect(() => {
+    if (safeIndex >= script.steps.length - 1) markComplete(moduleId);
+  }, [safeIndex, script.steps.length, moduleId, markComplete]);
+
+  const lumen = useLumenSession();
   const [showMath, setShowMath] = useState(false);
   const [mathValue, setMathValue] = useState("");
   const [mathToast, setMathToast] = useState<string | null>(null);
@@ -44,10 +59,16 @@ export function LessonRoute() {
   const concept = getConcept(conceptId);
 
   useEffect(() => {
-    try { localStorage.setItem("lumen.concept", conceptId); } catch { /* ignore */ }
+    try {
+      localStorage.setItem("lumen.concept", conceptId);
+    } catch {
+      /* ignore */
+    }
   }, [conceptId]);
 
-  useEffect(() => { setDemoActive(false); }, [conceptId]);
+  useEffect(() => {
+    setDemoActive(false);
+  }, [conceptId]);
 
   const goto = (i: number) => setStep(moduleId, Math.max(0, Math.min(script.steps.length - 1, i)));
 
@@ -78,6 +99,14 @@ export function LessonRoute() {
     onFinish: () => setDemoActive(false),
   });
 
+  // Ground Lumen whenever the visible step changes (pull-first grounding, see plan 08).
+  useEffect(() => {
+    if (lumen.status !== "idle") {
+      lumen.sendBoardState(buildBoardState(script, safeIndex, moduleId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safeIndex, moduleId, script, lumen.status]);
+
   const insertShortcut = (latex: string) => setMathValue((v) => v + latex);
 
   const addMathToBoard = () => {
@@ -96,7 +125,7 @@ export function LessonRoute() {
   const boardTone = concept.boardTone;
 
   return (
-    <div className="lesson-shell" data-board-tone={boardTone} data-live-open={liveOpen ? "true" : undefined}>
+    <div className="lesson-shell" data-board-tone={boardTone}>
       {boardTone !== "hidden" && (
         <div className="lesson-canvas" data-tone={boardTone}>
           <Whiteboard persistenceKey={`lumen-${moduleId}`} />
@@ -109,6 +138,7 @@ export function LessonRoute() {
             topic={roadmap.topic}
             modules={roadmap.modules}
             currentId={moduleId}
+            completedIds={completed}
             onSelect={goToModule}
           />
         ) : (
@@ -122,20 +152,31 @@ export function LessonRoute() {
             Step {safeIndex + 1} of {script.steps.length} · {concept.name}
           </p>
         </div>
-        <button
-          className="live-launch"
-          onClick={() => setLiveOpen(true)}
-          aria-label="Talk to Lumen live"
-        >
-          <span className="live-launch-orb" aria-hidden />
-          <span className="live-launch-label">
-            <strong>Live</strong>
-            <em>Lumen listens</em>
-          </span>
-        </button>
+        <div className="lesson-topbar-right">
+          <ConceptSwitcher
+            active={concept.id}
+            onChange={setConceptId}
+            demoActive={demoActive}
+            onToggleDemo={() => setDemoActive((v) => !v)}
+          />
+          <button
+            className="live-launch"
+            onClick={() => lumen.start(moduleId)}
+            aria-label="Talk to Lumen live"
+          >
+            <span className="live-launch-orb" aria-hidden />
+            <span className="live-launch-label">
+              <strong>Live</strong>
+              <em>Lumen listens</em>
+            </span>
+          </button>
+        </div>
       </header>
 
-      <div className={`concept-stage concept-stage--${concept.id}`} key={`${concept.id}:${moduleId}`}>
+      <div
+        className={`concept-stage concept-stage--${concept.id}`}
+        key={`${concept.id}:${moduleId}`}
+      >
         <ConceptView
           script={script}
           stepIndex={safeIndex}
@@ -143,25 +184,21 @@ export function LessonRoute() {
           demoTick={demoTick}
           demoActive={demoActive}
           onWriteMath={() => setShowMath(true)}
-          onOpenLive={() => setLiveOpen(true)}
+          onOpenLive={() => lumen.start(moduleId)}
           nextModule={nextMod ? { id: nextMod.id, title: nextMod.title } : null}
           onNextModule={goNextModule}
         />
       </div>
-
-      <ConceptSwitcher
-        active={concept.id}
-        onChange={setConceptId}
-        demoActive={demoActive}
-        onToggleDemo={() => setDemoActive((v) => !v)}
-      />
 
       {/* Math floating panel */}
       {showMath && (
         <div className="math-panel tutor-fade-in">
           <div className="math-panel-head">
             <div>
-              <p className="text-xs uppercase tracking-widest" style={{ color: "var(--tutor-muted)", letterSpacing: "0.14em" }}>
+              <p
+                className="text-xs uppercase tracking-widest"
+                style={{ color: "var(--tutor-muted)", letterSpacing: "0.14em" }}
+              >
                 Write math
               </p>
               <p className="text-sm" style={{ color: "var(--tutor-muted)", marginTop: 2 }}>
@@ -194,18 +231,12 @@ export function LessonRoute() {
             {mathValue.trim() ? (
               <BlockMath math={mathValue} />
             ) : (
-              <span className="math-preview-empty">
-                Your equation will preview here.
-              </span>
+              <span className="math-preview-empty">Your equation will preview here.</span>
             )}
           </div>
 
           <div className="math-panel-actions">
-            <button
-              className="tutor-chip"
-              onClick={() => setMathValue("")}
-              disabled={!mathValue}
-            >
+            <button className="tutor-chip" onClick={() => setMathValue("")} disabled={!mathValue}>
               clear
             </button>
             <button
@@ -220,7 +251,7 @@ export function LessonRoute() {
         </div>
       )}
 
-      <LiveDrawer moduleId={moduleId} open={liveOpen} onClose={() => setLiveOpen(false)} />
+      <LumenOverlay session={lumen} />
     </div>
   );
 }

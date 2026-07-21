@@ -64,7 +64,10 @@ export function useDemoPlayer(opts: {
 function useReveal(text: string, active: boolean, speed = 22) {
   const [n, setN] = useState(active ? 0 : text.length);
   useEffect(() => {
-    if (!active) { setN(text.length); return; }
+    if (!active) {
+      setN(text.length);
+      return;
+    }
     setN(0);
     const id = setInterval(() => {
       setN((v) => (v >= text.length ? (clearInterval(id), v) : v + 1));
@@ -83,7 +86,11 @@ function StepPill({ i, total, active }: { i: number; total: number; active: bool
 }
 
 function StepChrome({
-  script, stepIndex, goto, onWriteMath, onOpenLive,
+  script,
+  stepIndex,
+  goto,
+  onWriteMath,
+  onOpenLive,
   variant = "line",
 }: ConceptProps & { variant?: "line" | "dots" }) {
   const total = script.steps.length;
@@ -106,7 +113,9 @@ function StepChrome({
           className="concept-btn"
           onClick={() => goto(Math.max(0, stepIndex - 1))}
           disabled={stepIndex === 0}
-        >←</button>
+        >
+          ←
+        </button>
         <button className="concept-btn concept-btn--ghost" onClick={onWriteMath}>
           ✏️ write math
         </button>
@@ -117,7 +126,9 @@ function StepChrome({
           className="concept-btn concept-btn--primary"
           onClick={() => goto(Math.min(total - 1, stepIndex + 1))}
           disabled={stepIndex >= total - 1}
-        >→</button>
+        >
+          →
+        </button>
       </div>
     </div>
   );
@@ -133,7 +144,11 @@ function StepBody({ step, demo }: { step: LessonStep; demo: boolean }) {
     return (
       <>
         <p className="concept-body">{t}</p>
-        {step.math && <div className="concept-math"><BlockMath math={step.math} /></div>}
+        {step.math && (
+          <div className="concept-math">
+            <BlockMath math={step.math} />
+          </div>
+        )}
       </>
     );
   }
@@ -141,7 +156,11 @@ function StepBody({ step, demo }: { step: LessonStep; demo: boolean }) {
     return (
       <div className="concept-example">
         {step.lines.map((l, i) => (
-          <div key={i} className="concept-example-line tutor-fade-in" style={{ animationDelay: `${i * 220}ms` }}>
+          <div
+            key={i}
+            className="concept-example-line tutor-fade-in"
+            style={{ animationDelay: `${i * 220}ms` }}
+          >
             {l.math ? <BlockMath math={l.math} /> : <p className="concept-body">{l.text}</p>}
           </div>
         ))}
@@ -152,7 +171,9 @@ function StepBody({ step, demo }: { step: LessonStep; demo: boolean }) {
     <div>
       <p className="concept-body">{step.prompt}</p>
       {step.math && !step.options && (
-        <div className="concept-math"><InlineMath math={step.math} /></div>
+        <div className="concept-math">
+          <InlineMath math={step.math} />
+        </div>
       )}
       {step.options && (
         <div className="concept-options">
@@ -182,7 +203,9 @@ const FocusPanel: React.FC<ConceptProps> = (p) => {
       </div>
       <h2 className="tutor-serif c-focus-title">{step.title}</h2>
       <StepBody step={step} demo={p.demoActive} />
-      <div className="c-focus-foot"><StepChrome {...p} /></div>
+      <div className="c-focus-foot">
+        <StepChrome {...p} />
+      </div>
     </aside>
   );
 };
@@ -201,9 +224,13 @@ const Storyteller: React.FC<ConceptProps> = (p) => {
           {p.script.title} · <em>step {p.stepIndex + 1}</em>
         </p>
         <h2 className="tutor-serif c-story-title">{title}</h2>
-        <div className="c-story-body"><StepBody step={step} demo={p.demoActive} /></div>
+        <div className="c-story-body">
+          <StepBody step={step} demo={p.demoActive} />
+        </div>
       </div>
-      <div className="c-story-chrome"><StepChrome {...p} variant="dots" /></div>
+      <div className="c-story-chrome">
+        <StepChrome {...p} variant="dots" />
+      </div>
     </div>
   );
 };
@@ -225,7 +252,9 @@ const Chalkboard: React.FC<ConceptProps> = (p) => {
           </div>
         </div>
       </div>
-      <div className="c-chalk-chrome"><StepChrome {...p} /></div>
+      <div className="c-chalk-chrome">
+        <StepChrome {...p} />
+      </div>
     </div>
   );
 };
@@ -238,18 +267,23 @@ const Comic: React.FC<ConceptProps> = (p) => {
   const step = p.script.steps[p.stepIndex];
   const bits = useMemo(() => {
     if (step.kind === "explanation") return [step.title, step.body, step.math ?? "…"];
-    if (step.kind === "example")
-      return step.lines.slice(0, 3).map((l) => l.math ?? l.text ?? "");
+    if (step.kind === "example") return step.lines.slice(0, 3).map((l) => l.math ?? l.text ?? "");
     return [step.title, step.prompt, step.options?.join("  or  ") ?? step.math ?? ""];
   }, [step]);
   return (
     <div className="c-comic">
       <div className="c-comic-strip">
         {bits.map((b, i) => (
-          <div key={i} className="c-comic-panel tutor-fade-in" style={{ animationDelay: `${i * 180}ms` }}>
+          <div
+            key={i}
+            className="c-comic-panel tutor-fade-in"
+            style={{ animationDelay: `${i * 180}ms` }}
+          >
             <span className="c-comic-num">{i + 1}</span>
             {b.startsWith("\\") || /[=+\-^]/.test(b) ? (
-              <div className="c-comic-math"><BlockMath math={b} /></div>
+              <div className="c-comic-math">
+                <BlockMath math={b} />
+              </div>
             ) : (
               <p className="c-comic-text tutor-serif">{b}</p>
             )}
@@ -257,7 +291,9 @@ const Comic: React.FC<ConceptProps> = (p) => {
           </div>
         ))}
       </div>
-      <div className="c-comic-chrome"><StepChrome {...p} /></div>
+      <div className="c-comic-chrome">
+        <StepChrome {...p} />
+      </div>
     </div>
   );
 };
@@ -274,11 +310,17 @@ const Notebook: React.FC<ConceptProps> = (p) => {
         <div className="c-notebook-hole" />
         <div className="c-notebook-hole" />
         <div className="c-notebook-hole" />
-        <p className="c-notebook-date">{p.script.title} · page {p.stepIndex + 1}</p>
+        <p className="c-notebook-date">
+          {p.script.title} · page {p.stepIndex + 1}
+        </p>
         <h2 className="c-notebook-title tutor-serif">{step.title}</h2>
-        <div className="c-notebook-body"><StepBody step={step} demo={p.demoActive} /></div>
+        <div className="c-notebook-body">
+          <StepBody step={step} demo={p.demoActive} />
+        </div>
       </div>
-      <div className="c-notebook-chrome"><StepChrome {...p} /></div>
+      <div className="c-notebook-chrome">
+        <StepChrome {...p} />
+      </div>
     </div>
   );
 };
@@ -296,8 +338,12 @@ const SplitStudio: React.FC<ConceptProps> = (p) => {
           <span className="c-split-avatar" /> Lumen · teaching
         </p>
         <h2 className="tutor-serif c-split-title">{step.title}</h2>
-        <div className="c-split-body"><StepBody step={step} demo={p.demoActive} /></div>
-        <div className="c-split-chrome"><StepChrome {...p} /></div>
+        <div className="c-split-body">
+          <StepBody step={step} demo={p.demoActive} />
+        </div>
+        <div className="c-split-chrome">
+          <StepChrome {...p} />
+        </div>
       </div>
       <div className="c-split-right">
         <p className="c-split-label">your workspace →</p>
@@ -319,7 +365,9 @@ const Spotlight: React.FC<ConceptProps> = (p) => {
         <p className="c-spot-eyebrow">focus · step {p.stepIndex + 1}</p>
         <h2 className="tutor-serif c-spot-title">{step.title}</h2>
         <StepBody step={step} demo={p.demoActive} />
-        <div className="c-spot-chrome"><StepChrome {...p} /></div>
+        <div className="c-spot-chrome">
+          <StepChrome {...p} />
+        </div>
       </div>
     </div>
   );
@@ -347,14 +395,18 @@ const Deck: React.FC<ConceptProps> = (p) => {
                 zIndex: 10 - offset,
               }}
             >
-              <p className="c-deck-eyebrow">{s.kind} · {i + 1} / {p.script.steps.length}</p>
+              <p className="c-deck-eyebrow">
+                {s.kind} · {i + 1} / {p.script.steps.length}
+              </p>
               <h2 className="tutor-serif c-deck-title">{s.title}</h2>
               {offset === 0 && <StepBody step={s} demo={p.demoActive} />}
             </article>
           );
         })}
       </div>
-      <div className="c-deck-chrome"><StepChrome {...p} variant="dots" /></div>
+      <div className="c-deck-chrome">
+        <StepChrome {...p} variant="dots" />
+      </div>
     </div>
   );
 };
@@ -410,7 +462,9 @@ const BoardInk: React.FC<ConceptProps> = (p) => {
       <div className="c-ink-caption tutor-fade-in">
         <StepBody step={step} demo={p.demoActive} />
       </div>
-      <div className="c-ink-chrome"><StepChrome {...p} /></div>
+      <div className="c-ink-chrome">
+        <StepChrome {...p} />
+      </div>
     </div>
   );
 };
@@ -422,16 +476,96 @@ const BoardInk: React.FC<ConceptProps> = (p) => {
 import { BOARD_CONCEPTS } from "./board-concepts";
 
 const PANEL_CONCEPTS: ConceptDef[] = [
-  { id: "focus",   name: "Focus Panel",     tagline: "Calm side card, board stays hero.",          mood: "Minimal", boardTone: "light",  Component: FocusPanel, group: "panels" },
-  { id: "story",   name: "Storyteller",     tagline: "Cinematic one-line-at-a-time narration.",     mood: "Cinematic", boardTone: "dim",  Component: Storyteller, group: "panels" },
-  { id: "chalk",   name: "Chalkboard",      tagline: "Classroom vibes, chalk on green.",            mood: "Classroom", boardTone: "chalk", Component: Chalkboard, group: "panels" },
-  { id: "comic",   name: "Comic Strip",     tagline: "Three panels, playful speech bubbles.",       mood: "Playful",  boardTone: "light",  Component: Comic, group: "panels" },
-  { id: "notebook",name: "Notebook",        tagline: "Handwritten pages on lined paper.",           mood: "Cozy",     boardTone: "paper",  Component: Notebook, group: "panels" },
-  { id: "split",   name: "Split Studio",    tagline: "Lumen teaches left, you work right.",         mood: "Studious", boardTone: "light",  Component: SplitStudio, group: "panels" },
-  { id: "spot",    name: "Spotlight",       tagline: "Dim the room, focus on the beat.",            mood: "Focus",    boardTone: "dim",    Component: Spotlight, group: "panels" },
-  { id: "deck",    name: "Card Deck",       tagline: "Swipe through steps like flashcards.",        mood: "Bite-size",boardTone: "light",  Component: Deck, group: "panels" },
-  { id: "whisper", name: "Whisper Rail",    tagline: "Board owns the screen; note whispers below.", mood: "Board-first", boardTone: "light", Component: Whisper, group: "panels" },
-  { id: "ink",     name: "Board Ink",       tagline: "Lumen writes math directly on your board.",   mood: "Live",     boardTone: "light",  Component: BoardInk, group: "panels" },
+  {
+    id: "focus",
+    name: "Focus Panel",
+    tagline: "Calm side card, board stays hero.",
+    mood: "Minimal",
+    boardTone: "light",
+    Component: FocusPanel,
+    group: "panels",
+  },
+  {
+    id: "story",
+    name: "Storyteller",
+    tagline: "Cinematic one-line-at-a-time narration.",
+    mood: "Cinematic",
+    boardTone: "dim",
+    Component: Storyteller,
+    group: "panels",
+  },
+  {
+    id: "chalk",
+    name: "Chalkboard",
+    tagline: "Classroom vibes, chalk on green.",
+    mood: "Classroom",
+    boardTone: "chalk",
+    Component: Chalkboard,
+    group: "panels",
+  },
+  {
+    id: "comic",
+    name: "Comic Strip",
+    tagline: "Three panels, playful speech bubbles.",
+    mood: "Playful",
+    boardTone: "light",
+    Component: Comic,
+    group: "panels",
+  },
+  {
+    id: "notebook",
+    name: "Notebook",
+    tagline: "Handwritten pages on lined paper.",
+    mood: "Cozy",
+    boardTone: "paper",
+    Component: Notebook,
+    group: "panels",
+  },
+  {
+    id: "split",
+    name: "Split Studio",
+    tagline: "Lumen teaches left, you work right.",
+    mood: "Studious",
+    boardTone: "light",
+    Component: SplitStudio,
+    group: "panels",
+  },
+  {
+    id: "spot",
+    name: "Spotlight",
+    tagline: "Dim the room, focus on the beat.",
+    mood: "Focus",
+    boardTone: "dim",
+    Component: Spotlight,
+    group: "panels",
+  },
+  {
+    id: "deck",
+    name: "Card Deck",
+    tagline: "Swipe through steps like flashcards.",
+    mood: "Bite-size",
+    boardTone: "light",
+    Component: Deck,
+    group: "panels",
+  },
+  {
+    id: "whisper",
+    name: "Whisper Rail",
+    tagline: "Board owns the screen; note whispers below.",
+    mood: "Board-first",
+    boardTone: "light",
+    Component: Whisper,
+    group: "panels",
+  },
+  {
+    id: "ink",
+    name: "Board Ink",
+    tagline: "Lumen writes math directly on your board.",
+    mood: "Live",
+    boardTone: "light",
+    Component: BoardInk,
+    group: "panels",
+  },
 ];
 
 export const CONCEPTS: ConceptDef[] = [
@@ -440,8 +574,16 @@ export const CONCEPTS: ConceptDef[] = [
 ];
 
 export const CONCEPT_GROUPS: { id: "panels" | "board"; name: string; tagline: string }[] = [
-  { id: "board",  name: "Board Native", tagline: "The whiteboard teaches — diagrams, graphs, tiles." },
-  { id: "panels", name: "Panels & Pages", tagline: "Lumen speaks through cards, notes and scenes." },
+  {
+    id: "board",
+    name: "Board Native",
+    tagline: "The whiteboard teaches — diagrams, graphs, tiles.",
+  },
+  {
+    id: "panels",
+    name: "Panels & Pages",
+    tagline: "Lumen speaks through cards, notes and scenes.",
+  },
 ];
 
 export function getConcept(id: string | undefined): ConceptDef {

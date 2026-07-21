@@ -38,12 +38,12 @@ Ensure generated practice/math steps expose resolvable names (`stepN.equation`) 
 
 Two catalogs that should stay conceptually aligned:
 
-| Course Gen UI tool (`03`) | Live canvas tool (`../plan/02`) |
-|---------------------------|----------------------------------|
-| `showParabola` | `plot_parabola` / existing diagram |
-| `showEquation` | `add_label` / highlight equation beat |
-| `showPracticeCard` | (voice asks; optional highlight options) |
-| `updateLessonDiagram` | refresh targets after write |
+| Course Gen UI tool (`03`) | Live canvas tool (`../plan/02`)          |
+| ------------------------- | ---------------------------------------- |
+| `showParabola`            | `plot_parabola` / existing diagram       |
+| `showEquation`            | `add_label` / highlight equation beat    |
+| `showPracticeCard`        | (voice asks; optional highlight options) |
+| `updateLessonDiagram`     | refresh targets after write              |
 
 Long-term: one `ui-registry` + one `commands` schema. Short-term: duplicate is OK if names match.
 
@@ -75,12 +75,12 @@ You can also do Generative Module-1 first if demos care more about “infinite t
 
 ## 6. Risks
 
-| Risk | Mitigation |
-|------|------------|
-| Generated LaTeX breaks KaTeX | validate + repair (`02`) |
-| Wrong roots confuse Live circles | server-side `enrichParabola` |
-| SSE + LiveKit both open | fine; different concerns |
-| Free-tier Gemini exhaustion | Flash + concurrency 2 + cache |
-| Partial script mounted | lesson guard (`06`) |
+| Risk                             | Mitigation                    |
+| -------------------------------- | ----------------------------- |
+| Generated LaTeX breaks KaTeX     | validate + repair (`02`)      |
+| Wrong roots confuse Live circles | server-side `enrichParabola`  |
+| SSE + LiveKit both open          | fine; different concerns      |
+| Free-tier Gemini exhaustion      | Flash + concurrency 2 + cache |
+| Partial script mounted           | lesson guard (`06`)           |
 
 Next: `08` — phased rollout and file manifest.

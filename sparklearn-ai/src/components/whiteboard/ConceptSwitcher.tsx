@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CONCEPTS, CONCEPT_GROUPS } from "@/lib/lesson-concepts";
 
-type Pos = { x: number; y: number } | null;
-
+/**
+ * Board / variant switcher. Lives as one quiet control in the lesson topbar so
+ * the reading area stays clear — the full picker only appears when opened.
+ * Keyboard: [ / ] flip boards without opening anything.
+ */
 export function ConceptSwitcher({
   active,
   onChange,
@@ -18,25 +21,25 @@ export function ConceptSwitcher({
   const current = CONCEPTS.find((c) => c.id === active) ?? CONCEPTS[0];
   const currentGroup = current.group ?? "panels";
   const [groupTab, setGroupTab] = useState<"panels" | "board">(currentGroup);
-  useEffect(() => { setGroupTab(currentGroup); }, [currentGroup]);
-  const groupList = useMemo(() => CONCEPTS.filter((c) => (c.group ?? "panels") === currentGroup), [currentGroup]);
+  useEffect(() => {
+    setGroupTab(currentGroup);
+  }, [currentGroup]);
+  const groupList = useMemo(
+    () => CONCEPTS.filter((c) => (c.group ?? "panels") === currentGroup),
+    [currentGroup],
+  );
   const idx = groupList.findIndex((c) => c.id === current.id);
-  const sheetList = useMemo(() => CONCEPTS.filter((c) => (c.group ?? "panels") === groupTab), [groupTab]);
-
-  const dockRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<Pos>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = localStorage.getItem("lumen.cs-dock-pos");
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  });
-  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+  const sheetList = useMemo(
+    () => CONCEPTS.filter((c) => (c.group ?? "panels") === groupTab),
+    [groupTab],
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
       if (open) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
       if (e.key === "[") onChange(groupList[(idx - 1 + groupList.length) % groupList.length].id);
       if (e.key === "]") onChange(groupList[(idx + 1) % groupList.length].id);
     };
@@ -44,111 +47,40 @@ export function ConceptSwitcher({
     return () => window.removeEventListener("keydown", onKey);
   }, [idx, open, onChange, groupList]);
 
-  const clamp = (x: number, y: number) => {
-    const el = dockRef.current;
-    const w = el?.offsetWidth ?? 320;
-    const h = el?.offsetHeight ?? 52;
-    const pad = 8;
-    return {
-      x: Math.max(pad, Math.min(window.innerWidth - w - pad, x)),
-      y: Math.max(pad, Math.min(window.innerHeight - h - pad, y)),
-    };
-  };
-
-  const onGripPointerDown = (e: React.PointerEvent) => {
-    const el = dockRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
-
-    const onMove = (ev: PointerEvent) => {
-      const s = dragRef.current;
-      if (!s) return;
-      setPos(clamp(ev.clientX - s.dx, ev.clientY - s.dy));
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      dragRef.current = null;
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  };
-
-  useEffect(() => {
-    if (!pos) return;
-    try { localStorage.setItem("lumen.cs-dock-pos", JSON.stringify(pos)); } catch { /* ignore */ }
-  }, [pos]);
-
-  useEffect(() => {
-    const onResize = () => { if (pos) setPos(clamp(pos.x, pos.y)); };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pos]);
-
-  const resetPos = () => {
-    setPos(null);
-    try { localStorage.removeItem("lumen.cs-dock-pos"); } catch { /* ignore */ }
-  };
-
-  const dockStyle: React.CSSProperties = pos
-    ? { left: pos.x, top: pos.y, bottom: "auto", transform: "none" }
-    : {};
-
   return (
     <>
-      <div ref={dockRef} className="cs-dock" style={dockStyle}>
-        <button
-          className="cs-grip"
-          onPointerDown={onGripPointerDown}
-          onDoubleClick={resetPos}
-          aria-label="Drag concept switcher (double-click to reset)"
-          title="Drag to move · double-click to reset"
-        >
-          <svg width="12" height="16" viewBox="0 0 12 16" aria-hidden>
-            <g fill="currentColor">
-              <circle cx="3" cy="3" r="1.3" /><circle cx="9" cy="3" r="1.3" />
-              <circle cx="3" cy="8" r="1.3" /><circle cx="9" cy="8" r="1.3" />
-              <circle cx="3" cy="13" r="1.3" /><circle cx="9" cy="13" r="1.3" />
-            </g>
-          </svg>
-        </button>
-        <button
-          className="cs-pill"
-          onClick={() => onChange(groupList[(idx - 1 + groupList.length) % groupList.length].id)}
-          aria-label="Previous concept"
-          title="Previous concept ( [ )"
-        >‹</button>
-        <button className="cs-pill cs-pill--main" onClick={() => setOpen(true)}>
-          <span className="cs-pill-num">{idx + 1}/{groupList.length}</span>
-          <span className="cs-pill-name">{current.name}</span>
-          <span className="cs-pill-mood">{CONCEPT_GROUPS.find((g) => g.id === currentGroup)?.name}</span>
-        </button>
-        <button
-          className="cs-pill"
-          onClick={() => onChange(groupList[(idx + 1) % groupList.length].id)}
-          aria-label="Next concept"
-          title="Next concept ( ] )"
-        >›</button>
-        <button
-          className={`cs-pill cs-pill--demo ${demoActive ? "is-live" : ""}`}
-          onClick={onToggleDemo}
-          title="Auto-advance through the lesson"
-        >
-          {demoActive ? "◼ stop demo" : "▶ run demo"}
-        </button>
-      </div>
+      <button
+        type="button"
+        className="cs-trigger"
+        aria-label="Change how this lesson is taught"
+        aria-expanded={open}
+        data-state={open ? "open" : "closed"}
+        onClick={() => setOpen(true)}
+        title="Ways to teach this lesson ( [ / ] to flip )"
+      >
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden>
+          <g fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+            <rect x="2" y="2" width="5" height="5" rx="1" />
+            <rect x="9" y="2" width="5" height="5" rx="1" />
+            <rect x="2" y="9" width="5" height="5" rx="1" />
+            <rect x="9" y="9" width="5" height="5" rx="1" />
+          </g>
+        </svg>
+        <span className="cs-trigger-label">{current.name}</span>
+        {demoActive && <span className="cs-trigger-demo" aria-label="Demo running" />}
+      </button>
 
       {open && (
         <div className="cs-scrim" onClick={() => setOpen(false)}>
           <div className="cs-sheet" onClick={(e) => e.stopPropagation()}>
             <header className="cs-sheet-head">
               <div>
-                <p className="cs-sheet-eyebrow">Lesson concepts · pick a group, then a variant</p>
+                <p className="cs-sheet-eyebrow">Lesson boards · pick a group, then a variant</p>
                 <h2 className="tutor-serif cs-sheet-title">Ways to teach this lesson</h2>
               </div>
-              <button className="cs-close" onClick={() => setOpen(false)} aria-label="Close">✕</button>
+              <button className="cs-close" onClick={() => setOpen(false)} aria-label="Close">
+                ✕
+              </button>
             </header>
             <div className="cs-tabs">
               {CONCEPT_GROUPS.map((g) => (
@@ -169,7 +101,10 @@ export function ConceptSwitcher({
                   key={c.id}
                   className="cs-tile"
                   data-active={c.id === current.id}
-                  onClick={() => { onChange(c.id); setOpen(false); }}
+                  onClick={() => {
+                    onChange(c.id);
+                    setOpen(false);
+                  }}
                 >
                   <span className="cs-tile-num">{String(i + 1).padStart(2, "0")}</span>
                   <span className="cs-tile-name tutor-serif">{c.name}</span>
@@ -178,10 +113,21 @@ export function ConceptSwitcher({
                 </button>
               ))}
             </div>
-            <p className="cs-hint">
-              Tip · use <kbd>[</kbd> / <kbd>]</kbd> to flip concepts, drag the ⋮⋮ handle to move this dock
-              (double-click it to reset), then hit <em> ▶ run demo </em> to watch it come alive.
-            </p>
+            <footer className="cs-sheet-foot">
+              <p className="cs-hint">
+                Tip · use <kbd>[</kbd> / <kbd>]</kbd> to flip boards without opening this.
+              </p>
+              <button
+                type="button"
+                className={`cs-demo-btn ${demoActive ? "is-live" : ""}`}
+                onClick={() => {
+                  onToggleDemo();
+                  setOpen(false);
+                }}
+              >
+                {demoActive ? "◼ stop demo" : "▶ run demo"}
+              </button>
+            </footer>
           </div>
         </div>
       )}

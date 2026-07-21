@@ -33,14 +33,26 @@ type Step =
 type Dir = "forward" | "back";
 
 function prefersReducedMotion() {
-  return typeof window !== "undefined"
-    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return (
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
 }
 
 export function Onboarding() {
   const navigate = useNavigate();
   const setProfile = useTutorStore((s) => s.setProfile);
   const setRoadmap = useTutorStore((s) => s.setRoadmap);
+  const savedProfile = useTutorStore((s) => s.profile);
+  const ensureRoadmap = useTutorStore((s) => s.ensureRoadmap);
+
+  // Returning learner in this browser — skip straight to their path instead of
+  // re-asking every question. "Start over" on the roadmap clears this.
+  useEffect(() => {
+    if (savedProfile) {
+      ensureRoadmap();
+      navigate({ to: "/roadmap" });
+    }
+  }, [savedProfile, ensureRoadmap, navigate]);
 
   const [i, setI] = useState(0);
   const [dir, setDir] = useState<Dir>("forward");
@@ -53,6 +65,10 @@ export function Onboarding() {
   const [audio, setAudio] = useState<AudioPref | null>(null);
   const [finishing, setFinishing] = useState(false);
 
+  // True only when this browser already had a profile on first paint, so we can
+  // suppress the onboarding flash while the redirect above runs.
+  const returningRef = useRef(savedProfile !== null);
+
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -61,9 +77,23 @@ export function Onboarding() {
 
   const steps: Step[] = [
     { key: "name", kind: "text", prompt: "Hi! What should I call you?", placeholder: "Your name" },
-    { key: "grade", kind: "chips-number", prompt: name ? `Nice to meet you, ${name}. What grade are you in?` : "What grade are you in?" },
-    { key: "subject", kind: "text", prompt: "What class or subject is this for?", placeholder: "e.g. Math — Algebra I" },
-    { key: "topic", kind: "text", prompt: "What would you like to learn today?", placeholder: "e.g. quadratic equations" },
+    {
+      key: "grade",
+      kind: "chips-number",
+      prompt: name ? `Nice to meet you, ${name}. What grade are you in?` : "What grade are you in?",
+    },
+    {
+      key: "subject",
+      kind: "text",
+      prompt: "What class or subject is this for?",
+      placeholder: "e.g. Math — Algebra I",
+    },
+    {
+      key: "topic",
+      kind: "text",
+      prompt: "What would you like to learn today?",
+      placeholder: "e.g. quadratic equations",
+    },
     { key: "style", kind: "chips-style", prompt: "How do you like to learn?" },
     { key: "audio", kind: "chips-audio", prompt: "Sound while you learn?" },
   ];
@@ -74,12 +104,18 @@ export function Onboarding() {
 
   const canAdvance = () => {
     switch (step.key) {
-      case "name": return name.trim().length > 0;
-      case "grade": return grade !== null;
-      case "subject": return subject.trim().length > 0;
-      case "topic": return topic.trim().length > 0;
-      case "style": return style !== null;
-      case "audio": return audio !== null;
+      case "name":
+        return name.trim().length > 0;
+      case "grade":
+        return grade !== null;
+      case "subject":
+        return subject.trim().length > 0;
+      case "topic":
+        return topic.trim().length > 0;
+      case "style":
+        return style !== null;
+      case "audio":
+        return audio !== null;
     }
   };
 
@@ -162,6 +198,8 @@ export function Onboarding() {
     autoTimer.current = setTimeout(() => advanceRef.current(), delay);
   };
 
+  if (returningRef.current) return null;
+
   if (finishing) {
     return (
       <div className="tutor-app onboard-shell min-h-screen flex flex-col items-center justify-center px-6">
@@ -197,12 +235,13 @@ export function Onboarding() {
           className={`onboard-step${leaving ? " is-leaving" : ""}`}
           data-dir={dir}
         >
-          <p className="text-xs uppercase tracking-widest mb-4" style={{ color: "var(--tutor-muted)" }}>
+          <p
+            className="text-xs uppercase tracking-widest mb-4"
+            style={{ color: "var(--tutor-muted)" }}
+          >
             {i + 1} of {total}
           </p>
-          <h1 className="tutor-serif text-3xl md:text-5xl leading-tight mb-10">
-            {step.prompt}
-          </h1>
+          <h1 className="tutor-serif text-3xl md:text-5xl leading-tight mb-10">{step.prompt}</h1>
 
           {step.kind === "text" && (
             <input

@@ -17,6 +17,7 @@ token-server/
 ```
 
 `token-server/package.json`:
+
 ```json
 {
   "name": "lumen-token-server",
@@ -30,6 +31,7 @@ token-server/
 ```
 
 `token-server/.env`:
+
 ```dotenv
 LIVEKIT_API_KEY=APIxxxxxxxx
 LIVEKIT_API_SECRET=xxxxxxxxxxxxxxxxxxxx
@@ -38,6 +40,7 @@ ALLOWED_ORIGIN=http://localhost:3000
 ```
 
 `token-server/server.mjs`:
+
 ```js
 import "dotenv/config";
 import http from "node:http";
@@ -51,29 +54,36 @@ const server = http.createServer(async (req, res) => {
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "content-type",
   };
-  if (req.method === "OPTIONS") { res.writeHead(204, cors); return res.end(); }
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, cors);
+    return res.end();
+  }
 
   const url = new URL(req.url, `http://localhost:${PORT}`);
-  if (url.pathname !== "/token") { res.writeHead(404, cors); return res.end("not found"); }
+  if (url.pathname !== "/token") {
+    res.writeHead(404, cors);
+    return res.end("not found");
+  }
 
   const room = url.searchParams.get("room");
   const identity = url.searchParams.get("identity");
   const name = url.searchParams.get("name") ?? "Learner";
   if (!room || !identity) {
-    res.writeHead(400, cors); return res.end("room and identity required");
+    res.writeHead(400, cors);
+    return res.end("room and identity required");
   }
 
   const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
     identity,
     name,
-    ttl: "15m",              // short-lived
+    ttl: "15m", // short-lived
   });
   at.addGrant({
     room,
     roomJoin: true,
-    canPublish: true,        // mic
-    canSubscribe: true,      // agent audio
-    canPublishData: true,    // board-state deltas
+    canPublish: true, // mic
+    canSubscribe: true, // agent audio
+    canPublishData: true, // board-state deltas
   });
 
   const token = await at.toJwt();
@@ -85,11 +95,13 @@ server.listen(PORT, () => console.log(`token-server on :${PORT}`));
 ```
 
 Run:
+
 ```bash
 cd token-server && npm i && node --env-file=.env server.mjs
 ```
 
 Client env (`sparklearn-ai/.env` — Vite reads `VITE_` vars):
+
 ```dotenv
 VITE_LIVEKIT_URL=wss://<project>.livekit.cloud
 VITE_LUMEN_TOKEN_URL=http://localhost:8787/token
@@ -103,6 +115,7 @@ If you prefer one dev command, add a server route inside the app. TanStack Start
 `@tanstack/react-start ^1.168`) supports server routes via `createServerFileRoute`.
 
 `sparklearn-ai/src/routes/api/lumen-token.ts`:
+
 ```ts
 import { createServerFileRoute } from "@tanstack/react-start/server";
 import { AccessToken } from "livekit-server-sdk";
@@ -115,22 +128,30 @@ export const ServerRoute = createServerFileRoute("/api/lumen-token").methods({
     if (!room || !identity) {
       return new Response("room and identity required", { status: 400 });
     }
-    const at = new AccessToken(
-      process.env.LIVEKIT_API_KEY!,
-      process.env.LIVEKIT_API_SECRET!,
-      { identity, ttl: "15m" },
-    );
-    at.addGrant({ room, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true });
+    const at = new AccessToken(process.env.LIVEKIT_API_KEY!, process.env.LIVEKIT_API_SECRET!, {
+      identity,
+      ttl: "15m",
+    });
+    at.addGrant({
+      room,
+      roomJoin: true,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+    });
     return Response.json({ token: await at.toJwt(), url: process.env.LIVEKIT_URL ?? null });
   },
 });
 ```
 
 Add `livekit-server-sdk` to the app deps:
+
 ```bash
 cd sparklearn-ai && npm i livekit-server-sdk
 ```
+
 App env (`.env`, server-side — NOT `VITE_` so it never reaches the client):
+
 ```dotenv
 LIVEKIT_URL=wss://<project>.livekit.cloud
 LIVEKIT_API_KEY=APIxxxxxxxx
@@ -158,7 +179,10 @@ land in the same room:
 export function makeIdentity(): string {
   const KEY = "lumen.identity";
   let id = sessionStorage.getItem(KEY);
-  if (!id) { id = "learner-" + Math.random().toString(36).slice(2, 10); sessionStorage.setItem(KEY, id); }
+  if (!id) {
+    id = "learner-" + Math.random().toString(36).slice(2, 10);
+    sessionStorage.setItem(KEY, id);
+  }
   return id;
 }
 export const roomName = (moduleId: string, identity: string) => `lumen-${moduleId}-${identity}`;
@@ -171,8 +195,10 @@ sessions) comfortably serves a demo.
 
 ## Secrets hygiene
 
-- `LIVEKIT_API_SECRET`, `GOOGLE_API_KEY`, `OPENAI_API_KEY` live ONLY in server-side `.env`
-  files (`token-server/.env`, `agent/.env.local`, and app server env for Option B).
+- `LIVEKIT_API_SECRET`, `GOOGLE_API_KEY`, `OPENAI_API_KEY` (voice), and `MISTRAL_API_KEY` /
+  `TAVILY_API_KEY` (content — see `../plan-generative-courses/08`) live ONLY in server-side `.env`
+  files (`token-server/.env`, `agent/.env.local`, and the app server env). Never `VITE_`-prefix
+  them — that would ship them to the browser.
 - Client only ever receives: the short-lived JWT + the public `wss://` URL.
 - Add to `.gitignore`: `agent/.env.local`, `token-server/.env`, `sparklearn-ai/.env`.
 - For a shared demo build, use Gemini AI Studio **ephemeral tokens** later; not needed locally.

@@ -6,17 +6,39 @@ export function RoadmapView() {
   const navigate = useNavigate();
   const profile = useTutorStore((s) => s.profile);
   const roadmap = useTutorStore((s) => s.roadmap);
+  const completed = useTutorStore((s) => s.completed);
+  const lastModuleId = useTutorStore((s) => s.lastModuleId);
+  const ensureRoadmap = useTutorStore((s) => s.ensureRoadmap);
+  const reset = useTutorStore((s) => s.reset);
 
   useEffect(() => {
-    if (!profile || !roadmap) navigate({ to: "/" });
-  }, [profile, roadmap, navigate]);
+    // A returning learner may have a profile but no rebuilt roadmap yet.
+    if (profile && !roadmap) ensureRoadmap();
+  }, [profile, roadmap, ensureRoadmap]);
+
+  useEffect(() => {
+    if (!profile) navigate({ to: "/" });
+  }, [profile, navigate]);
 
   if (!profile || !roadmap) return null;
 
   const modules = roadmap.modules;
+  const doneCount = modules.filter((m) => completed[m.id]).length;
+  const allDone = doneCount === modules.length;
+  // Where to resume: last opened module, else the first unfinished one.
+  const resumeId =
+    (lastModuleId && modules.some((m) => m.id === lastModuleId) && lastModuleId) ||
+    modules.find((m) => !completed[m.id])?.id ||
+    modules[0]?.id;
+  const resumeMod = modules.find((m) => m.id === resumeId);
+  const startOver = () => {
+    reset();
+    navigate({ to: "/" });
+  };
+  const open = (id: string) => navigate({ to: "/lesson/$moduleId", params: { moduleId: id } });
   const ROW = 220;
   const AMP = 90; // sideways swing of the spine
-  const CX = 50;  // percent, spine centered
+  const CX = 50; // percent, spine centered
   const height = modules.length * ROW;
 
   // Build one continuous serpentine path through every module row.
@@ -38,9 +60,14 @@ export function RoadmapView() {
   return (
     <div className="tutor-app min-h-screen">
       <header className="roadmap-header">
-        <Link to="/" className="text-sm" style={{ color: "var(--tutor-muted)" }}>
+        <button
+          type="button"
+          className="text-sm roadmap-startover"
+          style={{ color: "var(--tutor-muted)" }}
+          onClick={startOver}
+        >
           ← start over
-        </Link>
+        </button>
         <span className="text-xs uppercase tracking-widest" style={{ color: "var(--tutor-muted)" }}>
           Grade {profile.grade} · {profile.subject}
         </span>
@@ -54,6 +81,25 @@ export function RoadmapView() {
         <p className="roadmap-hero-sub">
           {modules.length} short modules woven together. Begin with the first, or wander.
         </p>
+
+        {resumeMod && (
+          <div className="roadmap-resume">
+            <button type="button" className="tutor-primary-btn" onClick={() => open(resumeMod.id)}>
+              {allDone
+                ? "Revisit your path"
+                : doneCount > 0
+                  ? `Continue · ${resumeMod.title}`
+                  : `Start · ${resumeMod.title}`}
+              <span aria-hidden> →</span>
+            </button>
+            <div className="roadmap-resume-track" aria-hidden>
+              <span style={{ width: `${(doneCount / modules.length) * 100}%` }} />
+            </div>
+            <p className="roadmap-resume-meta">
+              {doneCount} of {modules.length} modules complete
+            </p>
+          </div>
+        )}
       </section>
 
       <div className="roadmap-flow" style={{ height }}>
@@ -77,30 +123,38 @@ export function RoadmapView() {
 
         {modules.map((m, idx) => {
           const side = idx % 2 === 0 ? "right" : "left";
-          const first = idx === 0;
           const top = idx * ROW;
+          const done = !!completed[m.id];
+          const current = m.id === resumeId && !allDone;
+          const eyebrow = done
+            ? "Complete"
+            : current
+              ? doneCount > 0
+                ? "Continue here"
+                : "Start here"
+              : `Module ${idx + 1}`;
           return (
             <div
               key={m.id}
               className={`roadmap-row roadmap-row--${side} tutor-fade-in`}
               style={{ top, animationDelay: `${idx * 70}ms` }}
             >
-              <span className="roadmap-dot" data-active={first}>
-                {idx + 1}
+              <span className="roadmap-dot" data-active={current} data-done={done || undefined}>
+                {done ? "✓" : idx + 1}
               </span>
               <button
                 type="button"
                 className="roadmap-card"
-                onClick={() =>
-                  navigate({ to: "/lesson/$moduleId", params: { moduleId: m.id } })
-                }
+                data-current={current || undefined}
+                data-done={done || undefined}
+                onClick={() => open(m.id)}
               >
-                <p className="roadmap-card-eyebrow">
-                  {first ? "Start here" : `Module ${idx + 1}`}
-                </p>
+                <p className="roadmap-card-eyebrow">{eyebrow}</p>
                 <h3 className="tutor-serif roadmap-card-title">{m.title}</h3>
                 <p className="roadmap-card-blurb">{m.blurb}</p>
-                <span className="roadmap-card-cta">Open on the whiteboard →</span>
+                <span className="roadmap-card-cta">
+                  {done ? "Revisit →" : "Open on the whiteboard →"}
+                </span>
               </button>
             </div>
           );

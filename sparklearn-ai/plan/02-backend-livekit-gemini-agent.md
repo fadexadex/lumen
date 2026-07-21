@@ -42,6 +42,7 @@ dependencies = [
 ```
 
 Install:
+
 ```bash
 cd agent
 uv sync           # or: python -m venv .venv && . .venv/bin/activate && pip install -e .
@@ -256,7 +257,7 @@ ALL_TOOLS = [
 ```
 
 > Async-tool note: the LiveKit `perform_rpc` awaits the client ack (≤5 s). Because the client
-> handler *returns as soon as it kicks off the animation* (it does NOT await the animation),
+> handler _returns as soon as it kicks off the animation_ (it does NOT await the animation),
 > the round-trip is a few ms and the model's speech is not stalled. If you ever add a slow
 > tool, use the LiveKit "async tools" pattern (`ctx.session.say(...)` / status update first).
 
@@ -342,9 +343,11 @@ prints tool calls so you can confirm the model emits `draw_axis_of_symmetry()` e
 ## 10. Model-backend swap (fallback)
 
 Flip one env var and restart the worker:
+
 ```bash
 LUMEN_MODEL_BACKEND=openai uv run agent.py dev
 ```
+
 `build_model()` returns OpenAI Realtime; everything else (tools, RPC, prompt) is unchanged
 because the tool layer is model-agnostic. See `09` for auto-fallback on quota errors.
 

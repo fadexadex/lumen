@@ -67,20 +67,24 @@ class CourseOrchestrator {
     // PRIORITY: module 0
     await this.generateOne(course, 0, send);
 
-    // BACKGROUND: remaining with concurrency 2
-    await mapPool(course.modules.slice(1), 2, (mod, i) =>
-      this.generateOne(course, i + 1, send),
-    );
+    // BACKGROUND: remaining with concurrency 3 (Mistral is not TPM-boxed)
+    await mapPool(course.modules.slice(1), 3, (mod, i) => this.generateOne(course, i + 1, send));
     send("done", {});
   }
 
   private async generateOne(course: Course, index: number, send: SendFn) {
     const mod = course.modules[index];
-    mod.status = "generating"; send("module_status", { id: mod.id, status: "generating" });
+    mod.status = "generating";
+    send("module_status", { id: mod.id, status: "generating" });
 
     try {
       const brief = await maybeCurate(course.profile, mod);
-      const stream = streamLesson({ profile: course.profile, module: mod, priorModules: course.modules.slice(0, index), brief });
+      const stream = streamLesson({
+        profile: course.profile,
+        module: mod,
+        priorModules: course.modules.slice(0, index),
+        brief,
+      });
 
       for await (const partial of stream.partialObjectStream) {
         send("module_partial", { id: mod.id, partial });
@@ -134,15 +138,17 @@ New:
 
 ## 6. Quota & cost control
 
-| Lever | Demo setting |
-|-------|----------------|
-| Max modules | 6–8 |
-| Concurrency | 2 |
-| Model | Flash |
-| Partial streaming | on (status UX) / off if flaky |
-| Skip curation | on for speed unless Option B is free |
+| Lever             | Demo setting                         |
+| ----------------- | ------------------------------------ |
+| Max modules       | 6–8                                       |
+| Concurrency       | 3–4 (Mistral 1M budget, not TPM-boxed)    |
+| Model             | `mistral-small-latest` (large for repair) |
+| Partial streaming | on (status UX) / off if flaky             |
+| Web research      | Tavily on (Option B); cache briefs        |
 
-Estimate: 1 roadmap + 6 lessons ≈ handful of Flash calls — fine for demos if you don’t regenerate endlessly.
+Estimate: 1 roadmap + 6 lessons + curation ≈ a few dozen Mistral calls, comfortably inside the
+~1M free-token budget. Unlike Gemini Live (`../plan/11`), content generation is **not** per-minute
+rate-limited, so background concurrency can run 3–4 without a quota wall.
 
 ---
 

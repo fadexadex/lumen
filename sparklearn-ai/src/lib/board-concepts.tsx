@@ -31,15 +31,15 @@ export interface ConceptDef {
 /* -------------------------------------------------------------------------- */
 
 function fallbackDiagram(script: LessonScript): LessonDiagram {
-  return script.diagram ?? {
-    parabola: { a: 1, b: 0, c: 0 },
-    captions: script.steps.map((s) => s.title),
-  };
+  return (
+    script.diagram ?? {
+      parabola: { a: 1, b: 0, c: 0 },
+      captions: script.steps.map((s) => s.title),
+    }
+  );
 }
 
-function BoardChrome({
-  script, stepIndex, goto, onWriteMath, onOpenLive,
-}: ConceptProps) {
+function BoardChrome({ script, stepIndex, goto, onWriteMath, onOpenLive }: ConceptProps) {
   const total = script.steps.length;
   return (
     <div className="bc-chrome">
@@ -58,10 +58,26 @@ function BoardChrome({
         ))}
       </div>
       <div className="bc-actions">
-        <button className="bc-btn" onClick={() => goto(Math.max(0, stepIndex - 1))} disabled={stepIndex === 0}>‹ back</button>
-        <button className="bc-btn bc-btn--ghost" onClick={onWriteMath}>✏️ write math</button>
-        <button className="bc-btn bc-btn--ghost" onClick={onOpenLive}>🔊 ask Lumen</button>
-        <button className="bc-btn bc-btn--primary" onClick={() => goto(Math.min(total - 1, stepIndex + 1))} disabled={stepIndex >= total - 1}>next ›</button>
+        <button
+          className="bc-btn"
+          onClick={() => goto(Math.max(0, stepIndex - 1))}
+          disabled={stepIndex === 0}
+        >
+          ‹ back
+        </button>
+        <button className="bc-btn bc-btn--ghost" onClick={onWriteMath}>
+          ✏️ write math
+        </button>
+        <button className="bc-btn bc-btn--ghost" onClick={onOpenLive}>
+          🔊 ask Lumen
+        </button>
+        <button
+          className="bc-btn bc-btn--primary"
+          onClick={() => goto(Math.min(total - 1, stepIndex + 1))}
+          disabled={stepIndex >= total - 1}
+        >
+          next ›
+        </button>
       </div>
     </div>
   );
@@ -86,9 +102,13 @@ const Grapher: React.FC<ConceptProps> = (p) => {
   const { a, b, c, roots = [], vertex } = d.parabola ?? { a: 1, b: 0, c: 0 };
 
   // build path
-  const w = 900, h = 520, pad = 40;
-  const xMin = -2, xMax = 6;
-  const yMin = -4, yMax = 8;
+  const w = 900,
+    h = 520,
+    pad = 40;
+  const xMin = -2,
+    xMax = 6;
+  const yMin = -4,
+    yMax = 8;
   const sx = (x: number) => pad + ((x - xMin) / (xMax - xMin)) * (w - 2 * pad);
   const sy = (y: number) => h - pad - ((y - yMin) / (yMax - yMin)) * (h - 2 * pad);
   const pts: string[] = [];
@@ -112,7 +132,11 @@ const Grapher: React.FC<ConceptProps> = (p) => {
       <div className="bc-header">
         <span className="bc-eyebrow">graph · {p.script.title}</span>
         <h2 className="tutor-serif bc-title">{step.title}</h2>
-        <p className="bc-equation"><InlineMath math={`y = ${a}x^2 ${b >= 0 ? "+" : "-"} ${Math.abs(b)}x ${c >= 0 ? "+" : "-"} ${Math.abs(c)}`} /></p>
+        <p className="bc-equation">
+          <InlineMath
+            math={`y = ${a}x^2 ${b >= 0 ? "+" : "-"} ${Math.abs(b)}x ${c >= 0 ? "+" : "-"} ${Math.abs(c)}`}
+          />
+        </p>
       </div>
 
       <div className="bc-plot-wrap">
@@ -130,32 +154,60 @@ const Grapher: React.FC<ConceptProps> = (p) => {
           <line className="bc-axis" x1={pad} y1={sy(0)} x2={w - pad} y2={sy(0)} />
           <line className="bc-axis" x1={sx(0)} y1={pad} x2={sx(0)} y2={h - pad} />
           {/* x-labels */}
-          {Array.from({ length: xMax - xMin + 1 }, (_, i) => xMin + i).filter((x) => x !== 0).map((x) => (
-            <text key={`xl${x}`} className="bc-axis-label" x={sx(x)} y={sy(0) + 18} textAnchor="middle">{x}</text>
-          ))}
+          {Array.from({ length: xMax - xMin + 1 }, (_, i) => xMin + i)
+            .filter((x) => x !== 0)
+            .map((x) => (
+              <text
+                key={`xl${x}`}
+                className="bc-axis-label"
+                x={sx(x)}
+                y={sy(0) + 18}
+                textAnchor="middle"
+              >
+                {x}
+              </text>
+            ))}
           {/* curve */}
           {showCurve && (
             <path
               key={`curve-${p.stepIndex}`}
               d={pathD}
               className="bc-curve"
-              style={{ strokeDasharray: 2000, strokeDashoffset: 2000, animation: "bc-draw 1.4s ease-out forwards" }}
+              style={{
+                strokeDasharray: 2000,
+                strokeDashoffset: 2000,
+                animation: "bc-draw 1.4s ease-out forwards",
+              }}
             />
           )}
           {/* vertex */}
           {showVertex && vertex && (
             <g className="tutor-fade-in">
               <circle cx={sx(vertex[0])} cy={sy(vertex[1])} r="6" className="bc-vertex" />
-              <text x={sx(vertex[0]) + 12} y={sy(vertex[1]) - 8} className="bc-annot">vertex ({vertex[0]}, {vertex[1]})</text>
+              <text x={sx(vertex[0]) + 12} y={sy(vertex[1]) - 8} className="bc-annot">
+                vertex ({vertex[0]}, {vertex[1]})
+              </text>
             </g>
           )}
           {/* roots */}
-          {showRoots && roots.map((r, i) => (
-            <g key={`root-${r}`} className="tutor-fade-in" style={{ animationDelay: `${i * 250}ms` }}>
-              <circle cx={sx(r)} cy={sy(0)} r="8" className="bc-root" />
-              <text x={sx(r)} y={sy(0) + 32} className="bc-annot bc-annot--accent" textAnchor="middle">x = {r}</text>
-            </g>
-          ))}
+          {showRoots &&
+            roots.map((r, i) => (
+              <g
+                key={`root-${r}`}
+                className="tutor-fade-in"
+                style={{ animationDelay: `${i * 250}ms` }}
+              >
+                <circle cx={sx(r)} cy={sy(0)} r="8" className="bc-root" />
+                <text
+                  x={sx(r)}
+                  y={sy(0) + 32}
+                  className="bc-annot bc-annot--accent"
+                  textAnchor="middle"
+                >
+                  x = {r}
+                </text>
+              </g>
+            ))}
         </svg>
       </div>
 
@@ -190,7 +242,9 @@ const Tiles: React.FC<ConceptProps> = (p) => {
       <div className="bc-header">
         <span className="bc-eyebrow">tiles · {p.script.title}</span>
         <h2 className="tutor-serif bc-title">{step.title}</h2>
-        <p className="bc-equation"><InlineMath math={`${tiles.xSquared}x^2 ${xSign} ${xTiles}x ${uSign} ${uTiles}`} /></p>
+        <p className="bc-equation">
+          <InlineMath math={`${tiles.xSquared}x^2 ${xSign} ${xTiles}x ${uSign} ${uTiles}`} />
+        </p>
       </div>
 
       <div className={`bc-tiles ${rearranged ? "is-rearranged" : ""}`}>
@@ -201,15 +255,29 @@ const Tiles: React.FC<ConceptProps> = (p) => {
           ))}
         </div>
         <div className="bc-tile-group">
-          <span className="bc-tile-label">{xSign} x · {xTiles}</span>
+          <span className="bc-tile-label">
+            {xSign} x · {xTiles}
+          </span>
           {Array.from({ length: xTiles }).map((_, i) => (
-            <div key={`x-${i}`} className="bc-tile bc-tile--x" data-neg={tiles.x < 0} style={{ transitionDelay: `${i * 60}ms` }} />
+            <div
+              key={`x-${i}`}
+              className="bc-tile bc-tile--x"
+              data-neg={tiles.x < 0}
+              style={{ transitionDelay: `${i * 60}ms` }}
+            />
           ))}
         </div>
         <div className="bc-tile-group">
-          <span className="bc-tile-label">{uSign} {uTiles}</span>
+          <span className="bc-tile-label">
+            {uSign} {uTiles}
+          </span>
           {Array.from({ length: uTiles }).map((_, i) => (
-            <div key={`u-${i}`} className="bc-tile bc-tile--u" data-neg={tiles.unit < 0} style={{ transitionDelay: `${i * 40}ms` }} />
+            <div
+              key={`u-${i}`}
+              className="bc-tile bc-tile--u"
+              data-neg={tiles.unit < 0}
+              style={{ transitionDelay: `${i * 40}ms` }}
+            />
           ))}
         </div>
       </div>
@@ -219,12 +287,13 @@ const Tiles: React.FC<ConceptProps> = (p) => {
           rearranges into a rectangle · sides
           <strong> ({tiles.factored[0]}) </strong>
           and
-          <strong> ({tiles.factored[1]}) </strong>
-          — that's the factored form.
+          <strong> ({tiles.factored[1]}) </strong>— that's the factored form.
         </div>
       )}
 
-      {d.captions?.[p.stepIndex] && <CaptionBubble text={d.captions[p.stepIndex]} kind={step.kind} />}
+      {d.captions?.[p.stepIndex] && (
+        <CaptionBubble text={d.captions[p.stepIndex]} kind={step.kind} />
+      )}
       <BoardChrome {...p} />
     </div>
   );
@@ -239,7 +308,9 @@ const NumberLine: React.FC<ConceptProps> = (p) => {
   const step = p.script.steps[p.stepIndex];
   const nl = d.numberLine ?? { points: [], range: [-5, 5] as [number, number] };
   const [min, max] = nl.range;
-  const w = 900, h = 220, pad = 60;
+  const w = 900,
+    h = 220,
+    pad = 60;
   const sx = (x: number) => pad + ((x - min) / (max - min)) * (w - 2 * pad);
 
   const ticks = [] as number[];
@@ -259,7 +330,9 @@ const NumberLine: React.FC<ConceptProps> = (p) => {
         {ticks.map((t) => (
           <g key={t}>
             <line className="bc-nl-tick" x1={sx(t)} y1={h / 2 - 8} x2={sx(t)} y2={h / 2 + 8} />
-            <text className="bc-nl-num" x={sx(t)} y={h / 2 + 32} textAnchor="middle">{t}</text>
+            <text className="bc-nl-num" x={sx(t)} y={h / 2 + 32} textAnchor="middle">
+              {t}
+            </text>
           </g>
         ))}
         {/* interval shading between two points, once both revealed */}
@@ -276,12 +349,16 @@ const NumberLine: React.FC<ConceptProps> = (p) => {
         {nl.points.slice(0, revealCount).map((pt, i) => (
           <g key={pt.x} className="tutor-fade-in" style={{ animationDelay: `${i * 250}ms` }}>
             <circle cx={sx(pt.x)} cy={h / 2} r="12" className="bc-nl-dot" />
-            <text className="bc-nl-label" x={sx(pt.x)} y={h / 2 - 22} textAnchor="middle">{pt.label ?? pt.x}</text>
+            <text className="bc-nl-label" x={sx(pt.x)} y={h / 2 - 22} textAnchor="middle">
+              {pt.label ?? pt.x}
+            </text>
           </g>
         ))}
       </svg>
 
-      {d.captions?.[p.stepIndex] && <CaptionBubble text={d.captions[p.stepIndex]} kind={step.kind} />}
+      {d.captions?.[p.stepIndex] && (
+        <CaptionBubble text={d.captions[p.stepIndex]} kind={step.kind} />
+      )}
       <BoardChrome {...p} />
     </div>
   );
@@ -310,7 +387,9 @@ const Storyboard: React.FC<ConceptProps> = (p) => {
           <span className="bc-story-corner bc-story-corner--bl" />
           <span className="bc-story-corner bc-story-corner--br" />
 
-          <p className="bc-eyebrow">scene {p.stepIndex + 1} of {p.script.steps.length} · {step.kind}</p>
+          <p className="bc-eyebrow">
+            scene {p.stepIndex + 1} of {p.script.steps.length} · {step.kind}
+          </p>
           <h2 className="tutor-serif bc-story-title">{step.title}</h2>
 
           {bigMath && (
@@ -319,14 +398,16 @@ const Storyboard: React.FC<ConceptProps> = (p) => {
             </div>
           )}
 
-          {step.kind === "explanation" && (
-            <p className="bc-story-body">{step.body}</p>
-          )}
+          {step.kind === "explanation" && <p className="bc-story-body">{step.body}</p>}
           {step.kind === "example" && (
             <ul className="bc-story-list">
-              {step.lines.filter((l) => l.text).map((l, i) => (
-                <li key={i} className="tutor-fade-in" style={{ animationDelay: `${i * 200}ms` }}>{l.text}</li>
-              ))}
+              {step.lines
+                .filter((l) => l.text)
+                .map((l, i) => (
+                  <li key={i} className="tutor-fade-in" style={{ animationDelay: `${i * 200}ms` }}>
+                    {l.text}
+                  </li>
+                ))}
             </ul>
           )}
           {step.kind === "practice" && step.options && (
@@ -340,9 +421,7 @@ const Storyboard: React.FC<ConceptProps> = (p) => {
             </div>
           )}
 
-          {captions[p.stepIndex] && (
-            <p className="bc-story-caption">→ {captions[p.stepIndex]}</p>
-          )}
+          {captions[p.stepIndex] && <p className="bc-story-caption">→ {captions[p.stepIndex]}</p>}
         </div>
       </div>
 
@@ -370,25 +449,32 @@ type BoardLine = {
 function flattenScript(script: LessonScript): BoardLine[] {
   const out: BoardLine[] = [];
   script.steps.forEach((step, si) => {
-    out.push({ key: `${si}-eyebrow`, stepIndex: si, kind: "eyebrow", text: `${step.kind} · step ${si + 1}` });
+    out.push({
+      key: `${si}-eyebrow`,
+      stepIndex: si,
+      kind: "eyebrow",
+      text: `${step.kind} · step ${si + 1}`,
+    });
     out.push({ key: `${si}-title`, stepIndex: si, kind: "title", text: step.title });
     if (step.kind === "explanation") {
       splitSentences(step.body).forEach((s, i) =>
-        out.push({ key: `${si}-b-${i}`, stepIndex: si, kind: "body", text: s })
+        out.push({ key: `${si}-b-${i}`, stepIndex: si, kind: "body", text: s }),
       );
       if (step.math) out.push({ key: `${si}-m`, stepIndex: si, kind: "math", math: step.math });
     } else if (step.kind === "example") {
       step.lines.forEach((l, i) => {
         if (l.math) out.push({ key: `${si}-l-${i}`, stepIndex: si, kind: "math", math: l.math });
-        else if (l.text) out.push({ key: `${si}-l-${i}`, stepIndex: si, kind: "body", text: l.text });
+        else if (l.text)
+          out.push({ key: `${si}-l-${i}`, stepIndex: si, kind: "body", text: l.text });
       });
     } else {
       out.push({ key: `${si}-p`, stepIndex: si, kind: "body", text: step.prompt });
       if (step.math) out.push({ key: `${si}-pm`, stepIndex: si, kind: "math", math: step.math });
       (step.options ?? []).forEach((o, i) =>
-        out.push({ key: `${si}-o-${i}`, stepIndex: si, kind: "option", math: o })
+        out.push({ key: `${si}-o-${i}`, stepIndex: si, kind: "option", math: o }),
       );
-      if (step.hint) out.push({ key: `${si}-h`, stepIndex: si, kind: "note", text: `hint · ${step.hint}` });
+      if (step.hint)
+        out.push({ key: `${si}-h`, stepIndex: si, kind: "note", text: `hint · ${step.hint}` });
     }
   });
   return out;
@@ -404,11 +490,17 @@ function splitSentences(s: string): string[] {
 function useTypewriter(text: string, active: boolean, speed = 22) {
   const [n, setN] = useState(active ? 0 : text.length);
   useEffect(() => {
-    if (!active) { setN(text.length); return; }
+    if (!active) {
+      setN(text.length);
+      return;
+    }
     setN(0);
     const id = window.setInterval(() => {
       setN((v) => {
-        if (v >= text.length) { window.clearInterval(id); return v; }
+        if (v >= text.length) {
+          window.clearInterval(id);
+          return v;
+        }
         return Math.min(text.length, v + 2);
       });
     }, speed);
@@ -418,7 +510,12 @@ function useTypewriter(text: string, active: boolean, speed = 22) {
 }
 
 function RuledLine({
-  line, active, revealing, onSelect, isSelected, doodle,
+  line,
+  active,
+  revealing,
+  onSelect,
+  isSelected,
+  doodle,
 }: {
   line: BoardLine;
   active: boolean;
@@ -428,7 +525,7 @@ function RuledLine({
   doodle?: string;
 }) {
   const t = useTypewriter(line.text ?? "", revealing);
-  const shown = revealing ? t : line.text ?? "";
+  const shown = revealing ? t : (line.text ?? "");
   const done = !revealing || shown.length === (line.text?.length ?? 0);
 
   return (
@@ -451,7 +548,9 @@ function RuledLine({
           {!done && <span className="rb-caret" aria-hidden />}
         </span>
       )}
-      {doodle && <span className="rb-line-doodle" aria-hidden dangerouslySetInnerHTML={{ __html: doodle }} />}
+      {doodle && (
+        <span className="rb-line-doodle" aria-hidden dangerouslySetInnerHTML={{ __html: doodle }} />
+      )}
     </button>
   );
 }
@@ -466,7 +565,8 @@ function seedTurns(line: BoardLine, step: LessonStep, moduleId: string): Turn[] 
 
 function openerFor(line: BoardLine, step: LessonStep): string {
   if (line.kind === "math") return "Want me to walk through this line, or picture it another way?";
-  if (line.kind === "option") return "Not sure which one? Tell me what you're thinking and we'll test it.";
+  if (line.kind === "option")
+    return "Not sure which one? Tell me what you're thinking and we'll test it.";
   if (line.kind === "title") return `We're on “${step.title}”. What part feels fuzzy?`;
   if (line.kind === "note") return "That hint is a nudge — want to try it, or hear why it works?";
   return "Say more — where does this feel tricky?";
@@ -500,11 +600,14 @@ const RuledBoard: React.FC<ConceptProps> = (p) => {
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [visible.length]);
 
-  const openLineChat = useCallback((line: BoardLine) => {
-    setSelected(line.key);
-    const step = p.script.steps[line.stepIndex];
-    setTurns(seedTurns(line, step, p.script.moduleId));
-  }, [p.script]);
+  const openLineChat = useCallback(
+    (line: BoardLine) => {
+      setSelected(line.key);
+      const step = p.script.steps[line.stepIndex];
+      setTurns(seedTurns(line, step, p.script.moduleId));
+    },
+    [p.script],
+  );
 
   const closeChat = () => setSelected(null);
 
@@ -561,9 +664,19 @@ const RuledBoard: React.FC<ConceptProps> = (p) => {
           </div>
         </div>
         <div className="rb-chrome">
-          <button className="rb-btn" onClick={() => p.goto(Math.max(0, p.stepIndex - 1))} disabled={p.stepIndex === 0}>‹ back</button>
-          <button className="rb-btn rb-btn--ghost" onClick={p.onWriteMath}>✏️ write math</button>
-          <button className="rb-btn rb-btn--ghost" onClick={p.onOpenLive}>🔊 full live</button>
+          <button
+            className="rb-btn"
+            onClick={() => p.goto(Math.max(0, p.stepIndex - 1))}
+            disabled={p.stepIndex === 0}
+          >
+            ‹ back
+          </button>
+          <button className="rb-btn rb-btn--ghost" onClick={p.onWriteMath}>
+            ✏️ write math
+          </button>
+          <button className="rb-btn rb-btn--ghost" onClick={p.onOpenLive}>
+            🔊 full live
+          </button>
           <button
             className="rb-btn rb-btn--primary"
             onClick={() => p.goto(Math.min(total - 1, p.stepIndex + 1))}
@@ -582,7 +695,9 @@ const RuledBoard: React.FC<ConceptProps> = (p) => {
             <p className="rb-glass-name">Lumen · live</p>
             <p className="rb-glass-sub">talking about this line</p>
           </div>
-          <button className="rb-glass-close" onClick={closeChat} aria-label="Close transcript">✕</button>
+          <button className="rb-glass-close" onClick={closeChat} aria-label="Close transcript">
+            ✕
+          </button>
         </div>
         <div className="rb-glass-transcript">
           {turns.map((t, i) => (
@@ -592,11 +707,16 @@ const RuledBoard: React.FC<ConceptProps> = (p) => {
           ))}
         </div>
         <div className="rb-glass-actions">
-          <button className="rb-glass-chip" onClick={askForDoodle}>✎ draw it on the board</button>
+          <button className="rb-glass-chip" onClick={askForDoodle}>
+            ✎ draw it on the board
+          </button>
         </div>
         <form
           className="rb-glass-input"
-          onSubmit={(e) => { e.preventDefault(); send(); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            send();
+          }}
         >
           <input
             value={draft}
@@ -604,7 +724,9 @@ const RuledBoard: React.FC<ConceptProps> = (p) => {
             placeholder="Type or just keep listening…"
             aria-label="Message Lumen"
           />
-          <button type="submit" disabled={!draft.trim()}>send</button>
+          <button type="submit" disabled={!draft.trim()}>
+            send
+          </button>
         </form>
         <p className="rb-glass-hint">
           You can close this and keep chatting — Lumen stays live in the corner.
@@ -623,9 +745,12 @@ const RuledBoard: React.FC<ConceptProps> = (p) => {
 
 function mockReply(input: string): string {
   const lower = input.toLowerCase();
-  if (/why/.test(lower)) return "Great 'why'. Think about what happens on each side of the equation when we do the same move — nothing changes, right?";
-  if (/stuck|help|confus/.test(lower)) return "Totally okay. Let's slow down — what's the very last part that still made sense to you?";
-  if (/\?$/.test(input)) return "Good question. Try it out loud first — I'll follow along and jump in if you drift.";
+  if (/why/.test(lower))
+    return "Great 'why'. Think about what happens on each side of the equation when we do the same move — nothing changes, right?";
+  if (/stuck|help|confus/.test(lower))
+    return "Totally okay. Let's slow down — what's the very last part that still made sense to you?";
+  if (/\?$/.test(input))
+    return "Good question. Try it out loud first — I'll follow along and jump in if you drift.";
   return "Yes — say more. What made you notice that?";
 }
 
@@ -647,7 +772,8 @@ export const BOARD_CONCEPTS: ConceptDef[] = [
   {
     id: "math-canvas",
     name: "Math Canvas",
-    tagline: "An infinite whiteboard: Lumen writes, sketches and drops interactive diagrams beat by beat.",
+    tagline:
+      "An infinite whiteboard: Lumen writes, sketches and drops interactive diagrams beat by beat.",
     mood: "Signature",
     boardTone: "hidden",
     Component: (p) => (
@@ -663,9 +789,44 @@ export const BOARD_CONCEPTS: ConceptDef[] = [
       />
     ),
   },
-  { id: "ruled",     name: "Live Whiteboard",   tagline: "Lumen writes on a plain whiteboard — tap any line to talk it through.", mood: "Immersive", boardTone: "light", Component: RuledBoard },
-  { id: "grapher",   name: "Grapher",     tagline: "Live parabola with roots landing on the axis.", mood: "Visual",   boardTone: "hidden", Component: Grapher },
-  { id: "tiles",     name: "Algebra Tiles", tagline: "Blocks that rearrange into the factored rectangle.", mood: "Hands-on", boardTone: "hidden", Component: Tiles },
-  { id: "numline",   name: "Number Line", tagline: "Roots snap onto a line, interval shades in.",   mood: "Spatial",  boardTone: "hidden", Component: NumberLine },
-  { id: "storyboard",name: "Storyboard",  tagline: "Each step is a framed scene with big math.",    mood: "Cinematic",boardTone: "hidden", Component: Storyboard },
+  {
+    id: "ruled",
+    name: "Live Whiteboard",
+    tagline: "Lumen writes on a plain whiteboard — tap any line to talk it through.",
+    mood: "Immersive",
+    boardTone: "light",
+    Component: RuledBoard,
+  },
+  {
+    id: "grapher",
+    name: "Grapher",
+    tagline: "Live parabola with roots landing on the axis.",
+    mood: "Visual",
+    boardTone: "hidden",
+    Component: Grapher,
+  },
+  {
+    id: "tiles",
+    name: "Algebra Tiles",
+    tagline: "Blocks that rearrange into the factored rectangle.",
+    mood: "Hands-on",
+    boardTone: "hidden",
+    Component: Tiles,
+  },
+  {
+    id: "numline",
+    name: "Number Line",
+    tagline: "Roots snap onto a line, interval shades in.",
+    mood: "Spatial",
+    boardTone: "hidden",
+    Component: NumberLine,
+  },
+  {
+    id: "storyboard",
+    name: "Storyboard",
+    tagline: "Each step is a framed scene with big math.",
+    mood: "Cinematic",
+    boardTone: "hidden",
+    Component: Storyboard,
+  },
 ];

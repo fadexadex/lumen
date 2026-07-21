@@ -136,20 +136,34 @@ const iconProps = {
   strokeLinejoin: "round" as const,
 };
 const PenIcon = () => (
-  <svg {...iconProps}><path d="M15.5 4.5l4 4L8 20H4v-4L15.5 4.5z" /></svg>
+  <svg {...iconProps}>
+    <path d="M15.5 4.5l4 4L8 20H4v-4L15.5 4.5z" />
+  </svg>
 );
 const EraseIcon = () => (
-  <svg {...iconProps}><path d="M3 17l7-7 7 7-4 4H7l-4-4z" /><path d="M14 6l4 4" /></svg>
+  <svg {...iconProps}>
+    <path d="M3 17l7-7 7 7-4 4H7l-4-4z" />
+    <path d="M14 6l4 4" />
+  </svg>
 );
 const TextIcon = () => (
-  <svg {...iconProps}><path d="M5 5h14M12 5v14M9 19h6" /></svg>
+  <svg {...iconProps}>
+    <path d="M5 5h14M12 5v14M9 19h6" />
+  </svg>
 );
 const HandIcon = () => (
-  <svg {...iconProps}><path d="M7 11V6a1.5 1.5 0 013 0v4M10 10V4.5a1.5 1.5 0 013 0V10M13 10V6a1.5 1.5 0 013 0v6M16 10.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-1.5a5 5 0 01-3.5-1.5L4 15" /></svg>
+  <svg {...iconProps}>
+    <path d="M7 11V6a1.5 1.5 0 013 0v4M10 10V4.5a1.5 1.5 0 013 0V10M13 10V6a1.5 1.5 0 013 0v6M16 10.5a1.5 1.5 0 013 0V15a6 6 0 01-6 6h-1.5a5 5 0 01-3.5-1.5L4 15" />
+  </svg>
 );
 const UndoIcon = () => (
-  <svg {...iconProps}><path d="M9 14l-4-4 4-4" /><path d="M5 10h9a5 5 0 010 10h-2" /></svg>
+  <svg {...iconProps}>
+    <path d="M9 14l-4-4 4-4" />
+    <path d="M5 10h9a5 5 0 010 10h-2" />
+  </svg>
 );
 const TrashIcon = () => (
-  <svg {...iconProps}><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13h10l1-13" /></svg>
+  <svg {...iconProps}>
+    <path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13h10l1-13" />
+  </svg>
 );

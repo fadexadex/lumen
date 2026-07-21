@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lumen Plans — How Everything Connects</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #14201c;
+    --ink-soft: #3a4a44;
+    --paper: #f3f0e8;
+    --mistral: #5b3d8f;
+    --mistral-bg: rgba(91,61,143,0.09);
+    --gemini: #1f6b4a;
+    --gemini-bg: rgba(31,107,74,0.08);
+    --tavily: #2a5f7a;
+    --tavily-bg: rgba(42,95,122,0.09);
+    --shared: #b85c38;
+    --shared-bg: rgba(184,92,56,0.09);
+    --amber: #c9922a;
+    --line: rgba(20, 32, 28, 0.14);
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --sans: "Source Sans 3", system-ui, sans-serif;
+    --display: "Fraunces", Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse 70% 45% at 8% -8%, rgba(91,61,143,0.10), transparent 50%),
+      radial-gradient(ellipse 55% 40% at 95% 0%, rgba(31,107,74,0.09), transparent 45%),
+      linear-gradient(180deg, #f7f4ec 0%, var(--paper) 45%, #ebe7db 100%);
+    line-height: 1.55;
+    font-size: 17px;
+  }
+  a { color: var(--tavily); text-underline-offset: 3px; }
+  a:hover { color: var(--gemini); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.25rem 5rem; }
+
+  header.hero {
+    padding: 3.25rem 0 2.25rem;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 0;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 0.7rem;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.9rem, 4.5vw, 2.9rem);
+    line-height: 1.12;
+    margin: 0 0 1rem;
+    letter-spacing: -0.02em;
+  }
+  .lede {
+    font-size: 1.12rem;
+    color: var(--ink-soft);
+    max-width: 44rem;
+    margin: 0 0 1.5rem;
+  }
+  .changelog {
+    padding: 0.9rem 1rem;
+    background: rgba(255,255,255,0.55);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  .changelog strong { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.45rem; }
+  .changelog ul { margin: 0; padding-left: 1.1rem; }
+  .changelog li { margin-bottom: 0.25rem; }
+
+  nav.toc {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(243,240,232,0.9);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    margin: 0 -1.25rem 2.5rem;
+    padding: 0.65rem 1.25rem;
+    overflow-x: auto;
+  }
+  nav.toc ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 1rem; white-space: nowrap; font-size: 0.85rem; }
+  nav.toc a { color: var(--ink-soft); text-decoration: none; font-weight: 500; }
+  nav.toc a:hover { color: var(--ink); }
+
+  section { margin-bottom: 3.25rem; scroll-margin-top: 3.5rem; }
+  h2 { font-family: var(--display); font-size: 1.7rem; font-weight: 700; margin: 0 0 0.35rem; letter-spacing: -0.015em; }
+  .section-sub { color: var(--ink-soft); margin: 0 0 1.4rem; max-width: 42rem; }
+  h3 { font-family: var(--display); font-size: 1.2rem; margin: 1.75rem 0 0.6rem; }
+  h4 { font-size: 0.95rem; font-weight: 700; margin: 1.1rem 0 0.45rem; }
+  p { margin: 0 0 1rem; }
+  ul.clean { margin: 0 0 1rem; padding-left: 1.15rem; }
+  ul.clean li { margin-bottom: 0.35rem; }
+
+  .pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.35rem 0.75rem; border-radius: 999px;
+    font-family: var(--mono); font-size: 0.75rem;
+    border: 1px solid var(--line); background: rgba(255,255,255,0.55);
+  }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .pill.mistral .dot { background: var(--mistral); }
+  .pill.gemini .dot { background: var(--gemini); }
+  .pill.tavily .dot { background: var(--tavily); }
+  .pill.shared .dot { background: var(--shared); }
+
+  .mem {
+    margin: 1.35rem 0 1.75rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(20,32,28,0.03) 23px, rgba(20,32,28,0.03) 24px),
+      rgba(255,255,255,0.62);
+    overflow: hidden;
+  }
+  .mem-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+    padding: 0.7rem 1rem; border-bottom: 1px solid var(--line); background: rgba(232,228,216,0.7);
+  }
+  .mem-head strong { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .mem-head span { font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft); }
+  .mem-body { padding: 1.1rem 1rem 1.25rem; }
+  .mem-caption { font-size: 0.86rem; color: var(--ink-soft); margin: -0.35rem 0 1.4rem; }
+
+  .region {
+    border: 1.5px solid var(--ink); border-radius: 4px;
+    padding: 0.65rem 0.75rem; background: rgba(255,255,255,0.75);
+  }
+  .region.mistral-r { border-color: var(--mistral); background: var(--mistral-bg); }
+  .region.gemini-r { border-color: var(--gemini); background: var(--gemini-bg); }
+  .region.tavily-r { border-color: var(--tavily); background: var(--tavily-bg); }
+  .region.shared-r { border-color: var(--shared); background: var(--shared-bg); }
+  .region-label { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.3rem; }
+  .region-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.2rem; }
+  .region-meta { font-family: var(--mono); font-size: 0.72rem; color: var(--ink-soft); line-height: 1.45; }
+  .slot {
+    display: flex; gap: 0.5rem; align-items: flex-start;
+    padding: 0.3rem 0.4rem; margin: 0.22rem 0; border-radius: 3px;
+    background: rgba(20,32,28,0.04); font-size: 0.82rem;
+  }
+  .slot code { font-family: var(--mono); font-size: 0.72rem; color: var(--mistral); flex-shrink: 0; min-width: 5.2rem; }
+  .region.gemini-r .slot code { color: var(--gemini); }
+
+  .mem-grid { display: grid; gap: 0.7rem; }
+  .mem-grid.cols-2, .mem-grid.cols-3 { grid-template-columns: 1fr; }
+  @media (min-width: 700px) {
+    .mem-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+    .mem-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  }
+  .arrow-row {
+    display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+    gap: 0.45rem; padding: 0.55rem 0; font-family: var(--mono); font-size: 0.72rem;
+    color: var(--ink-soft); text-align: center;
+  }
+  .arrow-row .arr { color: var(--shared); font-size: 1.05rem; }
+
+  .svg-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .svg-wrap svg { display: block; min-width: 680px; width: 100%; height: auto; }
+
+  table.cmp { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0 1.4rem; }
+  table.cmp th, table.cmp td { text-align: left; padding: 0.6rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.cmp th {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--ink-soft); font-weight: 500;
+    background: rgba(232,228,216,0.5);
+  }
+
+  .flow { counter-reset: step; list-style: none; padding: 0; margin: 1rem 0 1.4rem; }
+  .flow li {
+    position: relative; padding: 0.8rem 0.85rem 0.8rem 3rem; margin-bottom: 0.45rem;
+    border: 1px solid var(--line); border-radius: 6px; background: rgba(255,255,255,0.45);
+  }
+  .flow li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0.7rem; top: 0.8rem;
+    width: 1.55rem; height: 1.55rem; border-radius: 50%;
+    background: var(--ink); color: var(--paper);
+    font-family: var(--mono); font-size: 0.72rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .flow li strong { display: block; margin-bottom: 0.12rem; }
+  .flow li span { color: var(--ink-soft); font-size: 0.9rem; }
+
+  .callout {
+    border-left: 3px solid var(--shared); padding: 0.85rem 1rem; margin: 1.2rem 0;
+    background: var(--shared-bg); border-radius: 0 4px 4px 0;
+  }
+  .callout.mistral { border-left-color: var(--mistral); background: var(--mistral-bg); }
+  .callout.gemini { border-left-color: var(--gemini); background: var(--gemini-bg); }
+  .callout strong { color: var(--shared); }
+  .callout.mistral strong { color: var(--mistral); }
+  .callout.gemini strong { color: var(--gemini); }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 0.66rem;
+    padding: 0.12rem 0.4rem; border-radius: 3px; margin-right: 0.2rem;
+    background: rgba(20,32,28,0.08);
+  }
+  .tag.new { background: rgba(184,92,56,0.18); color: var(--shared); }
+  .tag.mistral { background: rgba(91,61,143,0.15); color: var(--mistral); }
+  .tag.gemini { background: rgba(31,107,74,0.15); color: var(--gemini); }
+
+  footer {
+    margin-top: 2.5rem; padding-top: 1.4rem; border-top: 1px solid var(--line);
+    font-size: 0.85rem; color: var(--ink-soft);
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">SparkLearn · Plans refreshed · Jul 2026</p>
+  <h1>How everything connects</h1>
+  <p class="lede">
+    Two plan folders, one product. <strong>Mistral thinks</strong> (courses, research, memory).
+    <strong>Gemini Live speaks and draws</strong> (voice + canvas RPC). They meet on a shared
+    <code>LessonScript</code> and a tiny rolling session summary — so Live stays under the free-tier 65k TPM wall.
+  </p>
+  <div class="changelog">
+    <strong>What changed since the last analysis</strong>
+    <ul>
+      <li><strong>Content model swap:</strong> Gemini Flash → <em>Mistral</em> (<code>mistral-small-latest</code> / <code>mistral-large-latest</code> for repair)</li>
+      <li><strong>Web research locked:</strong> Mistral + <em>Tavily</em> curator loop (Option B)</li>
+      <li><span class="tag new">NEW</span> <code>plan/11-live-context-budget.md</code> — Mistral compresses context for Gemini Live</li>
+      <li><span class="tag new">NEW</span> <code>plan-generative-courses/09-concept-animations.md</code> — composable board storyboards</li>
+      <li>Roadmap now <em>streams</em> module cards in (planning animation); Gen UI gains <code>showConceptAnimation</code></li>
+      <li>Voice budget fallbacks: pull board state, short turns, optional half-cascade mode</li>
+    </ul>
+  </div>
+  <div class="pills">
+    <span class="pill mistral"><span class="dot"></span> Mistral · brain + memory</span>
+    <span class="pill gemini"><span class="dot"></span> Gemini Live · mouth + hand</span>
+    <span class="pill tavily"><span class="dot"></span> Tavily · live web facts</span>
+    <span class="pill shared"><span class="dot"></span> LessonScript · shared cell</span>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <ul>
+    <li><a href="#one-picture">One picture</a></li>
+    <li><a href="#split">Brain / mouth</a></li>
+    <li><a href="#course">Course factory</a></li>
+    <li><a href="#live">Live tutor</a></li>
+    <li><a href="#budget">65k budget</a></li>
+    <li><a href="#animations">Concept anims</a></li>
+    <li><a href="#handshake">Handshake</a></li>
+    <li><a href="#build">Build order</a></li>
+  </ul>
+</nav>
+
+<!-- ========== ONE PICTURE ========== -->
+<section id="one-picture">
+  <h2>One picture of the whole system</h2>
+  <p class="section-sub">
+    Read this left-to-right: research → generate course → hydrate board → speak &amp; draw.
+    Purple work never touches the Gemini Live TPM budget; green work never invents curriculum.
+  </p>
+
+  <div class="mem">
+    <div class="mem-head">
+      <strong>Fig 1 · End-to-end connection map</strong>
+      <span>plans × models × stores</span>
+    </div>
+    <div class="mem-body">
+      <div class="svg-wrap">
+        <svg viewBox="0 0 980 560" role="img" aria-label="Full system connection map">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="#b85c38"/>
+            </marker>
+            <marker id="arr-m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="#5b3d8f"/>
+            </marker>
+            <marker id="arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="#1f6b4a"/>
+            </marker>
+          </defs>
+
+          <!-- ONBOARDING -->
+          <rect x="20" y="30" width="150" height="70" rx="5" fill="#fff" stroke="#14201c"/>
+          <text x="95" y="58" text-anchor="middle" font-size="11" fill="#3a4a44" font-family="IBM Plex Mono, monospace">ONBOARDING</text>
+          <text x="95" y="78" text-anchor="middle" font-size="12" fill="#14201c">topic · grade · style</text>
+
+          <path d="M170 65 L210 65" stroke="#5b3d8f" stroke-width="1.5" marker-end="url(#arr-m)"/>
+
+          <!-- TAVILY -->
+          <rect x="210" y="20" width="170" height="90" rx="5" fill="rgba(42,95,122,0.1)" stroke="#2a5f7a" stroke-width="1.5"/>
+          <text x="295" y="48" text-anchor="middle" font-size="10" fill="#2a5f7a" font-family="IBM Plex Mono, monospace" letter-spacing="1">TAVILY</text>
+          <text x="295" y="70" text-anchor="middle" font-size="12" fill="#14201c">web search tool</text>
+          <text x="295" y="90" text-anchor="middle" font-size="10" fill="#3a4a44">per-module lookups</text>
+
+          <path d="M380 65 L420 65" stroke="#5b3d8f" stroke-width="1.5" marker-end="url(#arr-m)"/>
+
+          <!-- MISTRAL BRAIN -->
+          <rect x="420" y="16" width="280" height="200" rx="6" fill="rgba(91,61,143,0.08)" stroke="#5b3d8f" stroke-width="2"/>
+          <text x="560" y="40" text-anchor="middle" font-size="10" fill="#5b3d8f" font-family="IBM Plex Mono, monospace" letter-spacing="1.5">MISTRAL · BRAIN  (~1M tokens)</text>
+          <text x="560" y="62" text-anchor="middle" font-size="14" fill="#14201c" font-family="Fraunces, Georgia, serif">plan-generative-courses/</text>
+
+          <rect x="438" y="78" width="244" height="28" rx="3" fill="#fff" stroke="#5b3d8f"/>
+          <text x="560" y="97" text-anchor="middle" font-size="11" fill="#14201c">Curator → CuratedBrief</text>
+
+          <rect x="438" y="114" width="244" height="28" rx="3" fill="#fff" stroke="#5b3d8f"/>
+          <text x="560" y="133" text-anchor="middle" font-size="11" fill="#14201c">streamObject → Roadmap + Lessons</text>
+
+          <rect x="438" y="150" width="244" height="28" rx="3" fill="#fff" stroke="#5b3d8f"/>
+          <text x="560" y="169" text-anchor="middle" font-size="11" fill="#14201c">ConceptAnimation storyboards</text>
+
+          <rect x="438" y="186" width="244" height="22" rx="3" fill="#fff" stroke="#5b3d8f"/>
+          <text x="560" y="202" text-anchor="middle" font-size="11" fill="#14201c">Session summary (≤2 sentences)</text>
+
+          <!-- SHARED STORE -->
+          <path d="M560 216 L560 250" stroke="#b85c38" stroke-width="1.5" marker-end="url(#arr)"/>
+
+          <rect x="390" y="250" width="340" height="70" rx="6" fill="rgba(184,92,56,0.1)" stroke="#b85c38" stroke-width="2"/>
+          <text x="560" y="278" text-anchor="middle" font-size="10" fill="#b85c38" font-family="IBM Plex Mono, monospace" letter-spacing="1">SHARED MEMORY</text>
+          <text x="560" y="300" text-anchor="middle" font-size="14" fill="#14201c" font-family="Fraunces, Georgia, serif">LessonScript + Course store</text>
+
+          <!-- FAN OUT -->
+          <path d="M470 320 L280 360" stroke="#14201c" stroke-width="1.3" marker-end="url(#arr)"/>
+          <path d="M560 320 L560 360" stroke="#14201c" stroke-width="1.3" marker-end="url(#arr)"/>
+          <path d="M650 320 L820 360" stroke="#1f6b4a" stroke-width="1.3" marker-end="url(#arr-g)"/>
+
+          <rect x="160" y="365" width="240" height="55" rx="4" fill="#fff" stroke="#14201c"/>
+          <text x="280" y="390" text-anchor="middle" font-size="12" fill="#14201c">MathCanvas / layout</text>
+          <text x="280" y="408" text-anchor="middle" font-size="10" fill="#3a4a44">beats · diagrams · anim player</text>
+
+          <rect x="440" y="365" width="240" height="55" rx="4" fill="#fff" stroke="#14201c"/>
+          <text x="560" y="390" text-anchor="middle" font-size="12" fill="#14201c">board-targets</text>
+          <text x="560" y="408" text-anchor="middle" font-size="10" fill="#3a4a44">vertex · roots · sceneN.*</text>
+
+          <!-- GEMINI LIVE -->
+          <rect x="700" y="365" width="260" height="175" rx="6" fill="rgba(31,107,74,0.08)" stroke="#1f6b4a" stroke-width="2"/>
+          <text x="830" y="390" text-anchor="middle" font-size="10" fill="#1f6b4a" font-family="IBM Plex Mono, monospace" letter-spacing="1.5">GEMINI LIVE · MOUTH+HAND</text>
+          <text x="830" y="412" text-anchor="middle" font-size="13" fill="#14201c" font-family="Fraunces, Georgia, serif">plan/  (~65k TPM)</text>
+          <text x="830" y="438" text-anchor="middle" font-size="11" fill="#14201c">speech-to-speech</text>
+          <text x="830" y="456" text-anchor="middle" font-size="11" fill="#14201c">canvas RPC draw tools</text>
+          <text x="830" y="474" text-anchor="middle" font-size="11" fill="#14201c">pull get_board_state</text>
+          <text x="830" y="492" text-anchor="middle" font-size="11" fill="#14201c">sees tiny summary only</text>
+          <text x="830" y="518" text-anchor="middle" font-size="10" fill="#3a4a44">LiveKit room · Python agent</text>
+
+          <!-- summary arrow into live -->
+          <path d="M700 200 L760 200 L760 365" stroke="#5b3d8f" stroke-width="1.4" stroke-dasharray="5 3" fill="none" marker-end="url(#arr-m)"/>
+          <text x="768" y="240" font-size="9" fill="#5b3d8f">compressed</text>
+          <text x="768" y="254" font-size="9" fill="#5b3d8f">summary</text>
+
+          <!-- labels for plans -->
+          <text x="40" y="480" font-size="11" fill="#5b3d8f" font-family="IBM Plex Mono, monospace">plan-generative-courses/</text>
+          <text x="40" y="500" font-size="10" fill="#3a4a44">writes content · research · anims</text>
+          <text x="40" y="530" font-size="11" fill="#1f6b4a" font-family="IBM Plex Mono, monospace">plan/</text>
+          <text x="40" y="548" font-size="10" fill="#3a4a44">reads board · speaks · draws</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <p class="mem-caption">
+    Dashed purple arrow = the new budget bridge (<code>plan/11</code>): Mistral holds long memory; Gemini Live only gets a 1–2 sentence summary.
+  </p>
+</section>
+
+<!-- ========== BRAIN / MOUTH ========== -->
+<section id="split">
+  <h2>The model split <span class="tag new">key update</span></h2>
+  <p class="section-sub">
+    Voice and content are independent now. That is the load-bearing change across both plans.
+  </p>
+
+  <div class="mem">
+    <div class="mem-head">
+      <strong>Fig 2 · Division of labor</strong>
+      <span>from plan/11</span>
+    </div>
+    <div class="mem-body">
+      <div class="mem-grid cols-2">
+        <div class="region mistral-r">
+          <div class="region-label">Mistral · always-on brain</div>
+          <div class="region-title">~1M free tokens · thinking budget</div>
+          <div class="slot"><code>small</code> roadmap, lessons, summaries, Gen UI, animations</div>
+          <div class="slot"><code>large</code> repair + hard math checks only</div>
+          <div class="slot"><code>+Tavily</code> live web research during curation</div>
+          <div class="slot"><code>SDK</code> Vercel AI SDK · @ai-sdk/mistral</div>
+          <div class="region-meta" style="margin-top:0.5rem">Owns curriculum, facts, and rolling learner memory.</div>
+        </div>
+        <div class="region gemini-r">
+          <div class="region-label">Gemini Live · mouth + hand</div>
+          <div class="region-title">~65k TPM · audio dominates</div>
+          <div class="slot"><code>audio</code> speech-to-speech (native)</div>
+          <div class="slot"><code>tools</code> canvas draw RPC (async)</div>
+          <div class="slot"><code>sees</code> lean prompt + pull board + summary</div>
+          <div class="slot"><code>never</code> full lesson history / raw web / transcript dump</div>
+          <div class="region-meta" style="margin-top:0.5rem">Owns presence. Must stay short-spoken and thinly grounded.</div>
+        </div>
+      </div>
+      <div class="arrow-row">
+        <span>Mistral writes LessonScript + summary</span>
+        <span class="arr">→</span>
+        <span>shared store / lumen.board channel</span>
+        <span class="arr">→</span>
+        <span>Gemini Live speaks &amp; points</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout mistral">
+    <strong>Why split:</strong> Gemini Live free tier tokenizes audio in <em>and</em> out. Dumping lesson history into Live burns the runway.
+    Mistral has a fat content budget and is already generating the course — so it also maintains the tiny “what the learner is doing” summary Live needs.
+  </div>
+</section>
+
+<!-- ========== COURSE FACTORY ========== -->
+<section id="course">
+  <h2>Generative courses <span class="tag mistral">plan-generative-courses/</span></h2>
+  <p class="section-sub">
+    Module-1-first factory: outline streams in, Module 1 unlocks fast, later modules fill while the learner works.
+  </p>
+
+  <h3>Pipeline memory</h3>
+  <ol class="flow">
+    <li>
+      <strong>Onboarding → POST /api/course/start</strong>
+      <span>Profile (topic, grade, style) kicks CourseOrchestrator over SSE.</span>
+    </li>
+    <li>
+      <strong>Stream roadmap (new)</strong>
+      <span><code>streamObject(roadmapSchema)</code> — modules pop in one-by-one for the “planning” animation. Not a fake delay.</span>
+    </li>
+    <li>
+      <strong>Optional curator (Tavily)</strong>
+      <span>Mistral calls a Tavily search tool per module → <code>CuratedBrief</code> → grounds the lesson prompt.</span>
+    </li>
+    <li>
+      <strong>Priority: Module 0</strong>
+      <span><code>streamObject(lessonScriptSchema)</code> → Zod → enrichParabola → ready. Learner can enter.</span>
+    </li>
+    <li>
+      <strong>Background pool (concurrency 2)</strong>
+      <span>Modules 1…N generate; roadmap cards flip pending → generating → ready | failed.</span>
+    </li>
+    <li>
+      <strong>Hydrate MathCanvas</strong>
+      <span>Store serves <code>LessonScript</code>; layout + targets + optional ConceptAnimation.</span>
+    </li>
+  </ol>
+
+  <div class="mem">
+    <div class="mem-head">
+      <strong>Fig 3 · Two generation modes (unchanged idea, Mistral-backed)</strong>
+      <span>schema vs Gen UI</span>
+    </div>
+    <div class="mem-body">
+      <div class="mem-grid cols-2">
+        <div class="region mistral-r">
+          <div class="region-label">A · Schema generation</div>
+          <div class="region-title">Durable course content</div>
+          <div class="slot"><code>OUT</code> Roadmap + LessonScript</div>
+          <div class="slot"><code>+anim</code> optional ConceptAnimation on script</div>
+          <div class="slot"><code>PERSIST</code> Course store</div>
+          <div class="slot"><code>READERS</code> MathCanvas, Live targets</div>
+        </div>
+        <div class="region">
+          <div class="region-label">B · Generative UI</div>
+          <div class="region-title">Live interactive surfaces</div>
+          <div class="slot"><code>OUT</code> tool parts → React widgets</div>
+          <div class="slot"><code>NEW</code> showConceptAnimation</div>
+          <div class="slot"><code>PERSIST</code> ephemeral unless updateLessonDiagram</div>
+          <div class="slot"><code>RULE</code> params only — never arbitrary HTML/JS</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Doc map</h3>
+  <table class="cmp">
+    <thead><tr><th>File</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><code>00–01</code></td><td>Vision, orchestrator, status machine</td></tr>
+      <tr><td><code>02</code></td><td>Zod schemas, streamObject, enrichParabola, Mistral small/large</td></tr>
+      <tr><td><code>03</code></td><td>Gen UI tools → components (+ showConceptAnimation)</td></tr>
+      <tr><td><code>04</code></td><td>Curator: Mistral + Tavily → CuratedBrief</td></tr>
+      <tr><td><code>05–06</code></td><td>SSE / background jobs / roadmap hydration</td></tr>
+      <tr><td><code>07</code></td><td>Integration touchpoints with Live</td></tr>
+      <tr><td><code>08</code></td><td>Phases A–F + file manifest</td></tr>
+      <tr><td><code>09</code> <span class="tag new">NEW</span></td><td>Concept animation primitives &amp; storyboard</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ========== LIVE ========== -->
+<section id="live">
+  <h2>Lumen Live <span class="tag gemini">plan/</span></h2>
+  <p class="section-sub">
+    Voice overlay on MathCanvas. Learner keeps the board; AI draws in world space while talking.
+  </p>
+
+  <div class="mem">
+    <div class="mem-head">
+      <strong>Fig 4 · Live runtime address spaces</strong>
+      <span>browser · LiveKit · agent · Gemini</span>
+    </div>
+    <div class="mem-body">
+      <div class="mem-grid cols-3">
+        <div class="region">
+          <div class="region-label">Browser</div>
+          <div class="region-title">MathCanvas + LumenOverlay</div>
+          <div class="slot"><code>layer</code> .mc-annotation-layer (world)</div>
+          <div class="slot"><code>ctrl</code> LumenCanvasController</div>
+          <div class="slot"><code>RPC</code> lumen.canvas handler</div>
+          <div class="slot"><code>sum</code> session-summary.ts (Mistral)</div>
+        </div>
+        <div class="region gemini-r">
+          <div class="region-label">Transport</div>
+          <div class="region-title">LiveKit Cloud</div>
+          <div class="slot"><code>audio</code> WebRTC Opus</div>
+          <div class="slot"><code>RPC</code> canvas commands + ack</div>
+          <div class="slot"><code>data</code> lumen.board (pull + summary)</div>
+          <div class="slot"><code>room</code> lumen-&lt;mod&gt;-&lt;uid&gt;</div>
+        </div>
+        <div class="region gemini-r">
+          <div class="region-label">Python agent</div>
+          <div class="region-title">livekit-agents + Gemini</div>
+          <div class="slot"><code>model</code> native-audio Live</div>
+          <div class="slot"><code>tools</code> circle, axis, play_scene…</div>
+          <div class="slot"><code>ctx</code> BoardContext (tiny)</div>
+          <div class="slot"><code>fb</code> OpenAI / cascade flags</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Draw-while-talk (still the money shot)</h3>
+  <p>
+    Three concurrent channels: <strong>(a)</strong> audio out, <strong>(b)</strong> async tool → RPC → animate,
+    <strong>(c)</strong> transcript. RPC ack returns when the animation <em>starts</em>, not when it ends —
+    so speech never waits on SVG. Model speaks semantic targets (<code>vertex</code>); client owns geometry.
+  </p>
+
+  <h3>Three product layers</h3>
+  <ul class="clean">
+    <li><strong>Board</strong> — MathCanvas owns pointers; new world-space annotation layer inside <code>.mc-world</code></li>
+    <li><strong>Presence</strong> — <code>LumenOverlay</code> (orb + transcript + mic); never steals board input</li>
+    <li><strong>Transport</strong> — token server + Python agent + LiveKit room</li>
+  </ul>
+</section>
+
+<!-- ========== BUDGET ========== -->
+<section id="budget">
+  <h2>Staying under 65k TPM <span class="tag new">plan/11</span></h2>
+  <p class="section-sub">
+    Audio is the budget. Controllable text is a rounding error — so the strategy is short turns + Mistral holds memory, not “trim the prompt more.”
+  </p>
+
+  <div class="mem">
+    <div class="mem-head">
+      <strong>Fig 5 · Four levers</strong>
+      <span>keep Live cheap</span>
+    </div>
+    <div class="mem-body">
+      <div class="mem-grid cols-2">
+        <div class="region gemini-r">
+          <div class="region-label">Lever 1</div>
+          <div class="region-title">PULL board context</div>
+          <div class="region-meta">Model calls get_board_state only when about to draw. Free tier: push disabled. ~60 tokens on demand beats N pushes/min.</div>
+        </div>
+        <div class="region mistral-r">
+          <div class="region-label">Lever 2</div>
+          <div class="region-title">Rolling session summary</div>
+          <div class="region-meta">Mistral refreshes ≤2 sentences on events (wrong answer, step jump). Sent on lumen.board as summary field. Costs Mistral budget, not Gemini TPM.</div>
+        </div>
+        <div class="region gemini-r">
+          <div class="region-label">Lever 3</div>
+          <div class="region-title">Lean prompt + short turns</div>
+          <div class="region-meta">~150 token system prompt. Persona: 1–3 sentences then pause. Long monologues are the biggest leak.</div>
+        </div>
+        <div class="region">
+          <div class="region-label">Lever 4</div>
+          <div class="region-title">Tiny draw payloads</div>
+          <div class="region-meta">Compact {op, args}. Concept anims advance by scene index: play_concept_scene(target, 2) — not a full re-description.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <table class="cmp">
+    <thead><tr><th>Pressure</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>Audio-heavy minutes</td><td>Short-turn rule; soft ~10 min session cap</td></tr>
+      <tr><td>Approaching TPM wall</td><td>429 → spoken “catch my breath” beat</td></tr>
+      <tr><td>Native audio too hot</td><td><code>LUMEN_LIVE_MODE=cascade</code> (STT→text LLM→TTS), lighter than native</td></tr>
+      <tr><td>Quota wall on Gemini</td><td>Existing <code>LUMEN_MODEL_BACKEND=openai</code> Realtime fallback</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout gemini">
+    <strong>Closing line from 11:</strong> Mistral is the always-on brain and memory; Gemini Live is a cheap, short-spoken mouth + hand that stays under 65k TPM.
+  </div>
+</section>
+
+<!-- ========== ANIMATIONS ========== -->
+<section id="animations">
+  <h2>Concept animations <span class="tag new">plan-gen/09</span></h2>
+  <p class="section-sub">
+    The board should feel unpredictable — without ever letting the model invent HTML/JS.
+    Novelty comes from <em>which</em> trusted primitives, in <em>what order</em>, with <em>what params</em>.
+  </p>
+
+  <div class="mem">
+    <div class="mem-head">
+      <strong>Fig 6 · Storyboard model</strong>
+      <span>Level A now · Level B later</span>
+    </div>
+    <div class="mem-body">
+      <div class="region shared-r" style="margin-bottom:0.75rem">
+        <div class="region-label">ConceptAnimation</div>
+        <div class="region-title">Ordered scenes · each picks one primitive</div>
+        <div class="slot"><code>scene 0</code> balanceScale · “both sides stay equal…”</div>
+        <div class="slot"><code>scene 1</code> morphCurve · “watch a stretch…”</div>
+        <div class="slot"><code>scene 2</code> partitionGrid · “area is the product…”</div>
+        <div class="region-meta" style="margin-top:0.4rem">advance: auto | voice | manual · max 8 scenes · Zod-discriminated union</div>
+      </div>
+      <div class="mem-grid cols-3">
+        <div class="region">
+          <div class="region-label">Primitives (examples)</div>
+          <div class="region-meta">plotFunction · morphCurve · balanceScale · partitionGrid · numberLineWalk · countObjects · vectorField · geometryTransform · stepReveal · fractionBar</div>
+        </div>
+        <div class="region mistral-r">
+          <div class="region-label">Directed by</div>
+          <div class="region-title">Mistral</div>
+          <div class="region-meta">Baked into LessonScript at gen time, or dropped live via showConceptAnimation Gen-UI tool.</div>
+        </div>
+        <div class="region gemini-r">
+          <div class="region-label">Narrated by</div>
+          <div class="region-title">Gemini Live</div>
+          <div class="region-meta">RPC play_concept_scene(target, i) advances scenes with speech. One visual authority — the board.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <ul class="clean">
+    <li><strong>Level A (now):</strong> ~15–25 composable primitives; model sequences them.</li>
+    <li><strong>Level B (later):</strong> constrained keyframe DSL over the same primitives — do not build until A is solid.</li>
+    <li>Math enrichment still server-side for plot/morph coeffs (same as enrichParabola).</li>
+    <li>Targets inside animations (<code>scene2.vertex</code>) resolve through the same <code>board-targets</code> path.</li>
+  </ul>
+</section>
+
+<!-- ========== HANDSHAKE ========== -->
+<section id="handshake">
+  <h2>Where the plans touch</h2>
+  <p class="section-sub">The contract is still LessonScript — plus the new summary bridge and animation scene indices.</p>
+
+  <div class="mem">
+    <div class="mem-head">
+      <strong>Fig 7 · Shared cell fan-out</strong>
+      <span>one write · many readers</span>
+    </div>
+    <div class="mem-body">
+      <div class="mem-grid cols-3">
+        <div class="region mistral-r">
+          <div class="region-label">Writer</div>
+          <div class="region-title">Course generator</div>
+          <div class="slot"><code>WRITE</code> modules[i].script</div>
+          <div class="slot"><code>+anim</code> conceptAnimation?</div>
+          <div class="slot"><code>ENRICH</code> roots / vertex owned by server</div>
+        </div>
+        <div class="region shared-r">
+          <div class="region-label">Cell</div>
+          <div class="region-title">LessonScript</div>
+          <div class="slot"><code>steps</code> explanation | example | practice</div>
+          <div class="slot"><code>diagram</code> parabola / tiles / …</div>
+          <div class="slot"><code>ids</code> stable kebab module ids</div>
+        </div>
+        <div class="region gemini-r">
+          <div class="region-label">Readers</div>
+          <div class="region-title">Canvas + Live</div>
+          <div class="slot"><code>LAYOUT</code> beats in world space</div>
+          <div class="slot"><code>TARGETS</code> for draw tools</div>
+          <div class="slot"><code>GROUND</code> pull + summary</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Hard rules (still true)</h3>
+  <ul class="clean">
+    <li>Always <code>enrichParabola</code> (and friends) before persist — Live circles wrong points otherwise.</li>
+    <li>Stable module ids (rooms are <code>lumen-${moduleId}-${identity}</code>).</li>
+    <li>Never regenerate an open lesson under the learner mid-Live session.</li>
+    <li>When Live is active: prefer RPC draw / play_scene on the board over a second side-rail widget.</li>
+    <li>One type system in <code>src/lib/types.ts</code> — don’t fork a second lesson format.</li>
+  </ul>
+
+  <h3>Tool catalogs that should stay aligned</h3>
+  <table class="cmp">
+    <thead><tr><th>Gen UI (Mistral)</th><th>Live RPC (Gemini)</th></tr></thead>
+    <tbody>
+      <tr><td><code>showParabola</code></td><td><code>plot_parabola</code> / diagram</td></tr>
+      <tr><td><code>showEquation</code></td><td><code>add_label</code> / highlight beat</td></tr>
+      <tr><td><code>showPracticeCard</code></td><td>voice + optional highlight</td></tr>
+      <tr><td><code>showConceptAnimation</code></td><td><code>play_concept_scene</code></td></tr>
+      <tr><td><code>updateLessonDiagram</code></td><td>refresh targets after write</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ========== BUILD ========== -->
+<section id="build">
+  <h2>How to build it (combined order)</h2>
+  <p class="section-sub">Each slice demos on its own. Suggested if you implement both plans.</p>
+
+  <ol class="flow">
+    <li>
+      <strong>Live Phase 1 — voice overlay</strong>
+      <span>Orb + talk on today’s static scripts. Prove no board takeover.</span>
+    </li>
+    <li>
+      <strong>Gen Phase A — Module 1 with Mistral</strong>
+      <span>Streaming roadmap + Module 1 into MathCanvas.</span>
+    </li>
+    <li>
+      <strong>Live Phase 2 — draw-while-talk</strong>
+      <span>World-space annotations; needs good enriched diagrams.</span>
+    </li>
+    <li>
+      <strong>Gen Phase B–C — background modules + Gen UI rail</strong>
+      <span>SSE statuses, concurrency 2, tool widgets.</span>
+    </li>
+    <li>
+      <strong>Gen Phase D — Tavily curation</strong>
+      <span>Live web research → CuratedBrief → lessons grounded in sources.</span>
+    </li>
+    <li>
+      <strong>Gen Phase E — concept animations</strong>
+      <span>Primitive library + player + showConceptAnimation + play_concept_scene.</span>
+    </li>
+    <li>
+      <strong>Phase F — budget polish</strong>
+      <span>session-summary bridge, pull-only board context, cascade/OpenAI fallbacks.</span>
+    </li>
+  </ol>
+
+  <div class="callout">
+    <strong>Dev ritual (Live):</strong> three terminals — token server (:8787), Python agent worker, <code>npm run dev</code>.
+    Content APIs run inside the TanStack Start app with server-side Mistral + Tavily keys (never <code>VITE_</code>-prefixed).
+  </div>
+
+  <h3>Success when both sides work</h3>
+  <ul class="clean">
+    <li>Onboard → streaming roadmap → Module 1 ready in ~10–20s with real math</li>
+    <li>Modules 2–3 flip to ready while you’re inside Module 1</li>
+    <li>Live: ask about the graph → talk + circle vertex + draw axis; marks survive zoom</li>
+    <li>Concept anim: ≥2 different primitives in a module; voice can advance scenes</li>
+    <li>Live stays under free-tier TPM via short turns + Mistral summary (not by starving grounding)</li>
+  </ul>
+</section>
+
+<footer>
+  <p>
+    Sources: <code>sparklearn-ai/plan/</code> (00–11) and <code>sparklearn-ai/plan-generative-courses/</code> (00–09), refreshed Jul 21 2026.
+  </p>
+  <p>File: <code>sparklearn-ai/docs/plan-systems-analysis.html</code> — open in a browser for full diagram layout.</p>
+</footer>
+
+</div>
+</body>
+</html>

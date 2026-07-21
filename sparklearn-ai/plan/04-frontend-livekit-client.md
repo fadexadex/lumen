@@ -31,12 +31,18 @@ const TOKEN_URL = import.meta.env.VITE_LUMEN_TOKEN_URL as string;
 export function makeIdentity(): string {
   const KEY = "lumen.identity";
   let id = sessionStorage.getItem(KEY);
-  if (!id) { id = "learner-" + Math.random().toString(36).slice(2, 10); sessionStorage.setItem(KEY, id); }
+  if (!id) {
+    id = "learner-" + Math.random().toString(36).slice(2, 10);
+    sessionStorage.setItem(KEY, id);
+  }
   return id;
 }
 export const roomName = (moduleId: string, identity: string) => `lumen-${moduleId}-${identity}`;
 
-export async function fetchToken(room: string, identity: string): Promise<{ token: string; url: string }> {
+export async function fetchToken(
+  room: string,
+  identity: string,
+): Promise<{ token: string; url: string }> {
   const u = `${TOKEN_URL}?room=${encodeURIComponent(room)}&identity=${encodeURIComponent(identity)}`;
   const res = await fetch(u);
   if (!res.ok) throw new Error(`token ${res.status}`);
@@ -78,7 +84,7 @@ export interface TranscriptTurn {
 type Listeners = {
   status: (s: SessionStatus) => void;
   transcript: (turns: TranscriptTurn[]) => void;
-  amplitude: (level: number) => void;   // 0..1, drives the orb
+  amplitude: (level: number) => void; // 0..1, drives the orb
   command: (cmd: CanvasCommand) => void; // canvas commands (handled by canvas bridge)
   error: (message: string) => void;
 };
@@ -91,10 +97,18 @@ export class TutorSession {
   private raf = 0;
   status: SessionStatus = "idle";
 
-  on<K extends keyof Listeners>(ev: K, fn: Listeners[K]) { this.listeners[ev] = fn; return this; }
+  on<K extends keyof Listeners>(ev: K, fn: Listeners[K]) {
+    this.listeners[ev] = fn;
+    return this;
+  }
 
-  private set(s: SessionStatus) { this.status = s; this.listeners.status?.(s); }
-  private emitTurns() { this.listeners.transcript?.([...this.turns]); }
+  private set(s: SessionStatus) {
+    this.status = s;
+    this.listeners.status?.(s);
+  }
+  private emitTurns() {
+    this.listeners.transcript?.([...this.turns]);
+  }
 
   async start(moduleId: string) {
     if (this.room) return;
@@ -110,15 +124,19 @@ export class TutorSession {
         if (track.kind === Track.Kind.Audio) this.attachAgentAudio(track);
       });
       r.on(RoomEvent.Disconnected, () => this.cleanup());
-      r.on(RoomEvent.ConnectionStateChanged, () => {/* optional UI */});
+      r.on(RoomEvent.ConnectionStateChanged, () => {
+        /* optional UI */
+      });
 
       // Transcriptions arrive as text streams on topic "lk.transcription".
       r.registerTextStreamHandler("lk.transcription", async (reader, participant) => {
-        const from: TranscriptTurn["from"] =
-          participant?.identity === identity ? "you" : "tutor";
+        const from: TranscriptTurn["from"] = participant?.identity === identity ? "you" : "tutor";
         const id = reader.info.id;
         let text = "";
-        for await (const chunk of reader) { text += chunk; this.upsertTurn(id, from, text, false); }
+        for await (const chunk of reader) {
+          text += chunk;
+          this.upsertTurn(id, from, text, false);
+        }
         this.upsertTurn(id, from, text, true);
       });
 
@@ -127,16 +145,19 @@ export class TutorSession {
         try {
           const cmd = JSON.parse(data.payload) as CanvasCommand;
           this.set("thinking");
-          this.listeners.command?.(cmd);      // handed to canvas bridge (06/05)
+          this.listeners.command?.(cmd); // handed to canvas bridge (06/05)
           // return fast — client animates independently
           queueMicrotask(() => this.set("speaking"));
           return "applied";
-        } catch (e) { return "error:" + (e as Error).message; }
+        } catch (e) {
+          return "error:" + (e as Error).message;
+        }
       });
 
       // System messages (quota, fallback) from the agent.
       r.registerRpcMethod("lumen.system", async (data) => {
-        this.listeners.error?.(data.payload); return "ok";
+        this.listeners.error?.(data.payload);
+        return "ok";
       });
 
       await r.connect(url, token);
@@ -162,14 +183,21 @@ export class TutorSession {
     await this.room.localParticipant.sendText(text, { topic: "lk.chat" });
   }
 
-  setMuted(muted: boolean) { this.room?.localParticipant.setMicrophoneEnabled(!muted); }
+  setMuted(muted: boolean) {
+    this.room?.localParticipant.setMicrophoneEnabled(!muted);
+  }
 
-  async stop() { await this.room?.disconnect(); this.cleanup(); }
+  async stop() {
+    await this.room?.disconnect();
+    this.cleanup();
+  }
 
   // ---- audio → amplitude (orb) ----
   private attachAgentAudio(track: RemoteTrack) {
     const el = track.attach() as HTMLAudioElement;
-    el.autoplay = true; el.style.display = "none"; document.body.appendChild(el);
+    el.autoplay = true;
+    el.style.display = "none";
+    document.body.appendChild(el);
     this.audioEl = el;
     this.set("speaking");
 
@@ -183,9 +211,12 @@ export class TutorSession {
     const tick = () => {
       analyser.getByteTimeDomainData(buf);
       let sum = 0;
-      for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; sum += v * v; }
-      const rms = Math.sqrt(sum / buf.length);         // 0..~0.5
-      const level = Math.min(1, rms * 3.2);            // normalize for the orb
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / buf.length); // 0..~0.5
+      const level = Math.min(1, rms * 3.2); // normalize for the orb
       this.listeners.amplitude?.(level);
       if (level < 0.03 && this.status === "speaking") this.set("listening");
       else if (level >= 0.03 && this.status !== "speaking") this.set("speaking");
@@ -205,7 +236,10 @@ export class TutorSession {
 
   private cleanup() {
     cancelAnimationFrame(this.raf);
-    if (this.audioEl) { this.audioEl.remove(); this.audioEl = null; }
+    if (this.audioEl) {
+      this.audioEl.remove();
+      this.audioEl = null;
+    }
     this.room = null;
     this.turns = [];
     this.emitTurns();
@@ -242,17 +276,25 @@ export function useLumenSession() {
     session
       .on("status", setStatus)
       .on("transcript", setTurns)
-      .on("amplitude", (l) => { ampRef.current = l; setAmp(l); })
+      .on("amplitude", (l) => {
+        ampRef.current = l;
+        setAmp(l);
+      })
       .on("error", setError)
       .on("command", (cmd) => {
         const ctrl = getCanvasController();
-        if (ctrl) applyCommand(ctrl, cmd);   // 06 defines applyCommand
+        if (ctrl) applyCommand(ctrl, cmd); // 06 defines applyCommand
       });
-    return () => { session.stop(); };
+    return () => {
+      session.stop();
+    };
   }, [session]);
 
   return {
-    status, turns, amplitude: amp, error,
+    status,
+    turns,
+    amplitude: amp,
+    error,
     start: (moduleId: string) => session.start(moduleId),
     stop: () => session.stop(),
     setMuted: (m: boolean) => session.setMuted(m),

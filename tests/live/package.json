@@ -1,0 +1,12 @@
+{
+  "name": "lumen-live-tests",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test:live": "node run-all.mjs"
+  },
+  "dependencies": {
+    "@livekit/rtc-node": "^0.13.31",
+    "livekit-server-sdk": "^2.17.0"
+  }
+}

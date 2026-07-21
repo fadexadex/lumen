@@ -5,14 +5,23 @@ export type Beat =
   | { kind: "text"; text: string; x: number; y: number; size: "body"; step: number }
   | { kind: "math"; latex: string; x: number; y: number; step: number }
   | { kind: "options"; options: string[]; answer: string; x: number; y: number; step: number }
-  | { kind: "diagram"; widget: "parabola"; x: number; y: number; w: number; h: number; step: number; params?: { a: number; b: number; c: number } };
+  | {
+      kind: "diagram";
+      widget: "parabola";
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      step: number;
+      params?: { a: number; b: number; c: number };
+    };
 
 export const BOARD_W = 1600;
 export const BOARD_H = 1000;
 
 /* 4pt-ish rhythm tuned for Inter prose + serif math (not Caveat costume) */
-const LEFT_X = 88;
-const COL_W = 680;
+export const LEFT_X = 88;
+export const COL_W = 680;
 const LINE_H = 34;
 const H1_H = 68;
 const H2_H = 40;
@@ -28,7 +37,8 @@ function measure(step: LessonStep): number {
   }
   if (step.kind === "example") {
     const lines = step.lines.reduce(
-      (a, l) => a + (l.math ? MATH_H + 8 : LINE_H * Math.max(1, Math.ceil((l.text ?? "").length / 62))),
+      (a, l) =>
+        a + (l.math ? MATH_H + 8 : LINE_H * Math.max(1, Math.ceil((l.text ?? "").length / 62))),
       0,
     );
     return H2_H + INTRA + lines + SECTION;
@@ -85,7 +95,14 @@ export function layoutScript(script: LessonScript): { beats: Beat[]; height: num
       }
       if (step.options) {
         y += 20;
-        beats.push({ kind: "options", options: step.options, answer: step.answer, x: LEFT_X, y, step: i });
+        beats.push({
+          kind: "options",
+          options: step.options,
+          answer: step.answer,
+          x: LEFT_X,
+          y,
+          step: i,
+        });
         y += 88;
       }
     }

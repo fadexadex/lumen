@@ -11,19 +11,20 @@
 
 This `plan/` folder is ordered. Read in sequence:
 
-| File | What it covers |
-|------|----------------|
-| `00-overview.md` | Vision, decisions, glossary, file map (this file) |
-| `01-architecture-and-data-flow.md` | System diagram, the full voice loop, sequence diagrams |
-| `02-backend-livekit-gemini-agent.md` | Python agent worker, Gemini Live plugin, function tools |
-| `03-token-server-and-env.md` | Token endpoint, env vars, secrets, running everything |
-| `04-frontend-livekit-client.md` | React room connection, `TutorSession` abstraction, transcripts |
+| File                                      | What it covers                                                             |
+| ----------------------------------------- | -------------------------------------------------------------------------- |
+| `00-overview.md`                          | Vision, decisions, glossary, file map (this file)                          |
+| `01-architecture-and-data-flow.md`        | System diagram, the full voice loop, sequence diagrams                     |
+| `02-backend-livekit-gemini-agent.md`      | Python agent worker, Gemini Live plugin, function tools                    |
+| `03-token-server-and-env.md`              | Token endpoint, env vars, secrets, running everything                      |
+| `04-frontend-livekit-client.md`           | React room connection, `TutorSession` abstraction, transcripts             |
 | `05-canvas-controller-and-annotations.md` | **The hard part** — world-space annotation layer + `LumenCanvasController` |
-| `06-tool-protocol-and-rpc.md` | Tool schema, JSON command protocol, agent→client RPC dispatch |
-| `07-ui-overlay-and-animations.md` | `LumenOverlay`, orb states, transcript, animations, removing `LiveDrawer` |
-| `08-board-context-and-grounding.md` | Feeding live board state to the model so it knows what it's looking at |
-| `09-phased-rollout-and-testing.md` | Day 1 / Week 1 / Later, demo scripts, quota + fallback strategy |
-| `10-file-manifest-and-checklists.md` | Exact new/edited files + acceptance criteria |
+| `06-tool-protocol-and-rpc.md`             | Tool schema, JSON command protocol, agent→client RPC dispatch              |
+| `07-ui-overlay-and-animations.md`         | `LumenOverlay`, orb states, transcript, animations, removing `LiveDrawer`  |
+| `08-board-context-and-grounding.md`       | Feeding live board state to the model so it knows what it's looking at     |
+| `09-phased-rollout-and-testing.md`        | Day 1 / Week 1 / Later, demo scripts, quota + fallback strategy            |
+| `10-file-manifest-and-checklists.md`      | Exact new/edited files + acceptance criteria                               |
+| `11-live-context-budget.md`               | Staying under 65k TPM: Mistral compresses context for Gemini Live          |
 
 ---
 
@@ -31,18 +32,18 @@ This `plan/` folder is ordered. Read in sequence:
 
 The learner clicks **Live**. Instead of a fullscreen chat takeover (today's `LiveDrawer`),
 a small **orb** appears in a corner and Lumen greets them by voice. The learner keeps
-panning/zooming/inking the `MathCanvas` the entire time. When the learner asks *"why does
-this open upward?"*, Lumen **talks** and — mid-sentence — **circles the vertex, draws the
+panning/zooming/inking the `MathCanvas` the entire time. When the learner asks _"why does
+this open upward?"_, Lumen **talks** and — mid-sentence — **circles the vertex, draws the
 axis of symmetry, and drops a label**, all pinned to the board so they stay put when the
 learner zooms. A minimal transcript sits top-right.
 
 ## 2. Non-negotiable product constraints
 
-1. **Stay on the graph.** The AI is an *overlay*. It NEVER takes pointer capture. The learner's
+1. **Stay on the graph.** The AI is an _overlay_. It NEVER takes pointer capture. The learner's
    pan/zoom/ink always wins.
-2. **Draw while talking.** Canvas tools are *async / fire-and-forget*. The model keeps
+2. **Draw while talking.** Canvas tools are _async / fire-and-forget_. The model keeps
    speaking while the animation plays. A tool that blocks the speech turn is a bug.
-3. **Annotations are world-space.** AI marks live *inside* `.mc-world` so they pan/zoom with
+3. **Annotations are world-space.** AI marks live _inside_ `.mc-world` so they pan/zoom with
    the content. (Today's ink layer is screen-space — we do NOT reuse it for AI marks.)
 4. **Free-demo-first.** Gemini Live free tier + LiveKit Cloud Build (free). One env flag
    swaps to OpenAI Realtime if Gemini quota walls a live pitch.
@@ -51,15 +52,15 @@ learner zooms. A minimal transcript sits top-right.
 
 ## 3. Stack decision (locked)
 
-| Concern | Choice | Why |
-|---------|--------|-----|
-| Realtime transport | **LiveKit Cloud (Build, free)** | WebRTC, echo-cancel, transcripts, RPC data channel, free 1,000 agent-min/mo |
-| Agent runtime | **`livekit-agents` (Python)** | First-class Gemini Live plugin, async tools, RPC to client |
-| Model | **Gemini 2.5 Flash native-audio Live** via `livekit-plugins-google` | Speech-to-speech, free tier via AI Studio, tool calling |
-| Fallback model | **OpenAI Realtime** (`livekit-plugins-openai`) | One env flag; quota insurance |
-| Frontend SDK | **`@livekit/components-react` + `livekit-client`** | Room, audio, transcription, RPC hooks |
-| AI presence | **Existing `.live-orb`**, amplitude-driven | No paid avatar for demo |
-| Canvas control | **New world-space SVG layer + `LumenCanvasController`** | The differentiator; 100% our code |
+| Concern            | Choice                                                              | Why                                                                         |
+| ------------------ | ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Realtime transport | **LiveKit Cloud (Build, free)**                                     | WebRTC, echo-cancel, transcripts, RPC data channel, free 1,000 agent-min/mo |
+| Agent runtime      | **`livekit-agents` (Python)**                                       | First-class Gemini Live plugin, async tools, RPC to client                  |
+| Model              | **Gemini 2.5 Flash native-audio Live** via `livekit-plugins-google` | Speech-to-speech, free tier via AI Studio, tool calling                     |
+| Fallback model     | **OpenAI Realtime** (`livekit-plugins-openai`)                      | One env flag; quota insurance                                               |
+| Frontend SDK       | **`@livekit/components-react` + `livekit-client`**                  | Room, audio, transcription, RPC hooks                                       |
+| AI presence        | **Existing `.live-orb`**, amplitude-driven                          | No paid avatar for demo                                                     |
+| Canvas control     | **New world-space SVG layer + `LumenCanvasController`**             | The differentiator; 100% our code                                           |
 
 Rationale and the alternatives we rejected (OpenAI-direct, Pipecat, Vapi/Retell) are in the
 research canvas: `canvases/lumen-live-ai-stack-research.canvas.tsx`.
@@ -87,6 +88,7 @@ research canvas: `canvases/lumen-live-ai-stack-research.canvas.tsx`.
 ## 5. Repo file map (new + edited)
 
 New backend/infra:
+
 ```
 agent/                              # Python LiveKit agent worker (NEW)
   agent.py                          #   session, Gemini Live model, tools
@@ -100,6 +102,7 @@ token-server/                       # tiny Node token minter (NEW, or TanStack r
 ```
 
 New frontend (all under `sparklearn-ai/src`):
+
 ```
 lib/live/
   livekit-client.ts                 # connect(), room singleton, token fetch
@@ -121,6 +124,7 @@ lib/live/live.css                   # overlay styles/keyframes
 ```
 
 Edited:
+
 ```
 components/math-canvas/MathCanvas.tsx   # mount annotation layer, register controller, expose coord fns
 components/whiteboard/LessonRoute.tsx   # swap LiveDrawer → LumenOverlay; session at route level
@@ -129,6 +133,7 @@ routes/__root.tsx                       # (optional) preconnect to LiveKit
 ```
 
 Deleted / retired:
+
 ```
 components/whiteboard/LiveDrawer.tsx     # removed (or kept as mock behind a flag)
 ```

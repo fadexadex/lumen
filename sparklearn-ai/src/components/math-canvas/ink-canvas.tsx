@@ -25,7 +25,11 @@ export const InkCanvas = forwardRef<InkHandle, { width: number; height: number; 
     };
 
     useImperativeHandle(ref, () => ({
-      clear: () => { strokes.current = []; active.current = null; redraw(); },
+      clear: () => {
+        strokes.current = [];
+        active.current = null;
+        redraw();
+      },
     }));
 
     useEffect(() => {
@@ -42,7 +46,10 @@ export const InkCanvas = forwardRef<InkHandle, { width: number; height: number; 
     const pos = (e: React.PointerEvent) => {
       const c = e.currentTarget as HTMLCanvasElement;
       const r = c.getBoundingClientRect();
-      return { x: ((e.clientX - r.left) / r.width) * c.offsetWidth, y: ((e.clientY - r.top) / r.height) * c.offsetHeight };
+      return {
+        x: ((e.clientX - r.left) / r.width) * c.offsetWidth,
+        y: ((e.clientY - r.top) / r.height) * c.offsetHeight,
+      };
     };
 
     const down = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -64,7 +71,11 @@ export const InkCanvas = forwardRef<InkHandle, { width: number; height: number; 
       redraw();
     };
     const up = () => {
-      if (active.current) { strokes.current.push(active.current); active.current = null; redraw(); }
+      if (active.current) {
+        strokes.current.push(active.current);
+        active.current = null;
+        redraw();
+      }
     };
     const erase = (p: { x: number; y: number }) => {
       const r = 16;

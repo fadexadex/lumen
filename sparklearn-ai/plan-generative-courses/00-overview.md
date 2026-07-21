@@ -4,17 +4,18 @@
 > roadmaps, lesson text + equations, and **generative UI** (interactive widgets emitted by the model),
 > with a **streaming pipeline** so Module 1 is ready immediately while Modules 2…N generate in the background.
 
-| File | What it covers |
-|------|----------------|
-| `00-overview.md` | Vision, decisions, relationship to Live plan (this file) |
-| `01-architecture-and-pipeline.md` | End-to-end flow, job queue, status machine |
-| `02-schemas-and-content-generation.md` | Zod schemas, `streamObject` for LessonScript / Roadmap |
-| `03-generative-ui-vercel-ai-sdk.md` | Vercel AI SDK Generative UI (tools → React components) |
-| `04-content-curation.md` | Curating source material (web research → curated briefs) |
-| `05-streaming-and-background-jobs.md` | Module-1-first streaming; parallel generation of later modules |
-| `06-roadmap-ui-and-lesson-hydration.md` | Roadmap “generating…” states; hydrating MathCanvas |
-| `07-integration-with-live-tutor.md` | How generated courses feed Lumen Live + board targets |
-| `08-phased-rollout-and-file-manifest.md` | Build phases, files, acceptance |
+| File                                     | What it covers                                                 |
+| ---------------------------------------- | -------------------------------------------------------------- |
+| `00-overview.md`                         | Vision, decisions, relationship to Live plan (this file)       |
+| `01-architecture-and-pipeline.md`        | End-to-end flow, job queue, status machine                     |
+| `02-schemas-and-content-generation.md`   | Zod schemas, `streamObject` for LessonScript / Roadmap         |
+| `03-generative-ui-vercel-ai-sdk.md`      | Vercel AI SDK Generative UI (tools → React components)         |
+| `04-content-curation.md`                 | Curating source material (web research → curated briefs)       |
+| `05-streaming-and-background-jobs.md`    | Module-1-first streaming; parallel generation of later modules |
+| `06-roadmap-ui-and-lesson-hydration.md`  | Roadmap “generating…” states; hydrating MathCanvas             |
+| `07-integration-with-live-tutor.md`      | How generated courses feed Lumen Live + board targets          |
+| `08-phased-rollout-and-file-manifest.md` | Build phases, files, acceptance                                |
+| `09-concept-animations.md`               | Dynamic, unpredictable board — composable animation primitives |
 
 ---
 
@@ -32,15 +33,25 @@ Today (`mock-roadmaps.ts` + 3 hand-authored `lesson-scripts.ts` entries) is the 
 
 ## 2. Stack decisions (locked for this plan)
 
-| Concern | Choice | Why |
-|---------|--------|-----|
-| LLM framework | **Vercel AI SDK** (`ai` + `@ai-sdk/google` / openai) | First-class streaming, tools, object generation; works with TanStack Start |
-| Generative UI | **AI SDK UI** pattern: `streamText` + tools → map `tool-*` parts to React components | **Production path**. Vercel marks `streamUI` / AI SDK RSC as experimental and recommends UI for production |
-| Structured lessons | **`streamObject` / `generateObject`** with Zod schemas mirroring `LessonScript` | MathCanvas already consumes this shape |
-| Transport to browser | **SSE** (AI SDK default) via TanStack Start API routes | Native, debuggable; WebSockets only if we need bidirectional job control later |
-| Background generation | In-process job queue (demo) → durable queue later (Inngest / BullMQ / Cloudflare Queues) | Module-1-first without blocking the UI |
-| Model (demo) | Gemini Flash (free/cheap) for outlines + lessons; stronger model for hard math QA | Aligns with Live plan’s Gemini preference |
-| Content curation | Curator agent: web research → **CuratedBrief** → lesson generator | Separates “facts” from “teaching voice” |
+| Concern               | Choice                                                                                   | Why                                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| LLM framework         | **Vercel AI SDK** (`ai` + `@ai-sdk/mistral`)                                             | First-class streaming, tools, object generation; provider-agnostic, works with TanStack Start              |
+| Generative UI         | **AI SDK UI** pattern: `streamText` + tools → map `tool-*` parts to React components     | **Production path**. Vercel marks `streamUI` / AI SDK RSC as experimental and recommends UI for production |
+| Structured lessons    | **`streamObject` / `generateObject`** with Zod schemas mirroring `LessonScript`          | MathCanvas already consumes this shape                                                                     |
+| Transport to browser  | **SSE** (AI SDK default) via TanStack Start API routes                                   | Native, debuggable; WebSockets only if we need bidirectional job control later                             |
+| Background generation | In-process job queue (demo) → durable queue later (Inngest / BullMQ / Cloudflare Queues) | Module-1-first without blocking the UI                                                                     |
+| Model (content)       | **Mistral** — `mistral-small-latest` for roadmap/lessons/summaries, `mistral-large-latest` for repair + hard-math checks | 1M free tokens, fast, structured output + tool calling; **decoupled from voice** (see note below)          |
+| Web research          | **Tavily** search API, called as a Vercel AI SDK tool during curation                    | LLM-optimized results, generous free tier, easy to wire; dynamic per-module lookups                        |
+| Content curation      | Curator agent: **Mistral + Tavily web search** → **CuratedBrief** → lesson generator     | Separates “facts” from “teaching voice”                                                                    |
+
+### Voice and content models are now independent
+
+The Live tutor (`../plan/`) uses **Gemini Live** for speech-to-speech; this plan uses **Mistral**
+for all content (roadmap, lessons, curation, concept animations, and the rolling session summary).
+They are separate concerns with separate budgets — Gemini Live is rate-limited to ~65k tokens/min
+on the free tier (audio-heavy), while Mistral gives ~1M free tokens for the thinking. The bridge
+that keeps Live cheap by having Mistral compress context for it is specified in
+`../plan/11-live-context-budget.md`.
 
 ### Why not AI SDK RSC `streamUI`?
 
@@ -65,29 +76,34 @@ If you later move to Next.js, RSC `streamUI` remains an option — schemas and t
 └─────────────────────────────────────────────────────────────┘
 ```
 
-- **A** is the backbone of generative *courses*.
-- **B** is how the model drops *live interactive UI* (Vercel’s “generative UI” docs).
+- **A** is the backbone of generative _courses_.
+- **B** is how the model drops _live interactive UI_ (Vercel’s “generative UI” docs).
 - MathCanvas remains the primary teaching surface; generative UI tools either (1) write into the `LessonScript.diagram` / beats, or (2) mount as overlays/widgets beside the board.
 
 ## 4. Relationship to `../plan/` (Live tutor)
 
-| Live plan | Generative courses |
-|-----------|-------------------|
-| Speaks + draws on existing board | Creates the board content beforehand / in parallel |
-| Needs `board-targets` from script | Generated scripts must emit stable target names |
-| `getLessonScript()` today | Becomes `getLessonScriptAsync()` / store hydration |
+| Live plan                         | Generative courses                                 |
+| --------------------------------- | -------------------------------------------------- |
+| Speaks + draws on existing board  | Creates the board content beforehand / in parallel |
+| Needs `board-targets` from script | Generated scripts must emit stable target names    |
+| `getLessonScript()` today         | Becomes `getLessonScriptAsync()` / store hydration |
 
 Shared types in `src/lib/types.ts` are the contract. Extend carefully; don’t fork a second lesson format.
 
-## 5. “Web circuits” note
+## 5. Live web research
 
-You mentioned curating text with **“web circuits.”** Interpreting for this plan as: **web-sourced research + streaming delivery** (research APIs / crawl → brief → generate; content streamed to the client over SSE). If you meant a specific product (WebSockets-only, a named curation tool, etc.), swap the curator in `04` — the pipeline stays the same.
+Curation pulls **live information off the internet** while the course is being delineated, so the
+board can reflect current, real material rather than only model priors. Implementation: a
+**Tavily** search tool that Mistral calls dynamically during the research phase (`04`) → brief →
+generate; statuses stream to the client over SSE. Because the model decides what to look up per
+module, the resulting board is genuinely dynamic — the learner can't predict what it surfaces. To
+swap providers later, replace the `SourceProvider` in `04`; the pipeline stays the same.
 
 ## 6. Non-negotiables
 
 1. **Module 1 ready before anything else.** Never make the learner wait for the whole course.
 2. **Schema-first.** Invalid LaTeX / missing answers fail validation and regenerate — don’t stream garbage into MathCanvas.
-3. **Deterministic widgets.** The model emits *params* (e.g. `{a,b,c}`); *you* own the React component. Never let the model invent arbitrary HTML/JS.
+3. **Deterministic widgets.** The model emits _params_ (e.g. `{a,b,c}`); _you_ own the React component. Never let the model invent arbitrary HTML/JS.
 4. **Progressive roadmap.** Cards show `pending | generating | ready | failed` with retry.
 5. **Style/grade respected.** `LearnerProfile.style` and `grade` actually change prompts (today they’re stored unused).
 

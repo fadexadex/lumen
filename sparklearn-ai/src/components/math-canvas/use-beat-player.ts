@@ -60,10 +60,7 @@ export function useBeatPlayer({
   onAdvanceStep: () => void;
 }) {
   const typeable = useMemo(
-    () =>
-      beats
-        .map((b, i) => ({ b, i }))
-        .filter(({ b }) => b.step === stepIndex && isTypeable(b)),
+    () => beats.map((b, i) => ({ b, i })).filter(({ b }) => b.step === stepIndex && isTypeable(b)),
     [beats, stepIndex],
   );
 

@@ -23,6 +23,7 @@ Exit: all three processes start without crashing (`03` health checks pass).
 Scope: voice loop + orb + transcript. **No canvas tools yet.**
 
 Build order:
+
 1. `token-server` (`03` Option A).
 2. `agent/` with Gemini model, **no tools** (comment out `ALL_TOOLS`), greeting only. Verify
    with `uv run agent.py console`.
@@ -31,11 +32,13 @@ Build order:
 5. `LessonRoute` surgery: swap `LiveDrawer` → `LumenOverlay`, wire Live button to `start()`.
 
 Demo script (Day 1):
+
 > Click **Live** → "Hey, I'm Lumen, what are we working on?" → you: "Explain what a parabola
 > is." → Lumen answers in voice; orb pulses; transcript streams; you pan/zoom the board the
 > whole time.
 
 Acceptance:
+
 - [ ] Round-trip voice < ~1.5 s to first audio.
 - [ ] Orb amplitude tracks speech; status transitions correct.
 - [ ] Board fully interactive during the session (pan/zoom/ink).
@@ -48,6 +51,7 @@ This alone is ~70% of the "wow."
 ## Phase 2 — "It draws while it talks" (Week 1, the differentiator)
 
 Build order:
+
 1. `annotation-layer.tsx` + mount inside `.mc-board`; `canvas-agent-bridge.ts`;
    register controller in `MathCanvas` (`05`).
 2. `board-targets.ts` (`05`) + `canvas-commands.ts` `applyCommand` (`06`).
@@ -56,6 +60,7 @@ Build order:
 5. Rehearse ONE golden path end-to-end.
 
 Golden-path demo script (Week 1):
+
 > Learner: "Why does this open upward?"
 > Lumen (speaking): "Because the x-squared coefficient is positive —" `circle_point("vertex")`
 > "— and this lowest point is the vertex." `draw_axis_of_symmetry()` `add_label("vertex","minimum")`
@@ -63,6 +68,7 @@ Golden-path demo script (Week 1):
 > "Clear that." `clear_annotations()`.
 
 Acceptance:
+
 - [ ] Speech continues while marks animate (async tools proven).
 - [ ] Every mark is world-space correct at 100% and after zoom/pan.
 - [ ] Unknown target degrades gracefully (model recovers verbally).
@@ -86,31 +92,37 @@ Acceptance:
 ## Testing strategy
 
 ### A. Backend-only (no browser)
+
 `uv run agent.py console` — talk, watch tool calls print. Fastest inner loop.
 
 ### B. Contract test (TS↔Py schema drift guard)
+
 A dev-only route/button that fires every command once against a mounted board and asserts
 `applyCommand` returns `ok`:
+
 ```ts
 const CMDS: CanvasCommand[] = [
-  { id:"t1", op:"highlight", args:{ target:"step2.equation" } },
-  { id:"t2", op:"circle", args:{ target:"vertex", label:"vertex" } },
-  { id:"t3", op:"drawAxis", args:{} },
-  { id:"t4", op:"plotParabola", args:{ a:0.3, b:0, c:-2 } },
-  { id:"t5", op:"label", args:{ target:"root1", text:"root" } },
-  { id:"t6", op:"arrow", args:{ from:"vertex", to:"root1" } },
-  { id:"t7", op:"panTo", args:{ target:"graph" } },
-  { id:"t8", op:"clear" },
+  { id: "t1", op: "highlight", args: { target: "step2.equation" } },
+  { id: "t2", op: "circle", args: { target: "vertex", label: "vertex" } },
+  { id: "t3", op: "drawAxis", args: {} },
+  { id: "t4", op: "plotParabola", args: { a: 0.3, b: 0, c: -2 } },
+  { id: "t5", op: "label", args: { target: "root1", text: "root" } },
+  { id: "t6", op: "arrow", args: { from: "vertex", to: "root1" } },
+  { id: "t7", op: "panTo", args: { target: "graph" } },
+  { id: "t8", op: "clear" },
 ];
 CMDS.forEach((c) => console.assert(applyCommand(getCanvasController()!, c) === "ok", c.op));
 ```
+
 Run this on a lesson that has a parabola diagram so all targets exist.
 
 ### C. Coordinate correctness (visual)
+
 Manually: `circle("vertex")` then zoom 100%→250%→pan. The ellipse must stay on the vertex.
 This is the single most important visual test — it proves the world-space decision.
 
 ### D. Latency budget
+
 - First audio after `start()`: target < 1.5 s (Build cold start may add a few s on first run —
   keep the agent warm by starting it before the demo).
 - Tool call → mark visible: < 200 ms.
@@ -120,15 +132,16 @@ This is the single most important visual test — it proves the world-space deci
 
 ## Quotas & cost reality (demo)
 
-| Resource | Free allotment | Watch-out |
-|----------|----------------|-----------|
-| LiveKit agent minutes | 1,000/mo (Build) | plenty for demos |
-| LiveKit inference credits | ~$2.50 (~50 min) | N/A — we use Gemini key directly, not LiveKit inference |
-| Gemini Live free tier | rate-limited daily (preview models stricter) | can 429 / 1011 mid-demo |
-| Concurrent agent sessions | 5 (Build) | 1 learner = fine |
-| Cold start | Build agents may sleep | start worker before pitch |
+| Resource                  | Free allotment                               | Watch-out                                               |
+| ------------------------- | -------------------------------------------- | ------------------------------------------------------- |
+| LiveKit agent minutes     | 1,000/mo (Build)                             | plenty for demos                                        |
+| LiveKit inference credits | ~$2.50 (~50 min)                             | N/A — we use Gemini key directly, not LiveKit inference |
+| Gemini Live free tier     | rate-limited daily (preview models stricter) | can 429 / 1011 mid-demo                                 |
+| Concurrent agent sessions | 5 (Build)                                    | 1 learner = fine                                        |
+| Cold start                | Build agents may sleep                       | start worker before pitch                               |
 
 Mitigations:
+
 - **Warm the worker** a minute before demoing (it registers and idles cheaply).
 - Keep sessions short; `stop()` when idle.
 - Have the **OpenAI fallback** ready (below).
@@ -144,6 +157,7 @@ different agent name; if Gemini walls, restart the app session — the OpenAI wo
 
 **Semi-auto:** in `agent.py`, catch Gemini errors and notify the client, then exit so LiveKit
 reschedules; run both workers so the healthy one takes the job:
+
 ```python
 try:
     await session.start(agent=agent, room=ctx.room)
@@ -154,6 +168,7 @@ except Exception as e:
             payload="Lumen hit a limit — switching voice…")
     raise
 ```
+
 Client `lumen.system` handler (`04`) shows the toast. For a demo, **manual** is more reliable
 than clever auto-switching.
 

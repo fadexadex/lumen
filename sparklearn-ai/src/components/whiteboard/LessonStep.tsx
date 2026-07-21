@@ -8,7 +8,10 @@ function Typewriter({ text }: { text: string }) {
     setN(0);
     const id = setInterval(() => {
       setN((v) => {
-        if (v >= text.length) { clearInterval(id); return v; }
+        if (v >= text.length) {
+          clearInterval(id);
+          return v;
+        }
         return v + 2;
       });
     }, 18);
@@ -41,12 +44,12 @@ export function LessonStepCard({ step }: { step: LessonStep }) {
       {step.kind === "example" && (
         <div className="space-y-3">
           {step.lines.map((l, i) => (
-            <div
-              key={i}
-              className="tutor-fade-in"
-              style={{ animationDelay: `${i * 250}ms` }}
-            >
-              {l.math ? <BlockMath math={l.math} /> : <p className="text-base leading-relaxed">{l.text}</p>}
+            <div key={i} className="tutor-fade-in" style={{ animationDelay: `${i * 250}ms` }}>
+              {l.math ? (
+                <BlockMath math={l.math} />
+              ) : (
+                <p className="text-base leading-relaxed">{l.text}</p>
+              )}
             </div>
           ))}
         </div>
@@ -56,16 +59,14 @@ export function LessonStepCard({ step }: { step: LessonStep }) {
         <>
           <p className="text-base leading-relaxed mb-3">{step.prompt}</p>
           {step.math && !step.options && (
-            <div className="my-3 text-lg"><InlineMath math={step.math} /></div>
+            <div className="my-3 text-lg">
+              <InlineMath math={step.math} />
+            </div>
           )}
           {step.options && (
             <div className="flex flex-col gap-2 my-4">
               {step.options.map((opt, i) => (
-                <button
-                  key={i}
-                  className="practice-option"
-                  type="button"
-                >
+                <button key={i} className="practice-option" type="button">
                   <span className="practice-option-index">{String.fromCharCode(65 + i)}</span>
                   <InlineMath math={opt} />
                 </button>

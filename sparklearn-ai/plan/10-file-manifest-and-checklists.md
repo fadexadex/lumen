@@ -8,51 +8,54 @@ acceptance criteria and the current code anchors for the edits.
 ## 1. New files
 
 ### Backend / infra
-| File | Purpose | Spec |
-|------|---------|------|
-| `agent/pyproject.toml` | deps | `02 §2` |
-| `agent/.env.local` | secrets | `02 §3`, `03` |
-| `agent/prompts.py` | persona + tool rules | `02 §4` |
-| `agent/commands.py` | Command builders (Py) | `02 §5` |
-| `agent/board_context.py` | board state store | `02 §6` |
-| `agent/tools.py` | function tools → RPC | `02 §7` |
-| `agent/agent.py` | entrypoint + model | `02 §8` |
-| `token-server/server.mjs` | JWT minter | `03 A` |
-| `token-server/package.json` | deps | `03 A` |
-| `token-server/.env` | secrets | `03 A` |
+
+| File                        | Purpose               | Spec          |
+| --------------------------- | --------------------- | ------------- |
+| `agent/pyproject.toml`      | deps                  | `02 §2`       |
+| `agent/.env.local`          | secrets               | `02 §3`, `03` |
+| `agent/prompts.py`          | persona + tool rules  | `02 §4`       |
+| `agent/commands.py`         | Command builders (Py) | `02 §5`       |
+| `agent/board_context.py`    | board state store     | `02 §6`       |
+| `agent/tools.py`            | function tools → RPC  | `02 §7`       |
+| `agent/agent.py`            | entrypoint + model    | `02 §8`       |
+| `token-server/server.mjs`   | JWT minter            | `03 A`        |
+| `token-server/package.json` | deps                  | `03 A`        |
+| `token-server/.env`         | secrets               | `03 A`        |
 
 ### Frontend (`sparklearn-ai/src`)
-| File | Purpose | Spec |
-|------|---------|------|
-| `lib/live/livekit-client.ts` | connect/token/identity | `04 §2` |
-| `lib/live/tutor-session.ts` | session + audio + RPC | `04 §3` |
-| `lib/live/use-lumen-session.ts` | React hook | `04 §4` |
-| `lib/live/canvas-agent-bridge.ts` | controller registry | `06 §1` |
-| `lib/live/canvas-commands.ts` | schema + `applyCommand` | `06 §2–3` |
-| `lib/live/board-targets.ts` | name → world coords | `05 §3` |
-| `lib/live/board-context.ts` | `buildBoardState` | `08 §2` |
-| `lib/live/pan.ts` | `panToRect`/`animateView` | `05 §5` |
-| `lib/live/live.css` | overlay styles | `07` |
-| `components/live/LumenOverlay.tsx` | overlay shell | `07 §4` |
-| `components/live/LumenOrb.tsx` | reactive orb | `07 §2` |
-| `components/live/LumenTranscript.tsx` | transcript | `07 §3` |
-| `components/live/LumenControls.tsx` | mic/end | `07 §4` |
-| `components/math-canvas/annotation-layer.tsx` | world-space SVG + controller | `05 §2` |
+
+| File                                          | Purpose                      | Spec      |
+| --------------------------------------------- | ---------------------------- | --------- |
+| `lib/live/livekit-client.ts`                  | connect/token/identity       | `04 §2`   |
+| `lib/live/tutor-session.ts`                   | session + audio + RPC        | `04 §3`   |
+| `lib/live/use-lumen-session.ts`               | React hook                   | `04 §4`   |
+| `lib/live/canvas-agent-bridge.ts`             | controller registry          | `06 §1`   |
+| `lib/live/canvas-commands.ts`                 | schema + `applyCommand`      | `06 §2–3` |
+| `lib/live/board-targets.ts`                   | name → world coords          | `05 §3`   |
+| `lib/live/board-context.ts`                   | `buildBoardState`            | `08 §2`   |
+| `lib/live/pan.ts`                             | `panToRect`/`animateView`    | `05 §5`   |
+| `lib/live/live.css`                           | overlay styles               | `07`      |
+| `components/live/LumenOverlay.tsx`            | overlay shell                | `07 §4`   |
+| `components/live/LumenOrb.tsx`                | reactive orb                 | `07 §2`   |
+| `components/live/LumenTranscript.tsx`         | transcript                   | `07 §3`   |
+| `components/live/LumenControls.tsx`           | mic/end                      | `07 §4`   |
+| `components/math-canvas/annotation-layer.tsx` | world-space SVG + controller | `05 §2`   |
 
 ## 2. Edited files (with current anchors)
 
-| File | Edit | Anchor (current) |
-|------|------|------------------|
-| `components/math-canvas/MathCanvas.tsx` | mount `<AnnotationLayer>` inside `.mc-board`; register controller + coord fns | after `.mc-lesson-layer` (line ~316); new `useEffect` near other effects |
-| `components/math-canvas/math-canvas.css` | `.mc-annotation-layer` + anno keyframes | append |
-| `components/math-canvas/parabola-widget.tsx` | optional `onParams` callback | setters at lines ~87–89 |
-| `components/whiteboard/LessonRoute.tsx` | remove `LiveDrawer`; add `useLumenSession` + `<LumenOverlay>`; Live button → `start` | import line 6; `liveOpen` line 33; button lines ~110–120; `onOpenLive` line 131; `<LiveDrawer>` line 208 |
-| `lib/design.css` | (optional) remove `.live-scene`/`.live-close` etc. | lines ~376–470 |
-| `.gitignore` | ignore new `.env*` | append |
+| File                                         | Edit                                                                                 | Anchor (current)                                                                                         |
+| -------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `components/math-canvas/MathCanvas.tsx`      | mount `<AnnotationLayer>` inside `.mc-board`; register controller + coord fns        | after `.mc-lesson-layer` (line ~316); new `useEffect` near other effects                                 |
+| `components/math-canvas/math-canvas.css`     | `.mc-annotation-layer` + anno keyframes                                              | append                                                                                                   |
+| `components/math-canvas/parabola-widget.tsx` | optional `onParams` callback                                                         | setters at lines ~87–89                                                                                  |
+| `components/whiteboard/LessonRoute.tsx`      | remove `LiveDrawer`; add `useLumenSession` + `<LumenOverlay>`; Live button → `start` | import line 6; `liveOpen` line 33; button lines ~110–120; `onOpenLive` line 131; `<LiveDrawer>` line 208 |
+| `lib/design.css`                             | (optional) remove `.live-scene`/`.live-close` etc.                                   | lines ~376–470                                                                                           |
+| `.gitignore`                                 | ignore new `.env*`                                                                   | append                                                                                                   |
 
 ## 3. Retired
-| File | Action |
-|------|--------|
+
+| File                                   | Action                           |
+| -------------------------------------- | -------------------------------- |
 | `components/whiteboard/LiveDrawer.tsx` | delete, or keep behind `?mock=1` |
 
 ---
@@ -60,6 +63,7 @@ acceptance criteria and the current code anchors for the edits.
 ## 4. Dependency changes
 
 `sparklearn-ai/package.json`:
+
 ```jsonc
 "dependencies": {
   "livekit-client": "^2.9.0",
@@ -68,6 +72,7 @@ acceptance criteria and the current code anchors for the edits.
   // "livekit-server-sdk": "^2.9.0"
 }
 ```
+
 `agent/` (Python): `livekit-agents`, `livekit-plugins-google`, `livekit-plugins-openai`,
 `livekit-plugins-silero`, `python-dotenv` (`02 §2`).
 `token-server/`: `livekit-server-sdk`, `dotenv` (`03 A`).

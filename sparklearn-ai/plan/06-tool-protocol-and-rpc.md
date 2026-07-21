@@ -30,8 +30,12 @@ export interface CanvasControllerHandle {
 }
 
 let handle: CanvasControllerHandle | null = null;
-export function setCanvasController(h: CanvasControllerHandle | null) { handle = h; }
-export function getCanvasController(): CanvasControllerHandle | null { return handle; }
+export function setCanvasController(h: CanvasControllerHandle | null) {
+  handle = h;
+}
+export function getCanvasController(): CanvasControllerHandle | null {
+  return handle;
+}
 ```
 
 ## 2. Command schema — `lib/live/canvas-commands.ts`
@@ -47,13 +51,13 @@ export type Place = "above" | "below" | "left" | "right";
 
 export type CanvasCommand =
   | { id: string; op: "highlight"; args: { target: string; label?: string; color?: string } }
-  | { id: string; op: "circle";    args: { target: string; label?: string } }
-  | { id: string; op: "label";     args: { target: string; text: string; place?: Place } }
-  | { id: string; op: "arrow";     args: { from: string; to: string; text?: string } }
-  | { id: string; op: "drawAxis";  args: { target?: string } }
+  | { id: string; op: "circle"; args: { target: string; label?: string } }
+  | { id: string; op: "label"; args: { target: string; text: string; place?: Place } }
+  | { id: string; op: "arrow"; args: { from: string; to: string; text?: string } }
+  | { id: string; op: "drawAxis"; args: { target?: string } }
   | { id: string; op: "plotParabola"; args: { a: number; b: number; c: number } }
-  | { id: string; op: "panTo";     args: { target: string } }
-  | { id: string; op: "clear";     args?: Record<string, never> };
+  | { id: string; op: "panTo"; args: { target: string } }
+  | { id: string; op: "clear"; args?: Record<string, never> };
 
 export function isCanvasCommand(x: unknown): x is CanvasCommand {
   return !!x && typeof x === "object" && typeof (x as any).op === "string";
@@ -90,7 +94,8 @@ export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): 
       return "ok";
     }
     case "arrow": {
-      const a = T.point(cmd.args.from), b = T.point(cmd.args.to);
+      const a = T.point(cmd.args.from),
+        b = T.point(cmd.args.to);
       if (!a || !b) return "unknown-target";
       anno.arrow(a, b, cmd.args.text);
       return "ok";
@@ -127,14 +132,23 @@ function rectAround(p: { x: number; y: number } | null, pad = 60) {
 }
 
 /** Build an SVG path in WORLD coords for y=ax²+bx+c using the parabola's graphToWorld. */
-function sampleParabolaPath(par: NonNullable<ReturnType<() => any>>, a: number, b: number, c: number): string {
+function sampleParabolaPath(
+  par: NonNullable<ReturnType<() => any>>,
+  a: number,
+  b: number,
+  c: number,
+): string {
   const steps = 200;
   const { X_MIN, X_MAX, Y_MIN, Y_MAX, graphToWorld } = par;
-  let d = "", penUp = true;
+  let d = "",
+    penUp = true;
   for (let i = 0; i <= steps; i++) {
     const x = X_MIN + ((X_MAX - X_MIN) * i) / steps;
     const y = a * x * x + b * x + c;
-    if (y < Y_MIN - 3 || y > Y_MAX + 3) { penUp = true; continue; }
+    if (y < Y_MIN - 3 || y > Y_MAX + 3) {
+      penUp = true;
+      continue;
+    }
     const w = graphToWorld(x, y);
     d += `${penUp ? "M" : "L"} ${w.x.toFixed(1)} ${w.y.toFixed(1)} `;
     penUp = false;
@@ -159,7 +173,7 @@ model: draw_axis_of_symmetry()
 model: keeps generating audio the entire time
 ```
 
-The RPC ack resolves the instant the client *starts* the animation, not when it finishes. This
+The RPC ack resolves the instant the client _starts_ the animation, not when it finishes. This
 is the whole trick to "talks while drawing." If a future op genuinely needs to block (e.g. a
 long camera move before continuing), use LiveKit's async-tool status pattern: send an interim
 `session.say("let me zoom in")` then perform the move.
@@ -173,21 +187,22 @@ long camera move before continuing), use LiveKit's async-tool status pattern: se
 
 ## 6. The full tool ↔ command ↔ controller table
 
-| Agent tool (`02`) | Command `op` | Resolver | Controller method (`05`) | Visual |
-|-------------------|--------------|----------|--------------------------|--------|
-| `highlight_region` | `highlight` | rect(target) | `highlight(rect)` | tinted rounded box + pop |
-| `circle_point` | `circle` | point(target) | `circle(pt)` | hand-drawn ellipse, draw-on |
-| `add_label` | `label` | point(target) | `label(pt,text)` | serif text, fade-rise |
-| `draw_arrow` | `arrow` | point(from/to) | `arrow(a,b)` | arrow w/ marker |
-| `draw_axis_of_symmetry` | `drawAxis` | parabola.vertex + graph rect | `drawAxis(x,y0,y1)` | dashed vertical, draw-on |
-| `plot_parabola` | `plotParabola` | parabola.graphToWorld | `drawPath(d)` | overlaid curve, draw-on |
-| `focus_on` | `panTo` | rect(target) | camera animate | cinematic pan/zoom |
-| `clear_annotations` | `clear` | — | `clear()` | all AI marks removed |
-| `get_board_state` | (no command) | — | — | returns text to model |
+| Agent tool (`02`)       | Command `op`   | Resolver                     | Controller method (`05`) | Visual                      |
+| ----------------------- | -------------- | ---------------------------- | ------------------------ | --------------------------- |
+| `highlight_region`      | `highlight`    | rect(target)                 | `highlight(rect)`        | tinted rounded box + pop    |
+| `circle_point`          | `circle`       | point(target)                | `circle(pt)`             | hand-drawn ellipse, draw-on |
+| `add_label`             | `label`        | point(target)                | `label(pt,text)`         | serif text, fade-rise       |
+| `draw_arrow`            | `arrow`        | point(from/to)               | `arrow(a,b)`             | arrow w/ marker             |
+| `draw_axis_of_symmetry` | `drawAxis`     | parabola.vertex + graph rect | `drawAxis(x,y0,y1)`      | dashed vertical, draw-on    |
+| `plot_parabola`         | `plotParabola` | parabola.graphToWorld        | `drawPath(d)`            | overlaid curve, draw-on     |
+| `focus_on`              | `panTo`        | rect(target)                 | camera animate           | cinematic pan/zoom          |
+| `clear_annotations`     | `clear`        | —                            | `clear()`                | all AI marks removed        |
+| `get_board_state`       | (no command)   | —                            | —                        | returns text to model       |
 
 ## 7. Keeping TS ↔ Python in sync
 
 `canvas-commands.ts` (TS) and `commands.py` (Python) are the same schema in two languages. Rules:
+
 - Add an op in BOTH files or not at all.
 - Args are snake-case-free (use `target`, `label`, `from`, `to`) so no case translation.
 - A tiny contract test (in `09`) sends every op once from a script and asserts the client returns

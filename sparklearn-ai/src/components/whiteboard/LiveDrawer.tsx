@@ -74,9 +74,7 @@ export function LiveDrawer({
             className={`live-turn live-turn--${h.from} tutor-fade-in`}
             style={{ animationDelay: `${i * 40}ms` }}
           >
-            <span className="live-turn-role">
-              {h.from === "tutor" ? "Lumen" : "You"}
-            </span>
+            <span className="live-turn-role">{h.from === "tutor" ? "Lumen" : "You"}</span>
             <p className="live-turn-text">{h.text}</p>
           </div>
         ))}

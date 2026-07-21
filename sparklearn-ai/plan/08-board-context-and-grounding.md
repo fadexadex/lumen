@@ -1,11 +1,12 @@
 # 08 · Board Context & Grounding
 
-Gemini can *speak* but has no idea what's on the canvas unless we tell it. This file makes Lumen
+Gemini can _speak_ but has no idea what's on the canvas unless we tell it. This file makes Lumen
 aware of the current step, equation, parabola coefficients, and the **named targets** it's
-allowed to point at — so "circle the vertex" refers to the *right* vertex, and the model never
+allowed to point at — so "circle the vertex" refers to the _right_ vertex, and the model never
 invents a target that doesn't exist.
 
 Two channels:
+
 1. **Client → agent board-state deltas** (LiveKit data messages, topic `lumen.board`).
 2. **Agent-side context injection** (system prompt + `get_board_state` tool), from `02`.
 
@@ -16,13 +17,13 @@ latency, zero quota burn. Vision is a `Later` item (`09`).
 
 ## 1. What the model needs to know (and NOT know)
 
-| Model SHOULD know | Model should NOT know |
-|-------------------|-----------------------|
-| Current step index/title | Pixel coordinates |
-| The equation as words/latex | The `view` transform / zoom |
-| Parabola a,b,c (if any) | SVG paths |
-| List of target *names* it can point to | How annotations are rendered |
-| Roots count / vertex existence | DOM structure |
+| Model SHOULD know                      | Model should NOT know        |
+| -------------------------------------- | ---------------------------- |
+| Current step index/title               | Pixel coordinates            |
+| The equation as words/latex            | The `view` transform / zoom  |
+| Parabola a,b,c (if any)                | SVG paths                    |
+| List of target _names_ it can point to | How annotations are rendered |
+| Roots count / vertex existence         | DOM structure                |
 
 Keeping geometry client-side (targets resolved in `05`) means the prompt stays tiny and the
 model can't produce out-of-bounds coordinates.
@@ -31,32 +32,39 @@ model can't produce out-of-bounds coordinates.
 
 ## 2. Client builder — `lib/live/board-context.ts`
 
-Reuses `resolveTargets` (`05`) so the target *names* the model sees are exactly the ones the
+Reuses `resolveTargets` (`05`) so the target _names_ the model sees are exactly the ones the
 client can resolve. Single source of truth.
 
 ```ts
 import type { LessonScript } from "@/lib/types";
 import { resolveTargets } from "./board-targets";
-import { prettifyLatex } from "@/lib/whiteboard-bridge";  // reuse existing latex→text
+import { prettifyLatex } from "@/lib/whiteboard-bridge"; // reuse existing latex→text
 
 export interface BoardState {
   moduleId: string;
   stepIndex: number;
   stepTotal: number;
   stepTitle: string;
-  equation: string;              // human-readable
+  equation: string; // human-readable
   parabola: { a: number; b: number; c: number } | null;
-  targets: string[];             // names the model may reference
+  targets: string[]; // names the model may reference
 }
 
-export function buildBoardState(script: LessonScript, stepIndex: number, moduleId: string): BoardState {
+export function buildBoardState(
+  script: LessonScript,
+  stepIndex: number,
+  moduleId: string,
+): BoardState {
   const step = script.steps[stepIndex];
   const T = resolveTargets(script);
 
   // Prefer the step's own math; fall back to the diagram equation.
   const stepMath =
-    (step && "math" in step && step.math) ? step.math
-    : script.diagram?.parabola ? paramsToEq(script.diagram.parabola) : "";
+    step && "math" in step && step.math
+      ? step.math
+      : script.diagram?.parabola
+        ? paramsToEq(script.diagram.parabola)
+        : "";
 
   return {
     moduleId,
@@ -79,24 +87,32 @@ function paramsToEq(p: { a: number; b: number; c: number }): string {
 
 Send a board-state delta whenever the picture changes:
 
-| Event | Where | Why |
-|-------|-------|-----|
-| Session start | `useLumenSession.start` → after connect | first grounding |
-| Step change | `LessonRoute` effect on `safeIndex` (`07`) | model follows the lesson |
+| Event                 | Where                                          | Why                         |
+| --------------------- | ---------------------------------------------- | --------------------------- |
+| Session start         | `useLumenSession.start` → after connect        | first grounding             |
+| Step change           | `LessonRoute` effect on `safeIndex` (`07`)     | model follows the lesson    |
 | Parabola slider moved | `ParabolaWidget` → callback → `sendBoardState` | targets (vertex/roots) move |
-| Concept switch | `LessonRoute` (conceptId change) | different surface/targets |
+| Concept switch        | `LessonRoute` (conceptId change)               | different surface/targets   |
 
 The `LessonRoute` step effect is already shown in `07`. For slider changes, thread a callback:
 
 ```tsx
 // ParabolaWidget gains an optional onChange prop:
-export function ParabolaWidget({ width, height, initial, onParams }: {
-  width: number; height: number; initial?: {a:number;b:number;c:number};
-  onParams?: (p: {a:number;b:number;c:number}) => void;
+export function ParabolaWidget({
+  width,
+  height,
+  initial,
+  onParams,
+}: {
+  width: number;
+  height: number;
+  initial?: { a: number; b: number; c: number };
+  onParams?: (p: { a: number; b: number; c: number }) => void;
 }) {
   // in each setter: setA(v); onParams?.({ a: v, b, c });  (etc.)
 }
 ```
+
 Then `MathCanvas`/the diagram beat forwards `onParams` up to `LessonRoute`, which calls
 `lumen.sendBoardState({...buildBoardState(...), parabola: newParams})`. For the demo you can keep
 it simpler: recompute targets from the widget's live params only when the agent asks
@@ -120,6 +136,7 @@ it simpler: recompute targets from the widget's live params only when the agent 
 ## 5. Example grounding payload
 
 Client sends (topic `lumen.board`):
+
 ```json
 {
   "moduleId": "quadratics-intro",
@@ -128,11 +145,20 @@ Client sends (topic `lumen.board`):
   "stepTitle": "Finding the vertex",
   "equation": "y = x² − 5x + 6",
   "parabola": { "a": 1, "b": -5, "c": 6 },
-  "targets": ["step0.title","step2.equation","vertex","root1","root2","axisOfSymmetry","graph"]
+  "targets": [
+    "step0.title",
+    "step2.equation",
+    "vertex",
+    "root1",
+    "root2",
+    "axisOfSymmetry",
+    "graph"
+  ]
 }
 ```
 
 Agent turns this into the model-visible text (`BoardContext.as_prompt`):
+
 ```
 Current step 3 of 5: Finding the vertex
 Equation on board: y = x² − 5x + 6

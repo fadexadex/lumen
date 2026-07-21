@@ -5,19 +5,32 @@ type Note = { id: string; x: number; y: number; text: string };
 export type NotesHandle = { clear: () => void };
 
 export function TextNotes({
-  tool, width, height, overlayRef,
+  tool,
+  width,
+  height,
+  overlayRef,
 }: {
-  tool: MCTool; width: number; height: number; overlayRef: MutableRefObject<NotesHandle | null>;
+  tool: MCTool;
+  width: number;
+  height: number;
+  overlayRef: MutableRefObject<NotesHandle | null>;
 }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
-    overlayRef.current = { clear: () => { setNotes([]); setEditing(null); } };
+    overlayRef.current = {
+      clear: () => {
+        setNotes([]);
+        setEditing(null);
+      },
+    };
   }, [overlayRef]);
 
-  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+  useEffect(() => {
+    if (editing && inputRef.current) inputRef.current.focus();
+  }, [editing]);
 
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (tool !== "text" || e.target !== e.currentTarget) return;
@@ -28,12 +41,15 @@ export function TextNotes({
     const sx = el.offsetWidth / r.width;
     const sy = el.offsetHeight / r.height;
     const id = crypto.randomUUID();
-    setNotes((n) => [...n, {
-      id,
-      x: (e.clientX - r.left) * sx,
-      y: (e.clientY - r.top) * sy,
-      text: "",
-    }]);
+    setNotes((n) => [
+      ...n,
+      {
+        id,
+        x: (e.clientX - r.left) * sx,
+        y: (e.clientY - r.top) * sy,
+        text: "",
+      },
+    ]);
     setEditing(id);
   };
 
@@ -65,17 +81,20 @@ export function TextNotes({
             <textarea
               ref={inputRef}
               value={n.text}
-              onChange={(e) => setNotes((all) => all.map((x) => x.id === n.id ? { ...x, text: e.target.value } : x))}
+              onChange={(e) =>
+                setNotes((all) =>
+                  all.map((x) => (x.id === n.id ? { ...x, text: e.target.value } : x)),
+                )
+              }
               onBlur={() => commit(n.id)}
-              onKeyDown={(e) => { if (e.key === "Escape") commit(n.id); }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") commit(n.id);
+              }}
               className="mc-note-input"
               rows={1}
             />
           ) : (
-            <div
-              className="mc-note-text"
-              onDoubleClick={() => setEditing(n.id)}
-            >
+            <div className="mc-note-text" onDoubleClick={() => setEditing(n.id)}>
               {n.text}
             </div>
           )}

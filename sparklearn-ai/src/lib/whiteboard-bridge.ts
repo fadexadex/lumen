@@ -37,13 +37,22 @@ export function prettifyLatex(input: string): string {
   s = s.replace(/\\int/g, "∫");
   s = s.replace(/\\sum/g, "Σ");
   const sup: Record<string, string> = {
-    "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
-    "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
-    n: "ⁿ", x: "ˣ", "+": "⁺", "-": "⁻",
+    "0": "⁰",
+    "1": "¹",
+    "2": "²",
+    "3": "³",
+    "4": "⁴",
+    "5": "⁵",
+    "6": "⁶",
+    "7": "⁷",
+    "8": "⁸",
+    "9": "⁹",
+    n: "ⁿ",
+    x: "ˣ",
+    "+": "⁺",
+    "-": "⁻",
   };
-  s = s.replace(/\^\{([^{}]+)\}/g, (_, g: string) =>
-    [...g].map((c) => sup[c] ?? `^${c}`).join(""),
-  );
+  s = s.replace(/\^\{([^{}]+)\}/g, (_, g: string) => [...g].map((c) => sup[c] ?? `^${c}`).join(""));
   s = s.replace(/\^([0-9a-zA-Z])/g, (_, c: string) => sup[c] ?? `^${c}`);
   s = s.replace(/\{|\}/g, "");
   return s.trim();

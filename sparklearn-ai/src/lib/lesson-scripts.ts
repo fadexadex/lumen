@@ -51,7 +51,13 @@ export const lessonScripts: Record<string, LessonScript> = {
     diagram: {
       parabola: { a: 1, b: -5, c: 6, roots: [2, 3], vertex: [2.5, -0.25] },
       tiles: { xSquared: 1, x: -5, unit: 6, factored: ["x − 2", "x − 3"] },
-      numberLine: { points: [{ x: 2, label: "x=2" }, { x: 3, label: "x=3" }], range: [-1, 5] },
+      numberLine: {
+        points: [
+          { x: 2, label: "x=2" },
+          { x: 3, label: "x=3" },
+        ],
+        range: [-1, 5],
+      },
       captions: [
         "Product of two things = 0 · one of them must be zero.",
         "Find two numbers that multiply to c and add to b.",
@@ -91,7 +97,13 @@ export const lessonScripts: Record<string, LessonScript> = {
     title: "The quadratic formula",
     diagram: {
       parabola: { a: 2, b: 3, c: -2, roots: [0.5, -2], vertex: [-0.75, -3.125] },
-      numberLine: { points: [{ x: -2, label: "x=−2" }, { x: 0.5, label: "x=½" }], range: [-4, 2] },
+      numberLine: {
+        points: [
+          { x: -2, label: "x=−2" },
+          { x: 0.5, label: "x=½" },
+        ],
+        range: [-4, 2],
+      },
       captions: [
         "The formula never fails, even when factoring stalls.",
         "Plug a, b, c in carefully — mind the signs.",

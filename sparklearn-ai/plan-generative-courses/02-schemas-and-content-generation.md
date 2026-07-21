@@ -27,16 +27,21 @@ export const stepExplanationSchema = z.object({
   kind: z.literal("explanation"),
   title: z.string(),
   body: z.string().min(20).max(800),
-  math: z.string().optional(),          // KaTeX-compatible LaTeX
+  math: z.string().optional(), // KaTeX-compatible LaTeX
 });
 
 export const stepExampleSchema = z.object({
   kind: z.literal("example"),
   title: z.string(),
-  lines: z.array(z.object({
-    text: z.string().optional(),
-    math: z.string().optional(),
-  })).min(1).max(12),
+  lines: z
+    .array(
+      z.object({
+        text: z.string().optional(),
+        math: z.string().optional(),
+      }),
+    )
+    .min(1)
+    .max(12),
 });
 
 export const stepPracticeSchema = z.object({
@@ -55,24 +60,34 @@ export const lessonStepSchema = z.discriminatedUnion("kind", [
   stepPracticeSchema,
 ]);
 
-export const diagramSchema = z.object({
-  parabola: z.object({
-    a: z.number(), b: z.number(), c: z.number(),
-    roots: z.array(z.number()).optional(),
-    vertex: z.tuple([z.number(), z.number()]).optional(),
-  }).optional(),
-  tiles: z.object({
-    xSquared: z.number().int().nonnegative(),
-    x: z.number().int(),
-    unit: z.number().int(),
-    factored: z.tuple([z.string(), z.string()]).optional(),
-  }).optional(),
-  numberLine: z.object({
-    points: z.array(z.object({ x: z.number(), label: z.string().optional() })),
-    range: z.tuple([z.number(), z.number()]),
-  }).optional(),
-  captions: z.array(z.string()).optional(),
-}).optional();
+export const diagramSchema = z
+  .object({
+    parabola: z
+      .object({
+        a: z.number(),
+        b: z.number(),
+        c: z.number(),
+        roots: z.array(z.number()).optional(),
+        vertex: z.tuple([z.number(), z.number()]).optional(),
+      })
+      .optional(),
+    tiles: z
+      .object({
+        xSquared: z.number().int().nonnegative(),
+        x: z.number().int(),
+        unit: z.number().int(),
+        factored: z.tuple([z.string(), z.string()]).optional(),
+      })
+      .optional(),
+    numberLine: z
+      .object({
+        points: z.array(z.object({ x: z.number(), label: z.string().optional() })),
+        range: z.tuple([z.number(), z.number()]),
+      })
+      .optional(),
+    captions: z.array(z.string()).optional(),
+  })
+  .optional();
 
 export const lessonScriptSchema = z.object({
   moduleId: z.string(),
@@ -96,11 +111,11 @@ Keep them in sync with `types.ts` (or generate types from Zod to avoid drift).
 
 ```ts
 import { generateObject } from "ai";
-import { google } from "@ai-sdk/google";
+import { mistral } from "@ai-sdk/mistral";
 
 export async function generateRoadmap(profile: LearnerProfile) {
   const { object } = await generateObject({
-    model: google("gemini-2.5-flash"),
+    model: mistral("mistral-small-latest"),
     schema: roadmapSchema,
     prompt: `
 You are Lumen, designing a calm learning path.
@@ -117,7 +132,29 @@ Blurbs: one short sentence, no marketing fluff.
 }
 ```
 
-Target: **&lt; 5 seconds**. No streaming needed for the outline (small object); stream statuses for lessons instead.
+Target: **&lt; 5 seconds**.
+
+### Stream the outline for the "planning" animation
+
+The learner should **watch Lumen decide the shape of the course** — how many modules, what they
+are — before any lesson content exists. Use `streamObject(roadmapSchema)` instead of
+`generateObject` so modules **pop in one at a time** as the model emits them. This is the first
+thing the learner sees and sells the "it's really thinking" moment (see `06 §7`, which removes the
+old cosmetic delay).
+
+```ts
+import { streamObject } from "ai";
+const { partialObjectStream } = streamObject({
+  model: mistral("mistral-small-latest"),
+  schema: roadmapSchema,
+  prompt: buildRoadmapPrompt(profile),
+});
+for await (const partial of partialObjectStream) {
+  send("roadmap_partial", partial); // client animates each new module card in
+}
+```
+
+After the roadmap resolves, stream **statuses** for lessons (below) rather than the objects.
 
 ---
 
@@ -125,6 +162,7 @@ Target: **&lt; 5 seconds**. No streaming needed for the outline (small object); 
 
 ```ts
 import { streamObject } from "ai";
+import { mistral } from "@ai-sdk/mistral";
 
 export function streamLesson(args: {
   profile: LearnerProfile;
@@ -133,7 +171,7 @@ export function streamLesson(args: {
   brief?: CuratedBrief | null;
 }) {
   return streamObject({
-    model: google("gemini-2.5-flash"),
+    model: mistral("mistral-small-latest"),
     schema: lessonScriptSchema,
     prompt: buildLessonPrompt(args),
   });
@@ -164,7 +202,7 @@ for await (const partial of result.partialObjectStream) {
 }
 const final = await result.object;
 const checked = lessonScriptSchema.parse(final);
-await validateMathConsistency(checked);  // custom
+await validateMathConsistency(checked); // custom
 send({ type: "module_ready", id: moduleId, script: checked });
 ```
 
@@ -189,6 +227,7 @@ On failure: one **repair** call:
 
 ```ts
 generateObject({
+  model: mistral("mistral-large-latest"), // stronger model ONLY for repair
   schema: lessonScriptSchema,
   prompt: `Fix this lesson script. Errors: ${errors}. Original JSON: ${json}`,
 });
@@ -203,14 +242,13 @@ Two failures → `status: failed`.
 ```ts
 export function enrichParabola(p: { a: number; b: number; c: number }) {
   const disc = p.b * p.b - 4 * p.a * p.c;
-  const vertex: [number, number] = [
-    -p.b / (2 * p.a),
-    p.c - (p.b * p.b) / (4 * p.a),
-  ];
+  const vertex: [number, number] = [-p.b / (2 * p.a), p.c - (p.b * p.b) / (4 * p.a)];
   const roots =
-    disc < 0 || p.a === 0 ? [] :
-    disc === 0 ? [-p.b / (2 * p.a)] :
-    [(-p.b + Math.sqrt(disc)) / (2 * p.a), (-p.b - Math.sqrt(disc)) / (2 * p.a)];
+    disc < 0 || p.a === 0
+      ? []
+      : disc === 0
+        ? [-p.b / (2 * p.a)]
+        : [(-p.b + Math.sqrt(disc)) / (2 * p.a), (-p.b - Math.sqrt(disc)) / (2 * p.a)];
   return { ...p, roots, vertex };
 }
 ```
@@ -226,10 +264,16 @@ That keeps Live board-targets (`../plan/05`) correct.
 - Same learner re-entering a ready module → serve cache, no re-gen.
 - “Regenerate” button bumps a `nonce` in the key.
 
-## 7. Free-tier model notes
+## 7. Free-tier model notes (Mistral)
 
-- Prefer Flash for volume (N modules × retries).
-- Use a stronger model only for repair or final practice answer checking if Flash is weak.
-- Cap `max(modules) = 8` on free demos.
+- **`mistral-small-latest` for volume** (roadmap + N lessons + session summaries). Fast, cheap,
+  supports JSON-schema structured output and tool calls — the workhorse.
+- **`mistral-large-latest` only for repair** and final practice/answer checking, where small is
+  occasionally weak on arithmetic-sensitive fixes.
+- The ~1M free-token budget comfortably covers a full course + retries; you are not TPM-boxed the
+  way Gemini Live is (`../plan/11`).
+- Cap `max(modules) = 8` on free demos anyway (latency + curation cost, not token cost).
+- Mistral honours `response_format`/structured outputs; if a `streamObject` call ever emits loose
+  JSON, tighten via the SDK's schema mode before falling back to the repair loop.
 
 Next: `03` — Vercel generative UI tools → React components.
