@@ -3,7 +3,8 @@ import type { RemoteParticipant, RemoteTrack } from "livekit-client";
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL as string;
 /** Same-origin TanStack Start route — secrets stay on the server. */
-const TOKEN_URL = (import.meta.env.VITE_LUMEN_TOKEN_URL as string | undefined) || "/api/lumen-token";
+const TOKEN_URL =
+  (import.meta.env.VITE_LUMEN_TOKEN_URL as string | undefined) || "/api/lumen-token";
 
 export function makeIdentity(): string {
   const KEY = "lumen.identity";
@@ -15,7 +16,12 @@ export function makeIdentity(): string {
   return id;
 }
 
-export const roomName = (moduleId: string, identity: string) => `lumen-${moduleId}-${identity}`;
+/**
+ * A learner identity is stable for transcript attribution, but each Live start needs a fresh
+ * room. Reusing an emptied room can leave its previous agent dispatch attached but inactive.
+ */
+export const roomName = (moduleId: string, identity: string, sessionId: string) =>
+  `lumen-${moduleId}-${identity}-${sessionId}`;
 
 async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));

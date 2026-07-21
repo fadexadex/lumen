@@ -63,6 +63,8 @@ export class TutorSession {
   private intentionalStop = false;
   /** Synchronous guard: set before the first await so rapid double-starts can't open two rooms. */
   private starting = false;
+  /** Monotonic suffix prevents same-millisecond reconnects from reusing a room. */
+  private startAttempt = 0;
   status: SessionStatus = "idle";
   /** Last time we appended tutor transcript — used to keep one reply in one bubble. */
   private lastTutorAt = 0;
@@ -96,7 +98,8 @@ export class TutorSession {
     this.set("connecting");
     try {
       const identity = makeIdentity();
-      const room = roomName(moduleId, identity);
+      const sessionId = `${Date.now().toString(36)}-${++this.startAttempt}`;
+      const room = roomName(moduleId, identity, sessionId);
       const { token, url } = await fetchToken(room, identity);
       const r = createRoom();
       this.room = r;

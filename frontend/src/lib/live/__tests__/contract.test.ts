@@ -5,6 +5,17 @@ import type { CanvasControllerHandle } from "@/lib/live/canvas-agent-bridge";
 import type { LumenCanvasController } from "@/components/math-canvas/annotation-layer";
 import { lessonScripts } from "@/lib/lesson-scripts";
 import { rectsOverlap, writeBlockRect } from "@/lib/live/place-write";
+import { roomName } from "@/lib/live/livekit-client";
+
+describe("LiveKit session room naming", () => {
+  it("uses a fresh room instance when the same learner reconnects", () => {
+    const first = roomName("quad-1", "learner-a", "session-1");
+    const second = roomName("quad-1", "learner-a", "session-2");
+
+    expect(first).not.toBe(second);
+    expect(first).toBe("lumen-quad-1-learner-a-session-1");
+  });
+});
 
 /**
  * Recording mock of LumenCanvasController — avoids jsdom SVG gaps (getTotalLength/animate)
