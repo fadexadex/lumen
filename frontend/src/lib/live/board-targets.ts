@@ -61,6 +61,7 @@ export function resolveTargets(
   script: LessonScript,
   parabolaOverride?: { a: number; b: number; c: number } | null,
   stepIndex = 0,
+  visualSceneIndex?: number,
 ): ResolvedTargets {
   const { beats } = layoutScript(script);
   const names: string[] = [];
@@ -115,7 +116,12 @@ export function resolveTargets(
     c: number;
   } | null = null;
   if (visualBeat) {
-    const active = activeConceptScene(visualBeat.animation, stepIndex, script.steps.length);
+    const active = activeConceptScene(
+      visualBeat.animation,
+      stepIndex,
+      script.steps.length,
+      visualSceneIndex,
+    );
     const scene = active.scene;
     visual = { primitive: scene.primitive, narration: scene.narration, sceneIndex: active.index };
     const frame = { x: visualBeat.x, y: visualBeat.y, w: visualBeat.w, h: visualBeat.h };

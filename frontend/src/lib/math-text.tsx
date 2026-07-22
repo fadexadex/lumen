@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { Equation } from "@/components/math-canvas/equation";
+import { Equation, toHandMath } from "@/components/math-canvas/equation";
 import { renderKatexToString } from "@/lib/katex";
 
 export type MathTextSegment = { kind: "text" | "math"; value: string };
@@ -86,7 +86,11 @@ export function MathText({ text, className }: { text: string; className?: string
           {segment.kind === "math" ? (
             <StreamingMath value={segment.value} />
           ) : (
-            <Equation>{stripMarkdownDecoration(segment.value)}</Equation>
+            <Equation>
+              {segment.value.includes("\\")
+                ? toHandMath(stripMarkdownDecoration(segment.value))
+                : stripMarkdownDecoration(segment.value)}
+            </Equation>
           )}
         </Fragment>
       ))}

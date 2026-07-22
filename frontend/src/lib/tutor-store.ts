@@ -31,6 +31,12 @@ interface TutorState {
   roadmap: Roadmap | null;
   /** Generated course (schema content + per-module status). Source of truth. */
   course: Course | null;
+  /** Earlier generated paths remain available when a learner starts a new topic. */
+  courseHistory: Course[];
+  /** New-topic onboarding skips identity and preference questions. */
+  startingNewTopic: boolean;
+  /** One-time, non-blocking orientation shown beside the Live tutor. */
+  hasSeenLessonGuide: boolean;
   /** Transient: modules streaming in during the roadmap "planning" moment. */
   planningModules: { id?: string; title?: string; blurb?: string }[];
   /** Transient: the action feed shown while generating (not persisted). */
@@ -46,6 +52,10 @@ interface TutorState {
   setProfile: (p: LearnerProfile) => void;
   setRoadmap: (r: Roadmap) => void;
   setCourse: (c: Course) => void;
+  beginNewTopic: () => void;
+  finishNewTopic: () => void;
+  restoreCourse: (courseId: string) => void;
+  dismissLessonGuide: () => void;
   patchModule: (id: string, patch: Partial<CourseModule>) => void;
   /** Reduce one SSE course event into the store (drives feed + roadmap live). */
   applyCourseEvent: (event: CourseStreamEvent) => void;
@@ -164,6 +174,9 @@ export const useTutorStore = create<TutorState>()(
       profile: null,
       roadmap: null,
       course: null,
+      courseHistory: [],
+      startingNewTopic: false,
+      hasSeenLessonGuide: false,
       planningModules: [],
       genPhase: "idle",
       genLog: [],
@@ -174,6 +187,40 @@ export const useTutorStore = create<TutorState>()(
       setProfile: (profile) => set({ profile }),
       setRoadmap: (roadmap) => set({ roadmap }),
       setCourse: (course) => set({ course, roadmap: deriveRoadmap(course) }),
+      beginNewTopic: () =>
+        set((s) => ({
+          courseHistory: s.course
+            ? [s.course, ...s.courseHistory.filter((course) => course.id !== s.course?.id)]
+            : s.courseHistory,
+          course: null,
+          roadmap: null,
+          planningModules: [],
+          genPhase: "idle",
+          genLog: [],
+          lastModuleId: null,
+          startingNewTopic: true,
+        })),
+      finishNewTopic: () => set({ startingNewTopic: false }),
+      restoreCourse: (courseId) =>
+        set((s) => {
+          const selected = s.courseHistory.find((course) => course.id === courseId);
+          if (!selected) return s;
+          const archived = s.course
+            ? [s.course, ...s.courseHistory.filter((course) => course.id !== s.course?.id)]
+            : s.courseHistory;
+          return {
+            profile: selected.profile,
+            course: selected,
+            courseHistory: archived.filter((course) => course.id !== selected.id),
+            roadmap: deriveRoadmap(selected),
+            startingNewTopic: false,
+            lastModuleId: null,
+            planningModules: [],
+            genPhase: "done",
+            genLog: [],
+          };
+        }),
+      dismissLessonGuide: () => set({ hasSeenLessonGuide: true }),
       patchModule: (id, patch) =>
         set((s) => {
           if (!s.course) return s;
@@ -210,6 +257,9 @@ export const useTutorStore = create<TutorState>()(
           profile: null,
           roadmap: null,
           course: null,
+          courseHistory: [],
+          startingNewTopic: false,
+          hasSeenLessonGuide: false,
           planningModules: [],
           genPhase: "idle",
           genLog: [],
@@ -221,8 +271,8 @@ export const useTutorStore = create<TutorState>()(
     }),
     {
       name: "tutor:state",
-      // Bump when the persisted shape changes (v3 adds the generated course).
-      version: 3,
+      // v4 keeps previous courses and returning-learner UI preferences.
+      version: 4,
       migrate: (persisted, fromVersion) => {
         const p = (persisted ?? {}) as Record<string, unknown>;
         // v1 → v2: add subscription field (null until paid).
@@ -232,6 +282,11 @@ export const useTutorStore = create<TutorState>()(
         // v2 → v3: add generated course field (null until generated).
         if (fromVersion < 3 && p.course === undefined) {
           p.course = null;
+        }
+        if (fromVersion < 4) {
+          if (p.courseHistory === undefined) p.courseHistory = [];
+          if (p.startingNewTopic === undefined) p.startingNewTopic = false;
+          if (p.hasSeenLessonGuide === undefined) p.hasSeenLessonGuide = false;
         }
         return p as typeof p & { subscription?: unknown; course?: unknown };
       },
@@ -243,6 +298,9 @@ export const useTutorStore = create<TutorState>()(
         // Persist the generated course so a returning learner keeps their path
         // (server course map is in-memory and won't survive a restart).
         course: s.course,
+        courseHistory: s.courseHistory,
+        startingNewTopic: s.startingNewTopic,
+        hasSeenLessonGuide: s.hasSeenLessonGuide,
         subscription: s.subscription,
         stepByModule: s.stepByModule,
         completed: s.completed,

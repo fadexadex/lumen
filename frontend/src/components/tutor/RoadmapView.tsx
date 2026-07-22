@@ -6,6 +6,7 @@ import {
   courseIsSettled,
   resumeCourseGeneration,
   startCourseGeneration,
+  stopCourseGeneration,
 } from "@/lib/course-gen/session";
 import type { ModuleGenStatus } from "@/lib/course-gen/types";
 
@@ -16,10 +17,13 @@ export function RoadmapView() {
   const course = useTutorStore((s) => s.course);
   const genPhase = useTutorStore((s) => s.genPhase);
   const subscription = useTutorStore((s) => s.subscription);
+  const startingNewTopic = useTutorStore((s) => s.startingNewTopic);
   const completed = useTutorStore((s) => s.completed);
   const lastModuleId = useTutorStore((s) => s.lastModuleId);
+  const courseHistory = useTutorStore((s) => s.courseHistory);
   const ensureRoadmap = useTutorStore((s) => s.ensureRoadmap);
-  const reset = useTutorStore((s) => s.reset);
+  const beginNewTopic = useTutorStore((s) => s.beginNewTopic);
+  const restoreCourse = useTutorStore((s) => s.restoreCourse);
   const patchModule = useTutorStore((s) => s.patchModule);
 
   useEffect(() => {
@@ -30,10 +34,16 @@ export function RoadmapView() {
   useEffect(() => {
     // Safety net: a paid learner with no generated course (e.g. generation never
     // ran, or errored) should have it start here rather than see a dead path.
-    if (profile && subscription?.status === "active" && !course && genPhase === "idle") {
+    if (
+      profile &&
+      subscription?.status === "active" &&
+      !course &&
+      genPhase === "idle" &&
+      !startingNewTopic
+    ) {
       startCourseGeneration(profile);
     }
-  }, [profile, subscription, course, genPhase]);
+  }, [profile, subscription, course, genPhase, startingNewTopic]);
 
   useEffect(() => {
     if (course && !courseIsSettled(course)) resumeCourseGeneration(course);
@@ -86,7 +96,8 @@ export function RoadmapView() {
     modules[0]?.id;
   const resumeMod = modules.find((m) => m.id === resumeId);
   const startOver = () => {
-    reset();
+    stopCourseGeneration();
+    beginNewTopic();
     navigate({ to: "/" });
   };
   const open = (id: string) => navigate({ to: "/lesson/$moduleId", params: { moduleId: id } });
@@ -127,14 +138,33 @@ export function RoadmapView() {
   return (
     <div className="tutor-app min-h-screen">
       <header className="roadmap-header">
-        <button
-          type="button"
-          className="text-sm roadmap-startover"
-          style={{ color: "var(--tutor-muted)" }}
-          onClick={startOver}
-        >
-          ← start over
-        </button>
+        <div className="roadmap-path-actions">
+          <button
+            type="button"
+            className="text-sm roadmap-startover"
+            style={{ color: "var(--tutor-muted)" }}
+            onClick={startOver}
+          >
+            + new topic
+          </button>
+          {courseHistory.length > 0 && (
+            <details className="roadmap-history">
+              <summary>Previous paths</summary>
+              <div className="roadmap-history-menu">
+                {courseHistory.map((previous) => (
+                  <button
+                    key={previous.id}
+                    type="button"
+                    onClick={() => restoreCourse(previous.id)}
+                  >
+                    <strong>{previous.topic}</strong>
+                    <span>{previous.modules.length} modules</span>
+                  </button>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <span
             className="text-xs uppercase tracking-widest"

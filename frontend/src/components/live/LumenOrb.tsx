@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import type { SessionStatus } from "@/lib/live/tutor-session";
 
 export function LumenOrb({ amplitude, status }: { amplitude: number; status: SessionStatus }) {
@@ -24,11 +24,24 @@ export function LumenOrb({ amplitude, status }: { amplitude: number; status: Ses
       ref={ref}
       className={`lumen-orb lumen-orb--${status}`}
       data-speaking={status === "speaking" || undefined}
-      aria-hidden
+      role="img"
+      aria-label={`Lumen is ${status}`}
     >
       <span className="lumen-orb-glow" />
-      <span className="lumen-orb-ring" />
-      <span className="lumen-orb-ring lumen-orb-ring--slow" />
+      <span className="lumen-orb-bars" aria-hidden>
+        {Array.from({ length: 18 }, (_, index) => (
+          <span
+            key={index}
+            className="lumen-orb-bar"
+            style={
+              {
+                "--i": index,
+                "--bias": (0.35 + ((index * 7) % 10) / 15).toFixed(2),
+              } as CSSProperties
+            }
+          />
+        ))}
+      </span>
       <span className="lumen-orb-core" />
     </div>
   );

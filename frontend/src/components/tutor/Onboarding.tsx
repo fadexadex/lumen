@@ -47,17 +47,19 @@ export function Onboarding() {
   const genPhase = useTutorStore((s) => s.genPhase);
   const genLog = useTutorStore((s) => s.genLog);
   const planningModules = useTutorStore((s) => s.planningModules);
+  const startingNewTopic = useTutorStore((s) => s.startingNewTopic);
+  const finishNewTopic = useTutorStore((s) => s.finishNewTopic);
 
   // Returning learner: skip questions. Paid → path; unpaid → paywall.
   useEffect(() => {
-    if (!savedProfile) return;
+    if (!savedProfile || startingNewTopic) return;
     if (subscription?.status === "active") {
       ensureRoadmap();
       navigate({ to: "/roadmap" });
       return;
     }
     navigate({ to: "/subscribe" });
-  }, [savedProfile, subscription, ensureRoadmap, navigate]);
+  }, [savedProfile, subscription, startingNewTopic, ensureRoadmap, navigate]);
 
   const [i, setI] = useState(0);
   const [dir, setDir] = useState<Dir>("forward");
@@ -72,7 +74,7 @@ export function Onboarding() {
 
   // True only when this browser already had a profile on first paint, so we can
   // suppress the onboarding flash while the redirect above runs.
-  const returningRef = useRef(savedProfile !== null);
+  const returningRef = useRef(savedProfile !== null && !startingNewTopic);
 
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -173,6 +175,14 @@ export function Onboarding() {
     // Navigation to the paywall is driven by generation progress — see effect below.
   };
 
+  const startAnotherTopic = () => {
+    if (!savedProfile || !topic.trim()) return;
+    const nextProfile: LearnerProfile = { ...savedProfile, topic: topic.trim() };
+    setProfile(nextProfile);
+    startCourseGeneration(nextProfile);
+    setFinishing(true);
+  };
+
   const advance = () => {
     if (!canAdvance() || leaving) return;
     clearTimers();
@@ -210,11 +220,47 @@ export function Onboarding() {
   useEffect(() => {
     if (!finishing) return;
     const outlined = genPhase === "writing" || genPhase === "ready" || genPhase === "done";
-    const go = () => navigate({ to: "/subscribe" });
+    const go = () => {
+      if (startingNewTopic && subscription?.status === "active") {
+        finishNewTopic();
+        navigate({ to: "/roadmap" });
+      } else {
+        navigate({ to: "/subscribe" });
+      }
+    };
     // Let the learner see the outline settle, then continue.
     const t = setTimeout(go, outlined ? 1100 : 9000);
     return () => clearTimeout(t);
-  }, [finishing, genPhase, navigate]);
+  }, [finishing, genPhase, startingNewTopic, subscription, finishNewTopic, navigate]);
+
+  if (startingNewTopic && savedProfile && !finishing) {
+    return (
+      <main className="tutor-app onboard-shell min-h-screen flex items-center justify-center px-6">
+        <form
+          className="onboard-new-topic tutor-fade-in"
+          onSubmit={(event) => {
+            event.preventDefault();
+            startAnotherTopic();
+          }}
+        >
+          <p className="onboard-new-topic-kicker">Welcome back, {savedProfile.name}</p>
+          <h1 className="tutor-serif">What should we explore next?</h1>
+          <p>Your profile, learning preferences, payment, and earlier paths are already saved.</p>
+          <label htmlFor="new-topic">New topic</label>
+          <input
+            id="new-topic"
+            autoFocus
+            value={topic}
+            onChange={(event) => setTopic(event.target.value)}
+            placeholder="e.g. systems of linear equations"
+          />
+          <button type="submit" className="tutor-primary-btn" disabled={!topic.trim()}>
+            Build my next path <span aria-hidden>→</span>
+          </button>
+        </form>
+      </main>
+    );
+  }
 
   if (returningRef.current) return null;
 
@@ -236,7 +282,9 @@ export function Onboarding() {
               {phaseLabel}
             </span>
           </div>
-          <h1 className="tutor-serif text-4xl md:text-5xl">Designing {name}'s path…</h1>
+          <h1 className="tutor-serif text-4xl md:text-5xl">
+            Designing {savedProfile?.name ?? name}'s path…
+          </h1>
 
           {planningModules.length > 0 && (
             <ul className="onboard-plan-list" aria-label="Modules being planned">

@@ -72,6 +72,9 @@ export class TutorSession {
   private speakQuietMs = 0;
   private lastAmpTs = 0;
   private activeModuleId: string | null = null;
+  /** Latest board snapshot is queued across token fetch / room connection. */
+  private pendingBoardState: unknown | null = null;
+  private dataChannelReady = false;
   private acceptCommandId = createCommandDeduper(32);
 
   on<K extends keyof Listeners>(ev: K, fn: Listeners[K]) {
@@ -123,6 +126,10 @@ export class TutorSession {
         // Intentional End / page teardown — never toast.
         this.cleanup();
       });
+      r.on(RoomEvent.Reconnected, () => {
+        this.dataChannelReady = true;
+        void this.publishPendingBoardState();
+      });
 
       // Transcriptions arrive as text streams on topic "lk.transcription".
       // Prefer LiveKit segment id so interim streams of the same utterance upsert one line.
@@ -165,12 +172,22 @@ export class TutorSession {
         this.cleanup();
         return;
       }
+      this.dataChannelReady = true;
+      await this.publishPendingBoardState();
       // Headless E2E can skip mic (no getUserMedia) and still exercise connect + text + canvas.
       if (opts?.mic !== false) {
-        await r.localParticipant.setMicrophoneEnabled(true);
+        try {
+          await r.localParticipant.setMicrophoneEnabled(true);
+        } catch (error) {
+          // Keep the lesson and text channel alive. A denied microphone should
+          // not tear down the agent after it has already joined and received context.
+          this.emitError(
+            `${(error as Error).message || "Microphone unavailable"}. You can allow microphone access and reconnect.`,
+          );
+        }
       }
       this.starting = false;
-      this.set("listening");
+      if (this.status === "connecting") this.set("listening");
     } catch (e) {
       const msg = (e as Error).message || String(e);
       if (this.intentionalStop || isBenignDisconnectMessage(msg)) {
@@ -185,9 +202,23 @@ export class TutorSession {
 
   /** Publish a client→agent board-state delta (topic lumen.board). Fire-and-forget. */
   async sendBoardState(state: unknown) {
-    if (!this.room) return;
-    const payload = new TextEncoder().encode(JSON.stringify(state));
-    await this.room.localParticipant.publishData(payload, { topic: "lumen.board", reliable: true });
+    this.pendingBoardState = state;
+    await this.publishPendingBoardState();
+  }
+
+  private async publishPendingBoardState() {
+    if (!this.room || !this.dataChannelReady || this.pendingBoardState == null) return;
+    const payload = new TextEncoder().encode(JSON.stringify(this.pendingBoardState));
+    try {
+      await this.room.localParticipant.publishData(payload, {
+        topic: "lumen.board",
+        reliable: true,
+      });
+    } catch {
+      // Reconnect can briefly close the data channel. Retain the queued state;
+      // the next visible-step/status update will publish the same latest snapshot.
+      this.dataChannelReady = false;
+    }
   }
 
   /** Optional text input path when mic is denied. */
@@ -392,6 +423,7 @@ export class TutorSession {
     this.lastAmpTs = 0;
     this.lastTutorAt = 0;
     this.room = null;
+    this.dataChannelReady = false;
     this.turns = this.turns.map((turn) => (turn.final ? turn : { ...turn, final: true }));
     this.emitTurns();
     this.set("idle");

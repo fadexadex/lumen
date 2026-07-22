@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useTutorStore } from "@/lib/tutor-store";
 import { getLessonScript } from "@/lib/lesson-scripts";
@@ -27,6 +27,8 @@ export function LessonRoute() {
   const completed = useTutorStore((s) => s.completed);
   const markComplete = useTutorStore((s) => s.markComplete);
   const setLastModule = useTutorStore((s) => s.setLastModule);
+  const hasSeenLessonGuide = useTutorStore((s) => s.hasSeenLessonGuide);
+  const dismissLessonGuide = useTutorStore((s) => s.dismissLessonGuide);
 
   const mod = roadmap?.modules.find((m) => m.id === moduleId);
   const courseModule = course?.modules.find((m) => m.id === moduleId);
@@ -79,6 +81,10 @@ export function LessonRoute() {
   }, [subscription, safeIndex, script.steps.length, moduleId, markComplete]);
 
   const lumen = useLumenSession();
+  const lumenStartRef = useRef(lumen.start);
+  lumenStartRef.current = lumen.start;
+  const autoStartedLessonRef = useRef<string | null>(null);
+  const [visualSceneIndex, setVisualSceneIndex] = useState(0);
   const [showMath, setShowMath] = useState(false);
   const [mathValue, setMathValue] = useState("");
   const [mathToast, setMathToast] = useState<string | null>(null);
@@ -88,6 +94,24 @@ export function LessonRoute() {
   });
   const [demoActive, setDemoActive] = useState(false);
   const concept = getConcept(conceptId);
+
+  useEffect(() => {
+    setVisualSceneIndex(0);
+  }, [moduleId]);
+
+  // Lumen leads the lesson. A short delay lets the board mount and publish its
+  // first context packet before the agent begins teaching.
+  useEffect(() => {
+    if (!hydrated || subscription?.status !== "active" || lumen.status !== "idle") return;
+    if (courseModule && courseModule.status !== "ready" && !courseModule.script) return;
+    if (autoStartedLessonRef.current === moduleId) return;
+    const timer = setTimeout(() => {
+      if (autoStartedLessonRef.current === moduleId) return;
+      autoStartedLessonRef.current = moduleId;
+      void lumenStartRef.current(moduleId);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [hydrated, subscription, courseModule, moduleId, lumen.status]);
 
   useEffect(() => {
     try {
@@ -144,18 +168,20 @@ export function LessonRoute() {
   // Ground Lumen whenever the visible step changes, or Live starts.
   useEffect(() => {
     if (lumen.status !== "idle") {
-      lumen.sendBoardState(buildBoardState(script, safeIndex, moduleId));
+      lumen.sendBoardState(
+        buildBoardState(script, safeIndex, moduleId, undefined, visualSceneIndex),
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safeIndex, moduleId, script, lumen.status]);
+  }, [safeIndex, moduleId, script, visualSceneIndex, lumen.status]);
 
   // Push live parabola slider / set_parabola changes so Lumen knows "this" on screen.
   useEffect(() => {
     return onLiveParabolaChange((p) => {
       if (lumen.status === "idle") return;
-      lumen.sendBoardState(buildBoardState(script, safeIndex, moduleId, p));
+      lumen.sendBoardState(buildBoardState(script, safeIndex, moduleId, p, visualSceneIndex));
     });
-  }, [lumen, script, safeIndex, moduleId]);
+  }, [lumen, script, safeIndex, moduleId, visualSceneIndex]);
 
   const insertShortcut = (latex: string) => setMathValue((v) => v + latex);
 
@@ -270,10 +296,26 @@ export function LessonRoute() {
           demoActive={demoActive}
           onWriteMath={() => setShowMath(true)}
           onOpenLive={() => lumen.start(moduleId)}
+          onVisualSceneChange={setVisualSceneIndex}
           nextModule={nextMod ? { id: nextMod.id, title: nextMod.title } : null}
           onNextModule={goNextModule}
         />
       </div>
+
+      {!hasSeenLessonGuide && (
+        <aside className="lesson-live-guide tutor-fade-in" aria-label="How the live lesson works">
+          <p>Live lesson</p>
+          <h2>Lumen is joining you here.</h2>
+          <ul>
+            <li>Listen while Lumen teaches from the board.</li>
+            <li>Interrupt naturally whenever something is unclear.</li>
+            <li>Switch visual models and ask about the one you see.</li>
+          </ul>
+          <button type="button" onClick={dismissLessonGuide}>
+            Got it
+          </button>
+        </aside>
+      )}
 
       {/* Math floating panel */}
       {showMath && (

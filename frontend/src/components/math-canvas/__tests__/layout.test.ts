@@ -3,7 +3,7 @@ import { layoutScript, wrappedLineCount } from "../layout";
 import type { LessonScript } from "@/lib/types";
 
 describe("dynamic MathCanvas layout", () => {
-  it("reserves space for a wrapped generated lesson title", () => {
+  it("keeps every generated lesson step in one stable teaching frame", () => {
     const script: LessonScript = {
       moduleId: "inequalities",
       title: "Understanding Inequalities and Their Symbols",
@@ -19,11 +19,11 @@ describe("dynamic MathCanvas layout", () => {
     };
 
     const { beats } = layoutScript(script);
-    const lessonTitle = beats[0];
-    const firstStepTitle = beats[1];
-
+    const stepTitles = beats.filter(
+      (beat): beat is Extract<(typeof beats)[number], { kind: "title" }> => beat.kind === "title",
+    );
     expect(wrappedLineCount(script.title, 18)).toBeGreaterThan(1);
-    expect(firstStepTitle.y - lessonTitle.y).toBeGreaterThanOrEqual(180);
+    expect(stepTitles.map((beat) => beat.y)).toEqual([104, 104, 104]);
   });
 
   it("accounts for long generated step titles", () => {
@@ -42,7 +42,7 @@ describe("dynamic MathCanvas layout", () => {
     };
 
     const { beats } = layoutScript(script);
-    const firstTitle = beats.find((beat, index) => index > 0 && beat.kind === "title")!;
+    const firstTitle = beats.find((beat) => beat.kind === "title")!;
     const firstBody = beats.find((beat) => beat.kind === "text")!;
     expect(firstBody.y - firstTitle.y).toBeGreaterThanOrEqual(80);
   });

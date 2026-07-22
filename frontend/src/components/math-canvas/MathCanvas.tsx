@@ -12,7 +12,7 @@ import { AnnotationLayer, type LumenCanvasController } from "./annotation-layer"
 import { setCanvasController } from "@/lib/live/canvas-agent-bridge";
 import { estimateBeatRect, resolveTargets } from "@/lib/live/board-targets";
 import { emitLiveParabola } from "@/lib/live/board-live";
-import { activeConceptScene } from "@/lib/concept-visual";
+import { activeConceptScene, sceneIndexForStep } from "@/lib/concept-visual";
 
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 3;
@@ -63,41 +63,23 @@ function estimateBeatBox(beat: Beat): Bounds {
  * whole point: the learner always recognizes "the view."
  */
 const READING_FRAME: Bounds = { x: 0, y: 24, w: LEFT_X + COL_W + 40, h: 640 };
+const SPLIT_FRAME: Bounds = { x: 24, y: 48, w: 1460, h: 650 };
 
-/** Fit the standard reading column: width-first, centered horizontally, top-aligned. */
-function fitStandard(el: HTMLElement): View {
+function fitFrame(el: HTMLElement, frame: Bounds, maxScale = 1.05, alignTop = false): View {
   const pad = chromePad(el);
   const availW = Math.max(120, el.clientWidth - pad.left - pad.right);
-  const scale = Math.max(0.4, Math.min(1.05, availW / READING_FRAME.w));
-  const x = pad.left + (availW - READING_FRAME.w * scale) / 2 - READING_FRAME.x * scale;
-  const y = pad.top - READING_FRAME.y * scale + 8;
+  const availH = Math.max(120, el.clientHeight - pad.top - pad.bottom);
+  const scale = Math.max(0.35, Math.min(maxScale, availW / frame.w, availH / frame.h));
+  const x = pad.left + (availW - frame.w * scale) / 2 - frame.x * scale;
+  const y = alignTop
+    ? pad.top - frame.y * scale + 8
+    : pad.top + (availH - frame.h * scale) / 2 - frame.y * scale;
   return { x, y, scale };
 }
 
-/** Soft follow: only nudge if the active beat sits outside a safe inset. */
-function ensureInView(el: HTMLElement, view: View, beat: Beat): View {
-  const pad = chromePad(el);
-  const box = estimateBeatBox(beat);
-  const left = view.x + box.x * view.scale;
-  const top = view.y + box.y * view.scale;
-  const right = left + box.w * view.scale;
-  const bottom = top + box.h * view.scale;
-  const inset = {
-    l: pad.left + 16,
-    r: el.clientWidth - pad.right - 16,
-    t: pad.top + 16,
-    b: el.clientHeight - pad.bottom - 16,
-  };
-
-  let dx = 0;
-  let dy = 0;
-  if (left < inset.l) dx = inset.l - left;
-  else if (right > inset.r) dx = inset.r - right;
-  if (top < inset.t) dy = inset.t - top;
-  else if (bottom > inset.b) dy = inset.b - bottom;
-
-  if (dx === 0 && dy === 0) return view;
-  return { ...view, x: view.x + dx, y: view.y + dy };
+/** Fit the standard reading column: width-first, centered horizontally, top-aligned. */
+function fitStandard(el: HTMLElement): View {
+  return fitFrame(el, READING_FRAME, 1.05, true);
 }
 
 export interface MathCanvasProps {
@@ -107,12 +89,14 @@ export interface MathCanvasProps {
   demoActive: boolean;
   onWriteMath: () => void;
   onOpenLive: () => void;
+  onVisualSceneChange?: (index: number) => void;
   nextModule?: { id: string; title: string } | null;
   onNextModule?: () => void;
 }
 
 export function MathCanvas(props: MathCanvasProps) {
-  const { script, stepIndex, goto, onWriteMath, nextModule, onNextModule } = props;
+  const { script, stepIndex, goto, onWriteMath, nextModule, onNextModule, onVisualSceneChange } =
+    props;
   const [tool, setTool] = useState<MCTool>("pan");
   const [picked, setPicked] = useState<Record<number, number>>({});
   const [vp, setVp] = useState({ w: 0, h: 0 });
@@ -133,15 +117,32 @@ export function MathCanvas(props: MathCanvasProps) {
   const panning = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const annoRef = useRef<LumenCanvasController | null>(null);
   const boardElRef = useRef<HTMLDivElement | null>(null);
+  const automaticSceneIndex =
+    script.visual?.kind === "animation"
+      ? sceneIndexForStep(stepIndex, script.steps.length, script.visual.scenes.length)
+      : 0;
+  const [visualSceneIndex, setVisualSceneIndex] = useState(automaticSceneIndex);
+  useEffect(() => {
+    setVisualSceneIndex(automaticSceneIndex);
+    onVisualSceneChange?.(automaticSceneIndex);
+  }, [automaticSceneIndex, onVisualSceneChange]);
+
+  const selectVisualScene = useCallback(
+    (index: number) => {
+      setVisualSceneIndex(index);
+      onVisualSceneChange?.(index);
+    },
+    [onVisualSceneChange],
+  );
   const scriptPara = useMemo(() => {
     const activeScene =
       script.visual?.kind === "animation"
-        ? activeConceptScene(script.visual, stepIndex, script.steps.length).scene
+        ? activeConceptScene(script.visual, stepIndex, script.steps.length, visualSceneIndex).scene
         : null;
     return activeScene?.primitive === "plotFunction" && activeScene.fn === "parabola"
       ? { a: activeScene.a, b: activeScene.b, c: activeScene.c }
       : (script.diagram?.parabola ?? null);
-  }, [script, stepIndex]);
+  }, [script, stepIndex, visualSceneIndex]);
   const [paraParams, setParaParams] = useState<{ a: number; b: number; c: number } | null>(
     scriptPara,
   );
@@ -155,7 +156,7 @@ export function MathCanvas(props: MathCanvasProps) {
   // Register the Lumen Live canvas controller: annotations + view/coord helpers.
   // Re-resolve targets when the lesson OR live parabola params change.
   useEffect(() => {
-    const targets = resolveTargets(script, paraParams, stepIndex);
+    const targets = resolveTargets(script, paraParams, stepIndex, visualSceneIndex);
     setCanvasController({
       anno: () => annoRef.current,
       targets,
@@ -186,7 +187,7 @@ export function MathCanvas(props: MathCanvasProps) {
       },
     });
     return () => setCanvasController(null);
-  }, [script, beats, BOARD_H, paraParams, stepIndex]);
+  }, [script, beats, BOARD_H, paraParams, stepIndex, visualSceneIndex]);
 
   // Reset the idle countdown on any interaction; ~2.6s of stillness fades chrome.
   const bumpActivity = useCallback(() => {
@@ -227,8 +228,8 @@ export function MathCanvas(props: MathCanvasProps) {
   const visibleBeats = useMemo(
     () =>
       beats.filter((b, i) => {
-        if (b.step > stepIndex) return false;
-        if (b.step < stepIndex) return true;
+        if (b.kind === "visual" || b.kind === "diagram") return playerState.stepDone;
+        if (b.step !== stepIndex) return false;
         if (b.kind === "options" || b.kind === "diagram" || b.kind === "visual") {
           return playerState.stepDone;
         }
@@ -268,7 +269,7 @@ export function MathCanvas(props: MathCanvasProps) {
     if (!first) return;
     // Skip until the initial overview has been applied
     if (!fittedKeyRef.current) return;
-    setView((v) => ensureInView(el, v, first));
+    setView(fitStandard(el));
   }, [stepIndex, activeBeats]);
 
   // Once the prose has landed, give a generated scene its own stable camera beat.
@@ -280,7 +281,10 @@ export function MathCanvas(props: MathCanvasProps) {
     }
     const visual = beats.find((beat) => beat.kind === "visual");
     if (!visual) return;
-    setView((current) => ensureInView(el, current, visual));
+    const visualFrame = estimateBeatBox(visual);
+    setView(
+      el.clientWidth >= 1180 ? fitFrame(el, SPLIT_FRAME, 1) : fitFrame(el, visualFrame, 1.05),
+    );
   }, [beats, playerState.stepDone, stepIndex, vp.w, vp.h]);
 
   // Wheel: pinch-zoom or pan
@@ -419,6 +423,8 @@ export function MathCanvas(props: MathCanvasProps) {
                   paraParams={paraParams}
                   stepIndex={stepIndex}
                   stepTotal={script.steps.length}
+                  visualSceneIndex={visualSceneIndex}
+                  onVisualSceneChange={selectVisualScene}
                   onParaChange={(p) => {
                     setParaParams(p);
                     emitLiveParabola(p);
@@ -618,6 +624,8 @@ function BeatView({
   onParaChange,
   stepIndex,
   stepTotal,
+  visualSceneIndex,
+  onVisualSceneChange,
 }: {
   beat: Beat;
   beatIndex: number;
@@ -629,6 +637,8 @@ function BeatView({
   onParaChange: (p: { a: number; b: number; c: number }) => void;
   stepIndex: number;
   stepTotal: number;
+  visualSceneIndex: number;
+  onVisualSceneChange: (index: number) => void;
 }) {
   const base = { position: "absolute" as const, left: beat.x, top: beat.y };
   if (beat.kind === "title") {
@@ -696,6 +706,8 @@ function BeatView({
           width={beat.w - 36}
           height={beat.h - 36}
           plotOverride={paraParams}
+          sceneIndex={visualSceneIndex}
+          onSceneChange={onVisualSceneChange}
         />
       </div>
     );

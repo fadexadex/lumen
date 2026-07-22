@@ -23,6 +23,7 @@ export function buildBoardState(
   stepIndex: number,
   moduleId: string,
   parabolaOverride?: { a: number; b: number; c: number } | null,
+  visualSceneIndex?: number,
 ): BoardState {
   // Prefer explicit override, then live canvas controller params, then script defaults.
   const controller = getCanvasController();
@@ -30,7 +31,7 @@ export function buildBoardState(
   const writingTargets = controller?.anno()?.targetDescriptions() ?? [];
   const override = parabolaOverride ?? (live ? { a: live.a, b: live.b, c: live.c } : null);
 
-  const T = resolveTargets(script, override, stepIndex);
+  const T = resolveTargets(script, override, stepIndex, visualSceneIndex);
   const step = script.steps[stepIndex];
 
   const stepMath =
@@ -47,7 +48,7 @@ export function buildBoardState(
     stepTitle: step?.title ?? script.title,
     equation: stepMath ? prettifyLatex(stepMath) : "",
     parabola: T.parabola ? { a: T.parabola.a, b: T.parabola.b, c: T.parabola.c } : null,
-    visual: lessonVisualSummary(script, stepIndex),
+    visual: lessonVisualSummary(script, stepIndex, visualSceneIndex),
     targets: [...T.names, ...writingTargets.map((target) => target.name)],
     targetDetails: [...T.descriptions, ...writingTargets],
   };

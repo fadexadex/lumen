@@ -13,6 +13,7 @@ export interface ConceptProps {
   demoActive: boolean;
   onWriteMath: () => void;
   onOpenLive: () => void;
+  onVisualSceneChange?: (index: number) => void;
   nextModule?: { id: string; title: string } | null;
   onNextModule?: () => void;
 }
@@ -796,6 +797,7 @@ export const BOARD_CONCEPTS: ConceptDef[] = [
         demoActive={p.demoActive}
         onWriteMath={p.onWriteMath}
         onOpenLive={p.onOpenLive}
+        onVisualSceneChange={p.onVisualSceneChange}
         nextModule={p.nextModule}
         onNextModule={p.onNextModule}
       />

@@ -15,13 +15,24 @@ export function activeConceptScene(
   animation: ConceptAnimation,
   stepIndex: number,
   stepTotal: number,
+  preferredIndex?: number,
 ): { scene: ConceptScene; index: number } {
-  const index = sceneIndexForStep(stepIndex, stepTotal, animation.scenes.length);
+  const automatic = sceneIndexForStep(stepIndex, stepTotal, animation.scenes.length);
+  const index = Math.max(0, Math.min(animation.scenes.length - 1, preferredIndex ?? automatic));
   return { scene: animation.scenes[index], index };
 }
 
-export function lessonVisualSummary(script: LessonScript, stepIndex: number): string {
+export function lessonVisualSummary(
+  script: LessonScript,
+  stepIndex: number,
+  preferredIndex?: number,
+): string {
   if (!script.visual || script.visual.kind === "none") return "";
-  const { scene, index } = activeConceptScene(script.visual, stepIndex, script.steps.length);
+  const { scene, index } = activeConceptScene(
+    script.visual,
+    stepIndex,
+    script.steps.length,
+    preferredIndex,
+  );
   return `${script.visual.title}; scene ${index + 1} of ${script.visual.scenes.length}; ${scene.primitive}: ${scene.narration}`;
 }

@@ -214,7 +214,7 @@
 
 .mc-concept {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   color: var(--tutor-ink);
 }
 
@@ -249,6 +249,57 @@
   font: 600 0.7rem/1 var(--font-sans);
   font-variant-numeric: tabular-nums;
   color: oklch(0.42 0.08 60);
+}
+
+.mc-concept-scenes {
+  display: flex;
+  gap: 7px;
+  padding: 10px 4px 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mc-concept-scenes::-webkit-scrollbar {
+  display: none;
+}
+
+.mc-concept-scene {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--tutor-line);
+  border-radius: 999px;
+  background: white;
+  color: var(--tutor-muted);
+  font: 500 0.72rem/1 var(--font-sans);
+  cursor: pointer;
+  transition: 160ms var(--ease-tutor);
+  transition-property: background, border-color, color, transform;
+}
+
+.mc-concept-scene:hover {
+  color: var(--tutor-ink);
+  border-color: oklch(0.82 0.04 70);
+}
+
+.mc-concept-scene[aria-pressed="true"] {
+  background: var(--tutor-accent-soft);
+  border-color: oklch(0.82 0.09 72);
+  color: oklch(0.36 0.08 55);
+}
+
+.mc-concept-scene span {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: oklch(0.94 0.04 80);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .mc-concept-stage {
@@ -710,8 +761,8 @@
   border: 1px solid var(--tutor-line);
   border-radius: 999px;
   box-shadow: var(--elev-md);
-  /* Leave a right gutter so zoom never sits under the rail */
-  max-width: min(44rem, calc(100vw - 11.5rem));
+  width: max-content;
+  max-width: calc(100vw - 3rem);
   font-family: var(--font-sans);
   transition:
     opacity 0.5s var(--ease-tutor),
@@ -757,7 +808,7 @@
   background: var(--tutor-ink);
   color: white;
   width: auto;
-  min-width: 44px;
+  min-width: 92px;
   padding: 0 14px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -974,8 +1025,11 @@
     display: none;
   }
   .mc-controls {
-    max-width: min(36rem, calc(100vw - 10.5rem));
+    max-width: calc(100vw - 2rem);
     gap: 8px;
+  }
+  .mc-zoom {
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -994,7 +1048,7 @@
     font-size: 1.75rem;
   }
   .mc-controls {
-    max-width: min(34rem, calc(100vw - 2rem));
+    max-width: calc(100vw - 2rem);
   }
 }
 
@@ -1046,7 +1100,9 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    max-width: calc(100vw - 1.25rem);
+    width: calc(100vw - 1.25rem);
+    max-width: none;
+    justify-content: center;
   }
   .mc-controls::-webkit-scrollbar {
     display: none;

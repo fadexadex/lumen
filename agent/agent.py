@@ -65,6 +65,7 @@ async def entrypoint(ctx: JobContext):
     board.visual = ""
     board.targets = []
     board.target_details = []
+    board_ready = asyncio.Event()
 
     # Ingest board-state deltas. Store only — do NOT call update_instructions mid-session.
     @ctx.room.on("data_received")
@@ -84,6 +85,7 @@ async def entrypoint(ctx: JobContext):
         board.visual = data.get("visual", board.visual)
         board.targets = data.get("targets", board.targets)
         board.target_details = data.get("targetDetails", board.target_details)
+        board_ready.set()
 
     # Critical: Gemini Live already has server-side turn detection. Driving turns with Silero
     # VAD caused empty "user turn committed" events (no transcript) after tool/draw turns,
@@ -181,8 +183,12 @@ async def entrypoint(ctx: JobContext):
     agent = Agent(instructions=SYSTEM_PROMPT, tools=ALL_TOOLS)
     await session.start(agent=agent, room=ctx.room)
 
-    # Brief wait so the client's first board push can land before the greeting.
-    await asyncio.sleep(0.5)
+    # The client publishes the selected lesson/visual immediately after joining.
+    # Wait for that real context instead of racing it with a fixed sleep.
+    try:
+        await asyncio.wait_for(board_ready.wait(), timeout=2.5)
+    except TimeoutError:
+        logger.warning("initial board context did not arrive before lesson greeting")
     try:
         await session.generate_reply(
             instructions=f"{GREETING}\n\n[board]\n{board.as_prompt()}"

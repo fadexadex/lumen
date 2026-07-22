@@ -10,6 +10,8 @@ export function ConceptAnimationPlayer({
   width,
   height,
   plotOverride,
+  sceneIndex,
+  onSceneChange,
 }: {
   animation: ConceptAnimation;
   stepIndex: number;
@@ -17,8 +19,10 @@ export function ConceptAnimationPlayer({
   width: number;
   height: number;
   plotOverride?: { a: number; b: number; c: number } | null;
+  sceneIndex?: number;
+  onSceneChange?: (index: number) => void;
 }) {
-  const { scene, index } = activeConceptScene(animation, stepIndex, stepTotal);
+  const { scene, index } = activeConceptScene(animation, stepIndex, stepTotal, sceneIndex);
   const renderedScene =
     plotOverride && scene.primitive === "plotFunction" && scene.fn === "parabola"
       ? { ...scene, ...plotOverride }
@@ -42,6 +46,24 @@ export function ConceptAnimationPlayer({
           {index + 1} / {animation.scenes.length}
         </span>
       </header>
+      {animation.scenes.length > 1 ? (
+        <nav className="mc-concept-scenes" aria-label="Choose a visual model">
+          {animation.scenes.map((candidate, candidateIndex) => (
+            <button
+              key={`${candidate.primitive}-${candidateIndex}`}
+              type="button"
+              className="mc-concept-scene"
+              data-active={candidateIndex === index || undefined}
+              aria-pressed={candidateIndex === index}
+              onClick={() => onSceneChange?.(candidateIndex)}
+              title={candidate.narration}
+            >
+              <span>{candidateIndex + 1}</span>
+              {sceneLabel(candidate.primitive)}
+            </button>
+          ))}
+        </nav>
+      ) : null}
       <div className="mc-concept-stage" key={`${index}-${scene.primitive}`}>
         <SceneView scene={renderedScene} />
       </div>
@@ -51,6 +73,20 @@ export function ConceptAnimationPlayer({
       </p>
     </section>
   );
+}
+
+function sceneLabel(primitive: ConceptScene["primitive"]): string {
+  return {
+    plotFunction: "Graph",
+    numberLineWalk: "Number line",
+    algebraTiles: "Tiles",
+    balanceScale: "Balance",
+    partitionGrid: "Grid",
+    fractionBar: "Fractions",
+    countObjects: "Groups",
+    geometryTransform: "Transform",
+    stepReveal: "Steps",
+  }[primitive];
 }
 
 function SceneView({ scene }: { scene: ConceptScene }) {

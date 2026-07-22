@@ -15,6 +15,7 @@ export interface ConceptProps {
   demoActive: boolean;
   onWriteMath: () => void;
   onOpenLive: () => void;
+  onVisualSceneChange?: (index: number) => void;
   /** Next roadmap module, if any — used for end-of-lesson navigation. */
   nextModule?: { id: string; title: string } | null;
   onNextModule?: () => void;

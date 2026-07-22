@@ -32,7 +32,6 @@ export const BOARD_H = 1000;
 export const LEFT_X = 88;
 export const COL_W = 680;
 const LINE_H = 34;
-const H1_LINE_H = 72;
 const H2_LINE_H = 40;
 const MATH_H = 58;
 const INTRA = 12; // tight: heading → body / body → math
@@ -93,12 +92,13 @@ function measure(step: LessonStep): number {
 
 export function layoutScript(script: LessonScript): { beats: Beat[]; height: number } {
   const beats: Beat[] = [];
-  let y = 72;
-
-  beats.push({ kind: "title", text: script.title, x: LEFT_X, y, size: "h1", step: 0 });
-  y += wrappedLineCount(script.title, 18) * H1_LINE_H + SECTION;
+  let tallestStep = 0;
 
   script.steps.forEach((step, i) => {
+    // Each lesson step uses the same stable teaching frame. Previous steps stay
+    // available through the progress controls instead of accumulating into one
+    // enormous document that becomes unreadable at later steps.
+    let y = 104;
     const startY = y;
     beats.push({ kind: "title", text: step.title, x: LEFT_X, y, size: "h2", step: i });
     y += h2Height(step.title) + INTRA;
@@ -145,6 +145,7 @@ export function layoutScript(script: LessonScript): { beats: Beat[]; height: num
       }
     }
     y = Math.max(y + SECTION * 0.25, startY + measure(step));
+    tallestStep = Math.max(tallestStep, y);
   });
 
   if (script.visual?.kind === "animation") {
@@ -152,7 +153,7 @@ export function layoutScript(script: LessonScript): { beats: Beat[]; height: num
       kind: "visual",
       animation: script.visual,
       x: LEFT_X + COL_W + 72,
-      y: 146,
+      y: 88,
       w: 620,
       h: 510,
       step: 0,
@@ -162,7 +163,7 @@ export function layoutScript(script: LessonScript): { beats: Beat[]; height: num
       kind: "diagram",
       widget: "parabola",
       x: LEFT_X + COL_W + 72,
-      y: 160,
+      y: 96,
       w: 620,
       h: 600,
       step: Math.min(2, script.steps.length - 1),
@@ -170,7 +171,7 @@ export function layoutScript(script: LessonScript): { beats: Beat[]; height: num
     });
   }
 
-  return { beats, height: Math.max(BOARD_H, y + 100) };
+  return { beats, height: Math.max(BOARD_H, tallestStep + 100) };
 }
 
 export function beatCharCount(b: Beat): number {
