@@ -6,6 +6,8 @@ import { Whiteboard } from "./Whiteboard";
 import { MathField, MATH_SHORTCUTS } from "./MathField";
 import { BlockMath } from "@/lib/katex";
 import { insertMathOnBoard } from "@/lib/whiteboard-bridge";
+import { getCanvasController } from "@/lib/live/canvas-agent-bridge";
+import { applyCommand } from "@/lib/live/canvas-commands";
 import { getConcept } from "@/lib/lesson-concepts";
 import { PathNavigator } from "@/components/tutor/PathNavigator";
 import { useLumenSession } from "@/lib/live/use-lumen-session";
@@ -161,14 +163,35 @@ export function LessonRoute() {
   const insertShortcut = (latex: string) => setMathValue((v) => v + latex);
 
   const addMathToBoard = () => {
-    const ok = insertMathOnBoard(mathValue);
+    const value = mathValue.trim();
+    if (!value) {
+      setMathToast("Type some math first");
+      setTimeout(() => setMathToast(null), 1500);
+      return;
+    }
+    // tldraw lessons drop onto that editor; the Math Canvas has no tldraw board
+    // (boardTone "hidden"), so write it straight onto the lesson canvas near the
+    // learner's focus via the shared write-block command.
+    let ok = insertMathOnBoard(mathValue);
+    if (!ok) {
+      const ctrl = getCanvasController();
+      if (ctrl) {
+        const id = `user-math-${Date.now().toString(36)}`;
+        const result = applyCommand(ctrl, {
+          id,
+          op: "writeBlock",
+          args: { lines: [`$${value}$`], jobId: id },
+        });
+        ok = result === "ok" || result.startsWith("ok:");
+      }
+    }
     if (ok) {
-      setMathToast("Added to your whiteboard ✨");
+      setMathToast("Added to your board ✨");
       setMathValue("");
       setTimeout(() => setMathToast(null), 1800);
     } else {
-      setMathToast("Type some math first");
-      setTimeout(() => setMathToast(null), 1500);
+      setMathToast("Couldn't add that — try again");
+      setTimeout(() => setMathToast(null), 1600);
     }
   };
 
