@@ -479,18 +479,19 @@
 <section id="contracts">
   <h2>The one SSE contract</h2>
   <p class="section-sub">
-    <code>POST /api/course/start</code> → <code>text/event-stream</code>, served by the existing external
-    <strong>token-server</strong> (<code>:8787</code>) — the same Node process that already signs LiveKit tokens and
-    proxies Monnify. Vite proxies <code>/api/course/*</code> → <code>:8787</code> exactly like <code>/payments/*</code>.
-    Both the actions animation and the roadmap subscribe to the same events; reconnect replays missed <code>module_ready</code>.
+    <code>POST /api/course/start</code> → <code>text/event-stream</code>, served as a <strong>same-origin
+    TanStack Start API route</strong> (<code>src/routes/api/course/start.ts</code>) — the pattern the app now uses for
+    <code>lumen-token</code> and <code>payments/*</code>. No proxy, no separate process. Both the actions animation and
+    the roadmap subscribe to the same events; <code>GET /api/course/:id</code> serves reconnect on a single-node server.
   </p>
   <div class="callout tavily">
-    <strong>Revised from the plan docs (learned from phase 1):</strong> plans 03/05 assumed generation ran inside
-    TanStack Start API routes. In this repo, TanStack Start only exposes <code>createServerFn</code> (RPC, no clean
-    SSE), and <em>every</em> secret already lives in <code>token-server/server.mjs</code> loaded from
-    <code>frontend/.env</code>. So course generation + the Mistral/Tavily keys go there, and the AI SDK installs in
-    <code>token-server</code> — not the browser bundle. Pure domain logic (schemas, math, types) stays shareable TS in
-    <code>src/lib/course-gen/</code>.
+    <strong>Architecture note (reconciled after merge):</strong> the repo was refactored to <em>colocate server APIs</em>
+    — the old external token-server was removed and secrets now live in the app's server env, read via
+    <code>process.env</code> inside <code>createFileRoute(...).server.handlers</code>. So generation lives in
+    <code>src/server/course/</code> (TypeScript, importing the shared <code>@/lib/course-gen</code> schemas + math — no
+    JS duplication), the SSE route streams a <code>ReadableStream</code>, and the AI SDK installs in the frontend, never
+    the browser bundle. The in-memory course <code>Map</code> is pinned to <code>globalThis</code>; a Cloudflare/edge
+    deploy would swap it for KV/Durable Objects (the client also persists the course in localStorage).
   </div>
   <pre class="code"><span class="k">event:</span> course          <span class="c">// { id, topic }</span>
 <span class="k">event:</span> roadmap_partial <span class="c">// { modules: [...] }  ← pop-in animation</span>
@@ -522,9 +523,9 @@
       <tr><td><code>src/lib/course-gen/resources.ts</code></td><td class="tag new">new</td><td>Tavily curator → <code>enrichModuleResources</code> (Wave B)</td></tr>
       <tr><td><code>src/lib/course-gen/ui-registry.ts</code></td><td class="tag new">new</td><td>allowlist: tool name → component + args schema</td></tr>
       <tr><td><code>src/lib/course-gen/types.ts</code></td><td class="tag new">new</td><td><code>Course</code>, <code>CourseModule</code>, <code>ModuleGenStatus</code>, <code>ModuleResources</code></td></tr>
-      <tr><td><code>token-server/course/*.mjs</code> + routes in <code>server.mjs</code></td><td class="tag tavily">new</td><td>SSE <code>/api/course/start</code>, <code>/boost</code>, <code>/retry</code> — holds Mistral/Tavily keys</td></tr>
-      <tr><td><code>vite.config.ts</code></td><td class="tag mistral">edit</td><td>proxy <code>/api/course/*</code> → <code>:8787</code> (like <code>/payments/*</code>)</td></tr>
-      <tr><td><code>frontend/.env</code></td><td class="tag mistral">edit</td><td>add <code>MISTRAL_API_KEY</code>, <code>TAVILY_API_KEY</code> (server-only)</td></tr>
+      <tr><td><code>src/server/course/{generate,orchestrator,store}.ts</code></td><td class="tag tavily">new</td><td>generation + repair + two-wave orchestrator + globalThis course Map</td></tr>
+      <tr><td><code>src/routes/api/course/start.ts</code> · <code>$id.ts</code></td><td class="tag tavily">new</td><td>SSE stream route + reconnect GET (colocated app routes)</td></tr>
+      <tr><td><code>frontend/.env</code></td><td class="tag mistral">edit</td><td><code>MISTRAL_API_KEY</code>, <code>TAVILY_API_KEY</code> (server-only, read via <code>process.env</code>)</td></tr>
       <tr><td><code>src/components/course-gen/PracticeCard.tsx</code> · <code>WorkedExample.tsx</code></td><td class="tag new">new</td><td>registry components not yet built</td></tr>
       <tr><td><code>src/lib/tutor-store.ts</code></td><td class="tag mistral">edit</td><td>add <code>course</code>, <code>patchModule</code>; derive <code>roadmap</code></td></tr>
       <tr><td><code>src/components/tutor/Onboarding.tsx</code></td><td class="tag mistral">edit</td><td>finish state → SSE action feed; drop fake timeout</td></tr>
@@ -539,9 +540,9 @@
 <section id="order">
   <h2>Build order — each slice demos on its own</h2>
   <ol class="flow">
-    <li><strong>Phase A — schemas + math + types ✓ done</strong><span>Wrote <code>src/lib/course-gen/{types,schemas,math}.ts</code> + 6 passing unit tests. <code>enrichParabola</code> reproduces the quad-1 fixture (roots 2,3 / vertex 2.5,-0.25) and overrides model arithmetic. <code>zod</code> was already present; the AI SDK installs in <code>token-server</code> at Phase B.</span></li>
-    <li><strong>Phase B — roadmap generation (streamed) ✓ done</strong><span>AI SDK v7 + Mistral installed in <code>token-server</code>. <code>streamRoadmap</code> + SSE <code>/api/course/start</code> emitting <code>roadmap_partial</code> (verified: 8 modules pop in over ~4s). Onboarding <code>onboard-finish</code> now shows the live action feed + planning pop-in. Vite proxies <code>/api/course/*</code> → <code>:8787</code>.</span></li>
-    <li><strong>Phase C — Module 1 foreground ✓ done</strong><span><code>streamLesson</code> + Zod gate + <code>enrichScript</code> (server owns roots/vertex) + one-shot repair on <code>mistral-large</code>. Store holds <code>course</code>; <code>getLessonScript</code> is store-first; LessonRoute guards non-ready modules. Verified: 8/8 modules ready, 0 failed, all parabolas enriched.</span></li>
+    <li><strong>Phase A — schemas + math + types ✓ done</strong><span>Wrote <code>src/lib/course-gen/{types,schemas,math}.ts</code> + 6 passing unit tests. <code>enrichParabola</code> reproduces the quad-1 fixture (roots 2,3 / vertex 2.5,-0.25) and overrides model arithmetic.</span></li>
+    <li><strong>Phase B — roadmap generation (streamed) ✓ done</strong><span>AI SDK v7 + Mistral in the frontend; generation in <code>src/server/course/</code>. <code>streamRoadmap</code> + same-origin SSE <code>/api/course/start</code> emitting <code>roadmap_partial</code> (verified: 8 modules pop in ~4s). Onboarding <code>onboard-finish</code> now shows the live action feed + planning pop-in.</span></li>
+    <li><strong>Phase C — Module 1 foreground ✓ done</strong><span><code>streamLesson</code> + Zod gate + <code>enrichScript</code> (server owns roots/vertex) + one-shot repair on <code>mistral-large</code>. Store holds <code>course</code>; <code>getLessonScript</code> is store-first; LessonRoute guards non-ready modules. Verified end-to-end through the app route: 8/8 modules ready, 0 failed, all parabolas enriched.</span></li>
     <li><strong>Phase D — background content pool ✓ done</strong><span><code>mapPool(2)</code> for Modules 2…N; status-aware roadmap cards (pending/generating shimmer/ready/failed) + "N of M lessons ready" header. Boost/retry endpoints still TODO.</span></li>
     <li><strong>Phase E — resource wave (Tavily) · next</strong><span>Client + store already handle <code>module_enriched</code> and render a sources chip. Remaining: server <code>enrichModuleResources</code> (Tavily search → citations + extra practice) emitted as the background Wave B. <em>This is the "stream the rest in the background for resources" half.</em></span></li>
     <li><strong>Phase F — generative UI channel</strong><span><code>/api/course/gen-ui</code> + <code>ui-registry</code> + <code>PracticeCard</code>/<code>WorkedExample</code>; live widgets in a side rail. Optional concept-animation player (plan 09) rides the same registry.</span></li>

@@ -9,19 +9,21 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as RoadmapRouteImport } from './routes/roadmap'
 import { Route as SubscribeRouteImport } from './routes/subscribe'
-import { Route as ApiLumenTokenRouteImport } from './routes/api/lumen-token'
-import { Route as LessonModuleIdRouteImport } from './routes/lesson.$moduleId'
+import { Route as RoadmapRouteImport } from './routes/roadmap'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as PaymentCallbackRouteImport } from './routes/payment.callback'
-import { Route as ApiPaymentsConfigRouteImport } from './routes/api/payments/config'
-import { Route as ApiPaymentsInitRouteImport } from './routes/api/payments/init'
+import { Route as LessonModuleIdRouteImport } from './routes/lesson.$moduleId'
+import { Route as ApiLumenTokenRouteImport } from './routes/api/lumen-token'
 import { Route as ApiPaymentsVerifyRouteImport } from './routes/api/payments/verify'
+import { Route as ApiPaymentsInitRouteImport } from './routes/api/payments/init'
+import { Route as ApiPaymentsConfigRouteImport } from './routes/api/payments/config'
+import { Route as ApiCourseStartRouteImport } from './routes/api/course/start'
+import { Route as ApiCourseIdRouteImport } from './routes/api/course/$id'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const SubscribeRoute = SubscribeRouteImport.update({
+  id: '/subscribe',
+  path: '/subscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RoadmapRoute = RoadmapRouteImport.update({
@@ -29,19 +31,9 @@ const RoadmapRoute = RoadmapRouteImport.update({
   path: '/roadmap',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SubscribeRoute = SubscribeRouteImport.update({
-  id: '/subscribe',
-  path: '/subscribe',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiLumenTokenRoute = ApiLumenTokenRouteImport.update({
-  id: '/api/lumen-token',
-  path: '/api/lumen-token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LessonModuleIdRoute = LessonModuleIdRouteImport.update({
-  id: '/lesson/$moduleId',
-  path: '/lesson/$moduleId',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentCallbackRoute = PaymentCallbackRouteImport.update({
@@ -49,9 +41,19 @@ const PaymentCallbackRoute = PaymentCallbackRouteImport.update({
   path: '/payment/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPaymentsConfigRoute = ApiPaymentsConfigRouteImport.update({
-  id: '/api/payments/config',
-  path: '/api/payments/config',
+const LessonModuleIdRoute = LessonModuleIdRouteImport.update({
+  id: '/lesson/$moduleId',
+  path: '/lesson/$moduleId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLumenTokenRoute = ApiLumenTokenRouteImport.update({
+  id: '/api/lumen-token',
+  path: '/api/lumen-token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPaymentsVerifyRoute = ApiPaymentsVerifyRouteImport.update({
+  id: '/api/payments/verify',
+  path: '/api/payments/verify',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPaymentsInitRoute = ApiPaymentsInitRouteImport.update({
@@ -59,9 +61,19 @@ const ApiPaymentsInitRoute = ApiPaymentsInitRouteImport.update({
   path: '/api/payments/init',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPaymentsVerifyRoute = ApiPaymentsVerifyRouteImport.update({
-  id: '/api/payments/verify',
-  path: '/api/payments/verify',
+const ApiPaymentsConfigRoute = ApiPaymentsConfigRouteImport.update({
+  id: '/api/payments/config',
+  path: '/api/payments/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCourseStartRoute = ApiCourseStartRouteImport.update({
+  id: '/api/course/start',
+  path: '/api/course/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCourseIdRoute = ApiCourseIdRouteImport.update({
+  id: '/api/course/$id',
+  path: '/api/course/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -72,6 +84,8 @@ export interface FileRoutesByFullPath {
   '/api/lumen-token': typeof ApiLumenTokenRoute
   '/lesson/$moduleId': typeof LessonModuleIdRoute
   '/payment/callback': typeof PaymentCallbackRoute
+  '/api/course/$id': typeof ApiCourseIdRoute
+  '/api/course/start': typeof ApiCourseStartRoute
   '/api/payments/config': typeof ApiPaymentsConfigRoute
   '/api/payments/init': typeof ApiPaymentsInitRoute
   '/api/payments/verify': typeof ApiPaymentsVerifyRoute
@@ -83,6 +97,8 @@ export interface FileRoutesByTo {
   '/api/lumen-token': typeof ApiLumenTokenRoute
   '/lesson/$moduleId': typeof LessonModuleIdRoute
   '/payment/callback': typeof PaymentCallbackRoute
+  '/api/course/$id': typeof ApiCourseIdRoute
+  '/api/course/start': typeof ApiCourseStartRoute
   '/api/payments/config': typeof ApiPaymentsConfigRoute
   '/api/payments/init': typeof ApiPaymentsInitRoute
   '/api/payments/verify': typeof ApiPaymentsVerifyRoute
@@ -95,6 +111,8 @@ export interface FileRoutesById {
   '/api/lumen-token': typeof ApiLumenTokenRoute
   '/lesson/$moduleId': typeof LessonModuleIdRoute
   '/payment/callback': typeof PaymentCallbackRoute
+  '/api/course/$id': typeof ApiCourseIdRoute
+  '/api/course/start': typeof ApiCourseStartRoute
   '/api/payments/config': typeof ApiPaymentsConfigRoute
   '/api/payments/init': typeof ApiPaymentsInitRoute
   '/api/payments/verify': typeof ApiPaymentsVerifyRoute
@@ -108,6 +126,8 @@ export interface FileRouteTypes {
     | '/api/lumen-token'
     | '/lesson/$moduleId'
     | '/payment/callback'
+    | '/api/course/$id'
+    | '/api/course/start'
     | '/api/payments/config'
     | '/api/payments/init'
     | '/api/payments/verify'
@@ -119,6 +139,8 @@ export interface FileRouteTypes {
     | '/api/lumen-token'
     | '/lesson/$moduleId'
     | '/payment/callback'
+    | '/api/course/$id'
+    | '/api/course/start'
     | '/api/payments/config'
     | '/api/payments/init'
     | '/api/payments/verify'
@@ -130,6 +152,8 @@ export interface FileRouteTypes {
     | '/api/lumen-token'
     | '/lesson/$moduleId'
     | '/payment/callback'
+    | '/api/course/$id'
+    | '/api/course/start'
     | '/api/payments/config'
     | '/api/payments/init'
     | '/api/payments/verify'
@@ -142,6 +166,8 @@ export interface RootRouteChildren {
   ApiLumenTokenRoute: typeof ApiLumenTokenRoute
   LessonModuleIdRoute: typeof LessonModuleIdRoute
   PaymentCallbackRoute: typeof PaymentCallbackRoute
+  ApiCourseIdRoute: typeof ApiCourseIdRoute
+  ApiCourseStartRoute: typeof ApiCourseStartRoute
   ApiPaymentsConfigRoute: typeof ApiPaymentsConfigRoute
   ApiPaymentsInitRoute: typeof ApiPaymentsInitRoute
   ApiPaymentsVerifyRoute: typeof ApiPaymentsVerifyRoute
@@ -149,11 +175,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/subscribe': {
+      id: '/subscribe'
+      path: '/subscribe'
+      fullPath: '/subscribe'
+      preLoaderRoute: typeof SubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/roadmap': {
@@ -163,25 +189,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RoadmapRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/subscribe': {
-      id: '/subscribe'
-      path: '/subscribe'
-      fullPath: '/subscribe'
-      preLoaderRoute: typeof SubscribeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/lumen-token': {
-      id: '/api/lumen-token'
-      path: '/api/lumen-token'
-      fullPath: '/api/lumen-token'
-      preLoaderRoute: typeof ApiLumenTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/lesson/$moduleId': {
-      id: '/lesson/$moduleId'
-      path: '/lesson/$moduleId'
-      fullPath: '/lesson/$moduleId'
-      preLoaderRoute: typeof LessonModuleIdRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payment/callback': {
@@ -191,11 +203,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/payments/config': {
-      id: '/api/payments/config'
-      path: '/api/payments/config'
-      fullPath: '/api/payments/config'
-      preLoaderRoute: typeof ApiPaymentsConfigRouteImport
+    '/lesson/$moduleId': {
+      id: '/lesson/$moduleId'
+      path: '/lesson/$moduleId'
+      fullPath: '/lesson/$moduleId'
+      preLoaderRoute: typeof LessonModuleIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lumen-token': {
+      id: '/api/lumen-token'
+      path: '/api/lumen-token'
+      fullPath: '/api/lumen-token'
+      preLoaderRoute: typeof ApiLumenTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/payments/verify': {
+      id: '/api/payments/verify'
+      path: '/api/payments/verify'
+      fullPath: '/api/payments/verify'
+      preLoaderRoute: typeof ApiPaymentsVerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/payments/init': {
@@ -205,11 +231,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPaymentsInitRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/payments/verify': {
-      id: '/api/payments/verify'
-      path: '/api/payments/verify'
-      fullPath: '/api/payments/verify'
-      preLoaderRoute: typeof ApiPaymentsVerifyRouteImport
+    '/api/payments/config': {
+      id: '/api/payments/config'
+      path: '/api/payments/config'
+      fullPath: '/api/payments/config'
+      preLoaderRoute: typeof ApiPaymentsConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/course/start': {
+      id: '/api/course/start'
+      path: '/api/course/start'
+      fullPath: '/api/course/start'
+      preLoaderRoute: typeof ApiCourseStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/course/$id': {
+      id: '/api/course/$id'
+      path: '/api/course/$id'
+      fullPath: '/api/course/$id'
+      preLoaderRoute: typeof ApiCourseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -222,6 +262,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLumenTokenRoute: ApiLumenTokenRoute,
   LessonModuleIdRoute: LessonModuleIdRoute,
   PaymentCallbackRoute: PaymentCallbackRoute,
+  ApiCourseIdRoute: ApiCourseIdRoute,
+  ApiCourseStartRoute: ApiCourseStartRoute,
   ApiPaymentsConfigRoute: ApiPaymentsConfigRoute,
   ApiPaymentsInitRoute: ApiPaymentsInitRoute,
   ApiPaymentsVerifyRoute: ApiPaymentsVerifyRoute,
