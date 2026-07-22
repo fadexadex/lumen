@@ -1,6 +1,7 @@
 import { streamRoadmap, streamLesson, repairLesson } from "./generate";
 import { enrichScript } from "@/lib/course-gen/math";
 import { lessonScriptSchema } from "@/lib/course-gen/schemas";
+import { assertLessonMath } from "@/lib/course-gen/validation";
 import type { LearnerProfile, LessonScript } from "@/lib/types";
 import type { Course, CourseModule, CourseStreamEvent } from "@/lib/course-gen/types";
 
@@ -84,9 +85,22 @@ async function generateOne(opts: {
       raw = await repairLesson({ profile, module: mod, priorModules, cause: errMsg(streamErr) });
     }
 
-    // Re-parse defensively, force the correct moduleId, then let the server own
-    // the diagram arithmetic (roots/vertex).
-    const parsed = lessonScriptSchema.parse({ ...(raw as object), moduleId: mod.id });
+    let parsed;
+    try {
+      parsed = lessonScriptSchema.parse({ ...(raw as object), moduleId: mod.id });
+      assertLessonMath(parsed);
+    } catch (validationErr) {
+      raw = await repairLesson({
+        profile,
+        module: mod,
+        priorModules,
+        cause: errMsg(validationErr),
+      });
+      parsed = lessonScriptSchema.parse({ ...(raw as object), moduleId: mod.id });
+      assertLessonMath(parsed);
+    }
+
+    // The server, rather than the model, owns diagram arithmetic.
     const script = enrichScript(parsed);
 
     mod.status = "ready";
@@ -99,6 +113,18 @@ async function generateOne(opts: {
     course.updatedAt = Date.now();
     send({ type: "module_status", id: mod.id, status: "failed", error: mod.error });
   }
+}
+
+/** Retry one failed module without restarting the rest of the course. */
+export async function retryCourseModule(course: Course, moduleId: string): Promise<CourseModule> {
+  const index = course.modules.findIndex((module) => module.id === moduleId);
+  if (index < 0) throw new Error("module not found");
+  const module = course.modules[index];
+  if (module.status === "generating") throw new Error("module is already generating");
+
+  module.error = undefined;
+  await generateOne({ course, index, profile: course.profile, send: () => {} });
+  return course.modules[index];
 }
 
 /** Run `fn` over `items` with at most `size` promises in flight. */

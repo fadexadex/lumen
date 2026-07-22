@@ -48,6 +48,44 @@ export function enrichDiagram(diagram: LessonDiagram | undefined): LessonDiagram
 
 /** Apply diagram enrichment to a whole script before it is marked `ready`. */
 export function enrichScript(script: LessonScript): LessonScript {
-  if (!script.diagram) return script;
-  return { ...script, diagram: enrichDiagram(script.diagram) };
+  return {
+    ...script,
+    title: cleanGeneratedProse(script.title),
+    steps: script.steps.map((step) => {
+      if (step.kind === "explanation") {
+        return {
+          ...step,
+          title: cleanGeneratedProse(step.title),
+          body: cleanGeneratedProse(step.body),
+        };
+      }
+      if (step.kind === "example") {
+        return {
+          ...step,
+          title: cleanGeneratedProse(step.title),
+          lines: step.lines.map((line) => ({
+            ...line,
+            text: line.text ? cleanGeneratedProse(line.text) : line.text,
+          })),
+        };
+      }
+      return {
+        ...step,
+        title: cleanGeneratedProse(step.title),
+        prompt: cleanGeneratedProse(step.prompt),
+        options: step.options?.map(cleanGeneratedProse),
+        answer: cleanGeneratedProse(step.answer),
+        hint: step.hint ? cleanGeneratedProse(step.hint) : step.hint,
+      };
+    }),
+    diagram: enrichDiagram(script.diagram),
+  };
+}
+
+/** The board is not a Markdown surface; remove common model-authored emphasis markers. */
+export function cleanGeneratedProse(value: string): string {
+  return value
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/`([^`]+)`/g, "$1");
 }

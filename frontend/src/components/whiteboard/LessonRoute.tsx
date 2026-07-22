@@ -19,7 +19,9 @@ export function LessonRoute() {
   const navigate = useNavigate();
   const roadmap = useTutorStore((s) => s.roadmap);
   const course = useTutorStore((s) => s.course);
+  const profile = useTutorStore((s) => s.profile);
   const subscription = useTutorStore((s) => s.subscription);
+  const ensureRoadmap = useTutorStore((s) => s.ensureRoadmap);
   const stepByModule = useTutorStore((s) => s.stepByModule);
   const setStep = useTutorStore((s) => s.setStep);
   const completed = useTutorStore((s) => s.completed);
@@ -29,7 +31,7 @@ export function LessonRoute() {
   const mod = roadmap?.modules.find((m) => m.id === moduleId);
   const courseModule = course?.modules.find((m) => m.id === moduleId);
 
-  const [hydrated, setHydrated] = useState(() => useTutorStore.persist.hasHydrated());
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setHydrated(useTutorStore.persist.hasHydrated());
@@ -39,13 +41,23 @@ export function LessonRoute() {
   useEffect(() => {
     if (!hydrated) return;
     if (!roadmap) {
-      navigate({ to: "/" });
-      return;
+      if (profile || course) {
+        ensureRoadmap();
+        return;
+      }
+      // A direct URL can render before Zustand has applied synchronous browser
+      // storage. Defer the redirect one task so a saved lesson is not bounced.
+      const timer = setTimeout(() => {
+        const state = useTutorStore.getState();
+        if (state.profile || state.course) state.ensureRoadmap();
+        else navigate({ to: "/" });
+      }, 0);
+      return () => clearTimeout(timer);
     }
     if (subscription?.status !== "active") {
       navigate({ to: "/subscribe" });
     }
-  }, [hydrated, roadmap, subscription, navigate]);
+  }, [hydrated, roadmap, profile, course, subscription, ensureRoadmap, navigate]);
 
   // Remember this as the module to resume from.
   useEffect(() => {
@@ -53,8 +65,8 @@ export function LessonRoute() {
   }, [roadmap, subscription, moduleId, setLastModule]);
 
   const script = useMemo(
-    () => getLessonScript(moduleId, mod?.title ?? "Lesson"),
-    [moduleId, mod?.title],
+    () => courseModule?.script ?? getLessonScript(moduleId, mod?.title ?? "Lesson"),
+    [courseModule?.script, moduleId, mod?.title],
   );
 
   const stepIndex = stepByModule[moduleId] ?? 0;
@@ -102,11 +114,21 @@ export function LessonRoute() {
       navigate({ to: "/roadmap" });
       return;
     }
+    const nextCourseModule = course?.modules.find((module) => module.id === nextMod.id);
+    if (nextCourseModule && nextCourseModule.status !== "ready") {
+      navigate({ to: "/roadmap" });
+      return;
+    }
     setStep(nextMod.id, 0);
     navigate({ to: "/lesson/$moduleId", params: { moduleId: nextMod.id } });
   };
 
   const goToModule = (id: string) => {
+    const selected = course?.modules.find((module) => module.id === id);
+    if (selected && selected.status !== "ready") {
+      navigate({ to: "/roadmap" });
+      return;
+    }
     setStep(id, 0);
     navigate({ to: "/lesson/$moduleId", params: { moduleId: id } });
   };

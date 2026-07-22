@@ -8,6 +8,12 @@ export type WPoint = { x: number; y: number };
 
 export type Place = "above" | "below" | "left" | "right";
 
+export interface CanvasTargetDescription {
+  name: string;
+  kind: "writing";
+  text: string;
+}
+
 type Anno =
   | { id: string; kind: "highlight"; rect: WRect; color: string; label?: string }
   | { id: string; kind: "circle"; at: WPoint; r: number; label?: string }
@@ -40,6 +46,10 @@ export interface LumenCanvasController {
   clear(): void;
   /** World-space boxes already claimed by AI marks (for free-space placement). */
   occupiedRects(excludeId?: string): WRect[];
+  /** Resolve precise semantic targets inside Lumen's own previous writing. */
+  targetRect(name: string): WRect | null;
+  targetPoint(name: string): WPoint | null;
+  targetDescriptions(): CanvasTargetDescription[];
 }
 
 const COLORS: Record<string, string> = {
@@ -53,10 +63,22 @@ export interface AnnotationLayerProps {
   /** Board pixel width/height — must match the live board size so world coords map 1:1. */
   width: number;
   height: number;
+  /** Current parent world zoom, used to keep marker thickness hand-highlighter sized. */
+  viewScale?: number;
+}
+
+export function continuedRevealCount(
+  previous: { lines: string[]; revealed: number } | null,
+  nextLines: string[],
+): number {
+  if (!previous) return 0;
+  const previousText = previous.lines.join("\n");
+  const keepsEveryPreviousLine = previous.lines.every((line, index) => nextLines[index] === line);
+  return keepsEveryPreviousLine ? Math.min(previous.revealed, previousText.length) : 0;
 }
 
 export const AnnotationLayer = forwardRef<LumenCanvasController, AnnotationLayerProps>(
-  function AnnotationLayer({ width, height }, ref) {
+  function AnnotationLayer({ width, height, viewScale = 1 }, ref) {
     const [annos, setAnnos] = useState<Anno[]>([]);
     const annosRef = useRef(annos);
     annosRef.current = annos;
@@ -64,7 +86,9 @@ export const AnnotationLayer = forwardRef<LumenCanvasController, AnnotationLayer
     const newId = () => `ai-${++seq.current}`;
 
     const add = useCallback((a: Anno) => {
-      setAnnos((xs) => [...xs, a]);
+      const next = [...annosRef.current, a];
+      annosRef.current = next;
+      setAnnos(next);
       return a.id;
     }, []);
 
@@ -118,6 +142,12 @@ export const AnnotationLayer = forwardRef<LumenCanvasController, AnnotationLayer
           const clean = lines
             .map((l) => l.trimEnd())
             .filter((l, i, arr) => l.length || i < arr.length - 1);
+          const previous = annosRef.current.find(
+            (a): a is Extract<Anno, { kind: "writeBlock" }> =>
+              a.id === id && a.kind === "writeBlock",
+          );
+          const revealed = continuedRevealCount(previous ?? null, clean);
+          const total = clean.join("\n").length;
           const without = annosRef.current.filter((a) => a.id !== id);
           const next: Anno[] = [
             ...without,
@@ -126,8 +156,8 @@ export const AnnotationLayer = forwardRef<LumenCanvasController, AnnotationLayer
               kind: "writeBlock",
               at,
               lines: clean.length ? clean : [""],
-              revealed: 0,
-              writing: true,
+              revealed,
+              writing: revealed < total,
             },
           ];
           annosRef.current = next;
@@ -139,17 +169,30 @@ export const AnnotationLayer = forwardRef<LumenCanvasController, AnnotationLayer
           return block?.kind === "writeBlock" ? { ...block.at } : null;
         },
         cancelWriting: (jobId) => {
-          setAnnos((xs) =>
-            xs.map((a) => {
-              if (a.kind !== "writeBlock" || !a.writing) return a;
-              if (jobId && a.id !== jobId) return a;
-              return { ...a, writing: false };
-            }),
-          );
+          const next = annosRef.current.map((a) => {
+            if (a.kind !== "writeBlock" || !a.writing) return a;
+            if (jobId && a.id !== jobId) return a;
+            return { ...a, writing: false };
+          });
+          annosRef.current = next;
+          setAnnos(next);
         },
-        remove: (id) => setAnnos((xs) => xs.filter((a) => a.id !== id)),
-        clear: () => setAnnos([]),
+        remove: (id) => {
+          const next = annosRef.current.filter((a) => a.id !== id);
+          annosRef.current = next;
+          setAnnos(next);
+        },
+        clear: () => {
+          annosRef.current = [];
+          setAnnos([]);
+        },
         occupiedRects: (excludeId) => occupiedFromAnnos(annosRef.current, excludeId),
+        targetRect: (name) => annotationTargetRect(annosRef.current, name),
+        targetPoint: (name) => {
+          const rect = annotationTargetRect(annosRef.current, name);
+          return rect ? { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 } : null;
+        },
+        targetDescriptions: () => annotationTargetDescriptions(annosRef.current),
       }),
       [add],
     );
@@ -176,7 +219,7 @@ export const AnnotationLayer = forwardRef<LumenCanvasController, AnnotationLayer
           </marker>
         </defs>
         {annos.map((a) => (
-          <AnnoView key={a.id} a={a} />
+          <AnnoView key={a.id} a={a} viewScale={viewScale} />
         ))}
       </svg>
     );
@@ -197,24 +240,70 @@ function useDrawOn() {
   }, []);
 }
 
-function AnnoView({ a }: { a: Anno }) {
+function annotationTargetRect(annos: Anno[], name: string): WRect | null {
+  const lineMatch = /^work\.(.+)\.line(\d+)$/.exec(name);
+  if (lineMatch) {
+    const block = annos.find(
+      (a): a is Extract<Anno, { kind: "writeBlock" }> =>
+        a.kind === "writeBlock" && a.id === lineMatch[1],
+    );
+    const lineIndex = Number(lineMatch[2]) - 1;
+    const line = block?.lines[lineIndex];
+    if (!block || line == null) return null;
+    const visualLength = line.replace(/\\[a-zA-Z]+/g, "").replace(/[{}$]/g, "").length;
+    const lineWidth = Math.min(520, Math.max(64, 20 + visualLength * 9));
+    return {
+      x: block.at.x - 6,
+      y: block.at.y + lineIndex * 40,
+      w: lineWidth,
+      h: 32,
+    };
+  }
+
+  const blockMatch = /^work\.(.+)$/.exec(name);
+  if (!blockMatch) return null;
+  const block = annos.find(
+    (a): a is Extract<Anno, { kind: "writeBlock" }> =>
+      a.kind === "writeBlock" && a.id === blockMatch[1],
+  );
+  return block ? writeBlockRect(block.at, block.lines) : null;
+}
+
+function annotationTargetDescriptions(annos: Anno[]): CanvasTargetDescription[] {
+  const out: CanvasTargetDescription[] = [];
+  for (const a of annos) {
+    if (a.kind !== "writeBlock") continue;
+    out.push({ name: `work.${a.id}`, kind: "writing", text: "Lumen's complete writing block" });
+    a.lines.forEach((line, index) => {
+      out.push({ name: `work.${a.id}.line${index + 1}`, kind: "writing", text: line });
+    });
+  }
+  return out;
+}
+
+function AnnoView({ a, viewScale }: { a: Anno; viewScale: number }) {
   const drawOn = useDrawOn();
   switch (a.kind) {
-    case "highlight":
+    case "highlight": {
+      const y = a.rect.y + a.rect.h * 0.42;
+      const x0 = a.rect.x + 3;
+      const x1 = a.rect.x + Math.max(6, a.rect.w - 3);
+      const bend = Math.min(6, a.rect.h * 0.08);
+      const screenStrokeWidth = Math.min(24, Math.max(18, a.rect.h * 0.48));
+      const strokeWidth = screenStrokeWidth / Math.max(0.25, viewScale);
       return (
         <g className="mc-anno mc-anno--highlight">
-          <rect
-            x={a.rect.x}
-            y={a.rect.y}
-            width={a.rect.w}
-            height={a.rect.h}
-            rx={10}
-            fill={a.color}
-            fillOpacity={0.18}
+          <path
+            ref={drawOn}
+            d={`M ${x0} ${y + bend} C ${x0 + a.rect.w * 0.3} ${y - bend}, ${x0 + a.rect.w * 0.68} ${y + bend * 0.4}, ${x1} ${y - bend * 0.35}`}
+            fill="none"
             stroke={a.color}
-            strokeWidth={2}
+            strokeOpacity={0.42}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
-            style={{ transformBox: "fill-box", transformOrigin: "center" }}
+            style={{ mixBlendMode: "multiply" }}
           />
           {a.label && (
             <AnnoLabel
@@ -225,6 +314,7 @@ function AnnoView({ a }: { a: Anno }) {
           )}
         </g>
       );
+    }
     case "circle":
       return (
         <g className="mc-anno mc-anno--circle">

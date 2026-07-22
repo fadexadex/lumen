@@ -82,4 +82,24 @@ describe("board-targets geometry", () => {
     expect(targets.point("does-not-exist")).toBeNull();
     expect(targets.rect("does-not-exist")).toBeNull();
   });
+
+  it("gives every equation in a multi-line example its own described target", () => {
+    expect(targets.names).toEqual(
+      expect.arrayContaining(["step2.equation1", "step2.equation2", "step2.equation3"]),
+    );
+    expect(targets.descriptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "step2.equation1", text: "x^2 - 5x + 6 = 0" }),
+        expect.objectContaining({ name: "step2.equation2", text: "2x^2 + 3x - 2 = 0" }),
+        expect.objectContaining({ name: "step2.equation3", text: "x^2 = 9" }),
+      ]),
+    );
+  });
+
+  it("uses a line-sized rectangle for an equation highlight", () => {
+    const rect = targets.rect("step2.equation1");
+    expect(rect).toBeTruthy();
+    expect(rect!.h).toBeLessThanOrEqual(64);
+    expect(rect!.w).toBeLessThan(260);
+  });
 });

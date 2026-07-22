@@ -28,7 +28,83 @@ export type CanvasCommand =
   | { id: string; op: "clear"; args?: Record<string, never> };
 
 export function isCanvasCommand(x: unknown): x is CanvasCommand {
-  return !!x && typeof x === "object" && typeof (x as { op?: unknown }).op === "string";
+  if (!isRecord(x) || typeof x.id !== "string" || typeof x.op !== "string") return false;
+  const args = x.args;
+  const optionalString = (value: unknown) => value == null || typeof value === "string";
+  const finiteNumber = (value: unknown) => typeof value === "number" && Number.isFinite(value);
+  const validPlace = (value: unknown) =>
+    value == null ||
+    value === "above" ||
+    value === "below" ||
+    value === "left" ||
+    value === "right";
+
+  switch (x.op) {
+    case "highlight":
+      return (
+        isRecord(args) &&
+        typeof args.target === "string" &&
+        optionalString(args.label) &&
+        optionalString(args.color)
+      );
+    case "circle":
+      return isRecord(args) && typeof args.target === "string" && optionalString(args.label);
+    case "label":
+      return (
+        isRecord(args) &&
+        typeof args.target === "string" &&
+        typeof args.text === "string" &&
+        validPlace(args.place)
+      );
+    case "arrow":
+      return (
+        isRecord(args) &&
+        typeof args.from === "string" &&
+        typeof args.to === "string" &&
+        optionalString(args.text)
+      );
+    case "drawAxis":
+      return args == null || (isRecord(args) && optionalString(args.target));
+    case "plotParabola":
+    case "setParabola":
+      return isRecord(args) && finiteNumber(args.a) && finiteNumber(args.b) && finiteNumber(args.c);
+    case "writeBlock":
+      return (
+        isRecord(args) &&
+        Array.isArray(args.lines) &&
+        args.lines.length > 0 &&
+        args.lines.every((line) => typeof line === "string") &&
+        optionalString(args.target) &&
+        optionalString(args.jobId) &&
+        validPlace(args.place)
+      );
+    case "cancelWriting":
+      return args == null || (isRecord(args) && optionalString(args.jobId));
+    case "panTo":
+      return isRecord(args) && typeof args.target === "string";
+    case "clear":
+      return args == null || isRecord(args);
+    default:
+      return false;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+export function createCommandDeduper(limit = 32): (id: string) => boolean {
+  const recent = new Set<string>();
+  return (id: string) => {
+    if (recent.has(id)) return false;
+    recent.add(id);
+    while (recent.size > limit) {
+      const oldest = recent.values().next().value;
+      if (typeof oldest !== "string") break;
+      recent.delete(oldest);
+    }
+    return true;
+  };
 }
 
 export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): string {
@@ -39,29 +115,32 @@ export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): 
   switch (cmd.op) {
     case "highlight": {
       if (!anno) return "no-canvas";
-      const rect = T.rect(cmd.args.target) ?? rectAround(T.point(cmd.args.target));
+      const rect =
+        anno.targetRect(cmd.args.target) ??
+        T.rect(cmd.args.target) ??
+        rectAround(anno.targetPoint(cmd.args.target) ?? T.point(cmd.args.target));
       if (!rect) return `unknown-target:${cmd.args.target}`;
       anno.highlight(rect, { color: cmd.args.color, label: cmd.args.label });
       return "ok";
     }
     case "circle": {
       if (!anno) return "no-canvas";
-      const p = T.point(cmd.args.target);
+      const p = anno.targetPoint(cmd.args.target) ?? T.point(cmd.args.target);
       if (!p) return `unknown-target:${cmd.args.target}`;
       anno.circle(p, { label: cmd.args.label });
       return "ok";
     }
     case "label": {
       if (!anno) return "no-canvas";
-      const p = T.point(cmd.args.target);
+      const p = anno.targetPoint(cmd.args.target) ?? T.point(cmd.args.target);
       if (!p) return `unknown-target:${cmd.args.target}`;
       anno.label(p, cmd.args.text, cmd.args.place ?? "above");
       return "ok";
     }
     case "arrow": {
       if (!anno) return "no-canvas";
-      const a = T.point(cmd.args.from);
-      const b = T.point(cmd.args.to);
+      const a = anno.targetPoint(cmd.args.from) ?? T.point(cmd.args.from);
+      const b = anno.targetPoint(cmd.args.to) ?? T.point(cmd.args.to);
       if (!a || !b) return "unknown-target";
       anno.arrow(a, b, cmd.args.text);
       return "ok";
@@ -129,7 +208,11 @@ export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): 
       return "ok";
     }
     case "panTo": {
-      const rect = T.rect(cmd.args.target) ?? rectAround(T.point(cmd.args.target));
+      if (!anno) return "no-canvas";
+      const rect =
+        anno.targetRect(cmd.args.target) ??
+        T.rect(cmd.args.target) ??
+        rectAround(anno.targetPoint(cmd.args.target) ?? T.point(cmd.args.target));
       if (!rect) return `unknown-target:${cmd.args.target}`;
       panToRect(ctrl, rect);
       return "ok";

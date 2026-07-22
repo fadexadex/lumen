@@ -186,7 +186,7 @@ export const useTutorStore = create<TutorState>()(
         if (patch) set(patch);
       },
       resetCourseGen: () =>
-        set({ course: null, planningModules: [], genPhase: "idle", genLog: [] }),
+        set({ course: null, roadmap: null, planningModules: [], genPhase: "idle", genLog: [] }),
       setSubscription: (subscription) => set({ subscription }),
       setStep: (moduleId, step) =>
         set((s) => ({ stepByModule: { ...s.stepByModule, [moduleId]: step } })),
@@ -199,11 +199,11 @@ export const useTutorStore = create<TutorState>()(
       ensureRoadmap: () => {
         const { profile, roadmap, course } = get();
         if (roadmap) return;
-        if (course) {
+        if (course?.modules.length) {
           set({ roadmap: deriveRoadmap(course) });
           return;
         }
-        if (profile) set({ roadmap: buildRoadmap(profile.topic, profile.grade) });
+        if (profile && !course) set({ roadmap: buildRoadmap(profile.topic, profile.grade) });
       },
       reset: () =>
         set({
@@ -251,9 +251,9 @@ export const useTutorStore = create<TutorState>()(
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         // Prefer a persisted generated course; fall back to the legacy mock roadmap.
-        if (!state.roadmap && state.course) {
+        if (!state.roadmap && state.course?.modules.length) {
           state.roadmap = deriveRoadmap(state.course);
-        } else if (!state.roadmap && state.profile) {
+        } else if (!state.roadmap && state.profile && !state.course) {
           state.roadmap = buildRoadmap(state.profile.topic, state.profile.grade);
         }
       },

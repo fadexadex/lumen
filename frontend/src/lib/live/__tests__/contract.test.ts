@@ -1,11 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { applyCommand, type CanvasCommand } from "@/lib/live/canvas-commands";
+import { act, createElement, createRef } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  applyCommand,
+  createCommandDeduper,
+  isCanvasCommand,
+  type CanvasCommand,
+} from "@/lib/live/canvas-commands";
 import { resolveTargets } from "@/lib/live/board-targets";
 import type { CanvasControllerHandle } from "@/lib/live/canvas-agent-bridge";
 import type { LumenCanvasController } from "@/components/math-canvas/annotation-layer";
 import { lessonScripts } from "@/lib/lesson-scripts";
 import { rectsOverlap, writeBlockRect } from "@/lib/live/place-write";
 import { roomName } from "@/lib/live/livekit-client";
+import { AnnotationLayer, continuedRevealCount } from "@/components/math-canvas/annotation-layer";
 
 describe("LiveKit session room naming", () => {
   it("uses a fresh room instance when the same learner reconnects", () => {
@@ -14,6 +22,52 @@ describe("LiveKit session room naming", () => {
 
     expect(first).not.toBe(second);
     expect(first).toBe("lumen-quad-1-learner-a-session-1");
+  });
+});
+
+describe("continued AI board writing", () => {
+  it("keeps revealed text when a cumulative solution update adds more steps", () => {
+    expect(
+      continuedRevealCount({ lines: ["Step 1", "Find the roots"], revealed: 16 }, [
+        "Step 1",
+        "Find the roots",
+        "Step 2",
+        "Test intervals",
+      ]),
+    ).toBe(16);
+  });
+
+  it("does not resurrect cleared writing when a new block arrives immediately", () => {
+    const host = document.createElement("div");
+    const root = createRoot(host);
+    const ref = createRef<LumenCanvasController>();
+    act(() => root.render(createElement(AnnotationLayer, { ref, width: 1600, height: 1000 })));
+
+    act(() => {
+      ref.current!.writeBlock({ x: 100, y: 100 }, ["old"], { jobId: "old-work" });
+      ref.current!.clear();
+      ref.current!.writeBlock({ x: 300, y: 300 }, ["new"], { jobId: "new-work" });
+    });
+
+    expect(ref.current!.targetRect("work.old-work")).toBeNull();
+    expect(ref.current!.targetRect("work.new-work")).not.toBeNull();
+    ref.current!.writeBlock({ x: 300, y: 360 }, ["Vertex formula", "$x = \\frac{-b}{2a}$"], {
+      jobId: "formula-work",
+    });
+    expect(ref.current!.targetRect("work.formula-work.line2")!.w).toBeLessThan(180);
+    act(() => root.unmount());
+  });
+
+  it("starts over only when the existing lines are actually replaced", () => {
+    expect(
+      continuedRevealCount({ lines: ["Old calculation"], revealed: 12 }, ["Corrected calculation"]),
+    ).toBe(0);
+  });
+
+  it("starts over when an earlier line is extended instead of appended", () => {
+    expect(
+      continuedRevealCount({ lines: ["Find the root"], revealed: 13 }, ["Find the roots"]),
+    ).toBe(0);
   });
 });
 
@@ -71,6 +125,15 @@ function makeMockAnno() {
       calls.push({ method: "clear", args });
     },
     occupiedRects: () => [],
+    targetRect: (name) => {
+      const match = /^work\.([^.]*)\.line(\d+)$/.exec(name);
+      if (!match) return null;
+      const at = writePositions.get(match[1]!);
+      if (!at) return null;
+      return { x: at.x, y: at.y + (Number(match[2]) - 1) * 40, w: 180, h: 34 };
+    },
+    targetPoint: () => null,
+    targetDescriptions: () => [],
   };
   return { anno, calls };
 }
@@ -136,6 +199,7 @@ describe("canvas-commands contract (TS<->Py dispatch + resolver guard)", () => {
       args: { lines: ["Factor:", "x^2 - 5x + 6 = (x-2)(x-3)"], target: "graph", place: "left" },
     },
     { id: "c10", op: "clear" },
+    { id: "c11", op: "cancelWriting", args: {} },
   ];
 
   it.each(CMDS)("dispatches %o and returns ok", (cmd) => {
@@ -159,7 +223,29 @@ describe("canvas-commands contract (TS<->Py dispatch + resolver guard)", () => {
       "setParabola",
       "writeBlock",
       "clear",
+      "cancelWriting",
     ]);
+  });
+
+  it("can precisely highlight a line that Lumen previously wrote", () => {
+    applyCommand(handle, {
+      id: "write-targetable",
+      op: "writeBlock",
+      args: {
+        jobId: "vertex-work",
+        lines: ["Vertex x-coordinate", "$x = \\frac{-b}{2a}$", "$x = 2.5$"],
+      },
+    });
+
+    expect(
+      applyCommand(handle, {
+        id: "highlight-written-line",
+        op: "highlight",
+        args: { target: "work.vertex-work.line2" },
+      }),
+    ).toBe("ok");
+    const highlight = calls.findLast((call) => call.method === "highlight");
+    expect(highlight?.args[0]).toEqual(expect.objectContaining({ h: 34 }));
   });
 
   it("returns unknown-target:<name> for an unresolvable target and never throws", () => {
@@ -190,6 +276,23 @@ describe("canvas-commands contract (TS<->Py dispatch + resolver guard)", () => {
     };
     expect(() => applyCommand(noCanvasHandle, { id: "n1", op: "clear" })).not.toThrow();
     expect(applyCommand(noCanvasHandle, { id: "n1", op: "clear" })).toBe("no-canvas");
+  });
+
+  it("rejects malformed tool payloads before dispatch", () => {
+    expect(isCanvasCommand({ id: "bad", op: "highlight", args: {} })).toBe(false);
+    expect(
+      isCanvasCommand({ id: "bad", op: "plotParabola", args: { a: 1, b: "five", c: 6 } }),
+    ).toBe(false);
+    expect(isCanvasCommand({ id: "bad", op: "invented", args: {} })).toBe(false);
+  });
+
+  it("deduplicates retried command ids with a bounded window", () => {
+    const accept = createCommandDeduper(2);
+    expect(accept("one")).toBe(true);
+    expect(accept("one")).toBe(false);
+    expect(accept("two")).toBe(true);
+    expect(accept("three")).toBe(true);
+    expect(accept("one")).toBe(true);
   });
 
   it("places AI writing clear of the complete lesson, including beats outside the current view", () => {

@@ -17,10 +17,24 @@ export const roadmapModuleSchema = z.object({
 });
 export type RoadmapModuleInput = z.infer<typeof roadmapModuleSchema>;
 
-export const roadmapSchema = z.object({
-  topic: z.string().min(1).max(80),
-  modules: z.array(roadmapModuleSchema).min(4).max(10),
-});
+export const roadmapSchema = z
+  .object({
+    topic: z.string().min(1).max(80),
+    modules: z.array(roadmapModuleSchema).min(4).max(10),
+  })
+  .superRefine(({ modules }, ctx) => {
+    const seen = new Set<string>();
+    modules.forEach((module, index) => {
+      if (seen.has(module.id)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["modules", index, "id"],
+          message: "module ids must be unique",
+        });
+      }
+      seen.add(module.id);
+    });
+  });
 export type RoadmapInput = z.infer<typeof roadmapSchema>;
 
 /* ---------- lesson steps ---------- */
@@ -32,13 +46,16 @@ export const stepExplanationSchema = z.object({
   math: z.string().max(200).optional(), // KaTeX-compatible LaTeX
 });
 
+const workedLineSchema = z
+  .object({ text: z.string().max(300).optional(), math: z.string().max(200).optional() })
+  .refine((line) => Boolean(line.text?.trim() || line.math?.trim()), {
+    message: "each worked line needs text or math",
+  });
+
 export const stepExampleSchema = z.object({
   kind: z.literal("example"),
   title: z.string().min(2).max(120),
-  lines: z
-    .array(z.object({ text: z.string().max(300).optional(), math: z.string().max(200).optional() }))
-    .min(1)
-    .max(12),
+  lines: z.array(workedLineSchema).min(1).max(12),
 });
 
 export const stepPracticeSchema = z.object({
@@ -84,19 +101,33 @@ export const numberLineArgsSchema = z.object({
 export const diagramSchema = z
   .object({
     // Model only provides a,b,c; roots/vertex are stripped and recomputed server-side.
-    parabola: z.object({ a: z.number(), b: z.number(), c: z.number() }).optional(),
+    parabola: z
+      .object({ a: z.number().refine((a) => a !== 0), b: z.number(), c: z.number() })
+      .optional(),
     tiles: tilesArgsSchema.optional(),
     numberLine: numberLineArgsSchema.optional(),
     captions: z.array(z.string().max(200)).max(8).optional(),
   })
   .optional();
 
-export const lessonScriptSchema = z.object({
-  moduleId: z.string().min(1),
-  title: z.string().min(2).max(120),
-  steps: z.array(lessonStepSchema).min(3).max(10),
-  diagram: diagramSchema,
-});
+export const lessonScriptSchema = z
+  .object({
+    moduleId: z.string().min(1),
+    title: z.string().min(2).max(120),
+    steps: z.array(lessonStepSchema).min(3).max(10),
+    diagram: diagramSchema,
+  })
+  .superRefine(({ steps }, ctx) => {
+    steps.forEach((step, index) => {
+      if (step.kind === "practice" && step.options && !step.options.includes(step.answer)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["steps", index, "answer"],
+          message: "answer must exactly match one option",
+        });
+      }
+    });
+  });
 export type LessonScriptInput = z.infer<typeof lessonScriptSchema>;
 
 /* ---------- generative-UI tool args (Channel B) ---------- */
@@ -110,10 +141,7 @@ export const practiceArgsSchema = z.object({
 
 export const workedArgsSchema = z.object({
   title: z.string().min(2).max(120).optional(),
-  lines: z
-    .array(z.object({ text: z.string().max(300).optional(), math: z.string().max(200).optional() }))
-    .min(1)
-    .max(16),
+  lines: z.array(workedLineSchema).min(1).max(16),
 });
 
 export const equationArgsSchema = z.object({

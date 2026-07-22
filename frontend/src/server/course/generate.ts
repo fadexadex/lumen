@@ -110,6 +110,7 @@ Write a LessonScript with 3-7 steps mixing "explanation", "example", and "practi
 Rules:
 - moduleId MUST be exactly "${module.id}".
 - Every math field MUST be valid KaTeX: use x^2, \\frac{a}{b}, \\pm, \\sqrt{}. No unicode math operators.
+- Prose fields must be plain text, not Markdown. Put inline math in $...$ and standalone equations in math fields.
 - Practice steps MUST include an "answer"; if "options" are given, the answer MUST match one option exactly.
 - If this module is about graphing a quadratic, include diagram.parabola with a, b, c ONLY
   (do not include roots or vertex — those are computed for you). Keep a, b, c small integers.

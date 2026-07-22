@@ -1,7 +1,12 @@
 import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTutorStore } from "@/lib/tutor-store";
-import { startCourseGeneration } from "@/lib/course-gen/session";
+import { retryCourseModule } from "@/lib/course-gen/client";
+import {
+  courseIsSettled,
+  resumeCourseGeneration,
+  startCourseGeneration,
+} from "@/lib/course-gen/session";
 import type { ModuleGenStatus } from "@/lib/course-gen/types";
 
 export function RoadmapView() {
@@ -15,6 +20,7 @@ export function RoadmapView() {
   const lastModuleId = useTutorStore((s) => s.lastModuleId);
   const ensureRoadmap = useTutorStore((s) => s.ensureRoadmap);
   const reset = useTutorStore((s) => s.reset);
+  const patchModule = useTutorStore((s) => s.patchModule);
 
   useEffect(() => {
     // A returning learner may have a profile but no rebuilt roadmap yet.
@@ -30,6 +36,10 @@ export function RoadmapView() {
   }, [profile, subscription, course, genPhase]);
 
   useEffect(() => {
+    if (course && !courseIsSettled(course)) resumeCourseGeneration(course);
+  }, [course]);
+
+  useEffect(() => {
     if (!profile) {
       navigate({ to: "/" });
       return;
@@ -39,7 +49,26 @@ export function RoadmapView() {
     }
   }, [profile, subscription, navigate]);
 
-  if (!profile || !roadmap || subscription?.status !== "active") return null;
+  if (!profile || subscription?.status !== "active") return null;
+
+  if (!roadmap) {
+    return (
+      <div className="tutor-app onboard-shell min-h-screen flex flex-col items-center justify-center px-6">
+        <div className="onboard-finish" aria-live="polite">
+          <div className="onboard-finish-status">
+            <span className="live-dot" />
+            <span className="text-sm" style={{ color: "var(--tutor-muted)" }}>
+              outlining your path
+            </span>
+          </div>
+          <h1 className="tutor-serif text-3xl md:text-4xl">Lumen is planning your course…</h1>
+          <div className="onboard-finish-bar" aria-hidden>
+            <span />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const modules = roadmap.modules;
   // Per-module generation status (falls back to "ready" for legacy/mock roadmaps).
@@ -61,6 +90,19 @@ export function RoadmapView() {
     navigate({ to: "/" });
   };
   const open = (id: string) => navigate({ to: "/lesson/$moduleId", params: { moduleId: id } });
+  const retry = async (id: string) => {
+    if (!course) return;
+    patchModule(id, { status: "generating", error: undefined });
+    try {
+      const module = await retryCourseModule(course.id, id);
+      patchModule(id, module);
+    } catch (error) {
+      patchModule(id, {
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
   const ROW = 220;
   const AMP = 90; // sideways swing of the spine
   const CX = 50; // percent, spine centered
@@ -126,12 +168,19 @@ export function RoadmapView() {
 
         {resumeMod && (
           <div className="roadmap-resume">
-            <button type="button" className="tutor-primary-btn" onClick={() => open(resumeMod.id)}>
+            <button
+              type="button"
+              className="tutor-primary-btn"
+              disabled={statusOf(resumeMod.id) !== "ready"}
+              onClick={() => statusOf(resumeMod.id) === "ready" && open(resumeMod.id)}
+            >
               {allDone
                 ? "Revisit your path"
                 : doneCount > 0
                   ? `Continue · ${resumeMod.title}`
-                  : `Start · ${resumeMod.title}`}
+                  : statusOf(resumeMod.id) === "ready"
+                    ? `Start · ${resumeMod.title}`
+                    : `Writing · ${resumeMod.title}`}
               <span aria-hidden> →</span>
             </button>
             <div className="roadmap-resume-track" aria-hidden>
@@ -168,7 +217,7 @@ export function RoadmapView() {
           const top = idx * ROW;
           const done = !!completed[m.id];
           const status = statusOf(m.id);
-          const openable = status === "ready" || status === "failed";
+          const actionable = status === "ready" || status === "failed";
           const current = m.id === resumeId && !allDone && status === "ready";
           const resources = resourcesOf(m.id);
           const eyebrow = done
@@ -199,9 +248,12 @@ export function RoadmapView() {
                 data-current={current || undefined}
                 data-done={done || undefined}
                 data-status={status}
-                disabled={!openable}
-                aria-disabled={!openable}
-                onClick={() => openable && open(m.id)}
+                disabled={!actionable}
+                aria-disabled={!actionable}
+                onClick={() => {
+                  if (status === "failed") void retry(m.id);
+                  else if (status === "ready") open(m.id);
+                }}
               >
                 <p className="roadmap-card-eyebrow">{eyebrow}</p>
                 <h3 className="tutor-serif roadmap-card-title">{m.title}</h3>
@@ -218,7 +270,7 @@ export function RoadmapView() {
                     : status === "pending"
                       ? "Queued"
                       : status === "failed"
-                        ? "Unavailable"
+                        ? "Retry lesson"
                         : done
                           ? "Revisit →"
                           : "Open on the whiteboard →"}

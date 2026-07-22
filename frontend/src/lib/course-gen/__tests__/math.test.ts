@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { enrichParabola, enrichScript } from "@/lib/course-gen/math";
+import { cleanGeneratedProse, enrichParabola, enrichScript } from "@/lib/course-gen/math";
 import { lessonScripts } from "@/lib/lesson-scripts";
 import type { LessonScript } from "@/lib/types";
 
@@ -48,5 +48,13 @@ describe("enrichParabola", () => {
     const fixed = enrichScript(bad).diagram!.parabola!;
     expect(new Set(fixed.roots)).toEqual(new Set([2, 3]));
     expect(fixed.vertex).toEqual([2.5, -0.25]);
+  });
+});
+
+describe("cleanGeneratedProse", () => {
+  it("removes Markdown decoration without removing inline math delimiters", () => {
+    expect(cleanGeneratedProse("Use **<** and `$a^2 + b^2 = c^2$`.")).toBe(
+      "Use < and $a^2 + b^2 = c^2$.",
+    );
   });
 });

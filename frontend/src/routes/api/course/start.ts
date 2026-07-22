@@ -28,7 +28,7 @@ export const Route = createFileRoute("/api/course/start")({
         }
 
         const course: Course = {
-          id: `c_${randomUUID().slice(0, 8)}`,
+          id: `c_${randomUUID()}`,
           profile,
           topic: profile.topic,
           modules: [],
