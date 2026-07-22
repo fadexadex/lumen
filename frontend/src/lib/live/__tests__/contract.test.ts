@@ -1,9 +1,21 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { applyCommand, type CanvasCommand } from "@/lib/live/canvas-commands";
 import { resolveTargets } from "@/lib/live/board-targets";
 import type { CanvasControllerHandle } from "@/lib/live/canvas-agent-bridge";
 import type { LumenCanvasController } from "@/components/math-canvas/annotation-layer";
 import { lessonScripts } from "@/lib/lesson-scripts";
+import { rectsOverlap, writeBlockRect } from "@/lib/live/place-write";
+import { roomName } from "@/lib/live/livekit-client";
+
+describe("LiveKit session room naming", () => {
+  it("uses a fresh room instance when the same learner reconnects", () => {
+    const first = roomName("quad-1", "learner-a", "session-1");
+    const second = roomName("quad-1", "learner-a", "session-2");
+
+    expect(first).not.toBe(second);
+    expect(first).toBe("lumen-quad-1-learner-a-session-1");
+  });
+});
 
 /**
  * Recording mock of LumenCanvasController — avoids jsdom SVG gaps (getTotalLength/animate)
@@ -11,6 +23,7 @@ import { lessonScripts } from "@/lib/lesson-scripts";
  */
 function makeMockAnno() {
   const calls: { method: string; args: unknown[] }[] = [];
+  const writePositions = new Map<string, { x: number; y: number }>();
   let seq = 0;
   const anno: LumenCanvasController = {
     highlight: (...args) => {
@@ -39,8 +52,15 @@ function makeMockAnno() {
     },
     writeBlock: (...args) => {
       calls.push({ method: "writeBlock", args });
+      const [at, , options] = args as [
+        { x: number; y: number },
+        string[],
+        { jobId?: string } | undefined,
+      ];
+      if (options?.jobId) writePositions.set(options.jobId, at);
       return `mock-${++seq}`;
     },
+    writeBlockPosition: (jobId) => writePositions.get(jobId) ?? null,
     cancelWriting: (...args) => {
       calls.push({ method: "cancelWriting", args });
     },
@@ -55,7 +75,10 @@ function makeMockAnno() {
   return { anno, calls };
 }
 
-function makeHandle(): { handle: CanvasControllerHandle; calls: { method: string; args: unknown[] }[] } {
+function makeHandle(): {
+  handle: CanvasControllerHandle;
+  calls: { method: string; args: unknown[] }[];
+} {
   const script = lessonScripts["quad-1"];
   const targets = resolveTargets(script);
   const { anno, calls } = makeMockAnno();
@@ -86,6 +109,8 @@ describe("canvas-commands contract (TS<->Py dispatch + resolver guard)", () => {
     handle = made.handle;
     calls = made.calls;
   });
+
+  afterEach(() => vi.unstubAllGlobals());
 
   const targetNames = resolveTargets(lessonScripts["quad-1"]).names;
 
@@ -138,22 +163,24 @@ describe("canvas-commands contract (TS<->Py dispatch + resolver guard)", () => {
   });
 
   it("returns unknown-target:<name> for an unresolvable target and never throws", () => {
-    expect(() => applyCommand(handle, { id: "u1", op: "circle", args: { target: "nope" } })).not.toThrow();
+    expect(() =>
+      applyCommand(handle, { id: "u1", op: "circle", args: { target: "nope" } }),
+    ).not.toThrow();
     expect(applyCommand(handle, { id: "u1", op: "circle", args: { target: "nope" } })).toBe(
       "unknown-target:nope",
     );
     expect(applyCommand(handle, { id: "u2", op: "highlight", args: { target: "nope" } })).toBe(
       "unknown-target:nope",
     );
-    expect(applyCommand(handle, { id: "u3", op: "label", args: { target: "nope", text: "x" } })).toBe(
-      "unknown-target:nope",
-    );
+    expect(
+      applyCommand(handle, { id: "u3", op: "label", args: { target: "nope", text: "x" } }),
+    ).toBe("unknown-target:nope");
     expect(applyCommand(handle, { id: "u4", op: "panTo", args: { target: "nope" } })).toBe(
       "unknown-target:nope",
     );
-    expect(applyCommand(handle, { id: "u5", op: "arrow", args: { from: "nope", to: "vertex" } })).toBe(
-      "unknown-target",
-    );
+    expect(
+      applyCommand(handle, { id: "u5", op: "arrow", args: { from: "nope", to: "vertex" } }),
+    ).toBe("unknown-target");
   });
 
   it("returns no-canvas when the annotation layer isn't mounted, without throwing", () => {
@@ -163,5 +190,84 @@ describe("canvas-commands contract (TS<->Py dispatch + resolver guard)", () => {
     };
     expect(() => applyCommand(noCanvasHandle, { id: "n1", op: "clear" })).not.toThrow();
     expect(applyCommand(noCanvasHandle, { id: "n1", op: "clear" })).toBe("no-canvas");
+  });
+
+  it("places AI writing clear of the complete lesson, including beats outside the current view", () => {
+    const reservedLesson = { x: 40, y: 40, w: 700, h: 260 };
+    handle.lessonRects = [reservedLesson];
+
+    applyCommand(handle, {
+      id: "write-clear",
+      op: "writeBlock",
+      args: { lines: ["vertex x = -b / 2a", "x = 2"], place: "below" },
+    });
+
+    const write = calls.find((call) => call.method === "writeBlock");
+    const at = write?.args[0] as { x: number; y: number };
+    expect(rectsOverlap(writeBlockRect(at, ["vertex x = -b / 2a", "x = 2"]), reservedLesson)).toBe(
+      false,
+    );
+  });
+
+  it("automatically focuses the camera on a new AI write block", () => {
+    const views: Array<{ x: number; y: number; scale: number }> = [];
+    let followSuspendedFor = 0;
+    handle.viewportEl = () => ({ clientWidth: 1000, clientHeight: 700 }) as HTMLElement;
+    handle.setView = (view) => views.push(view);
+    handle.suspendLessonFollow = (ms) => {
+      followSuspendedFor = ms;
+    };
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(performance.now() + 1000);
+      return 1;
+    });
+
+    applyCommand(handle, {
+      id: "write-focus",
+      op: "writeBlock",
+      args: { lines: ["y = x² + 4x", "vertex x = -b / 2a"], place: "below" },
+    });
+
+    expect(views.length).toBeGreaterThan(0);
+    expect(views.at(-1)!.scale).toBeGreaterThan(1);
+    expect(followSuspendedFor).toBeGreaterThanOrEqual(5000);
+  });
+
+  it("keeps a continued calculation at the same board position and camera scale", () => {
+    const views: Array<{ x: number; y: number; scale: number }> = [];
+    let currentView = { x: 0, y: 0, scale: 1 };
+    handle.boardSize = { w: 900, h: 360 };
+    handle.viewportEl = () => ({ clientWidth: 900, clientHeight: 600 }) as HTMLElement;
+    handle.getView = () => currentView;
+    handle.setView = (view) => {
+      currentView = view;
+      views.push(view);
+    };
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(performance.now() + 1000);
+      return 1;
+    });
+
+    applyCommand(handle, {
+      id: "first-command",
+      op: "writeBlock",
+      args: { jobId: "quadratic-work", lines: ["$x^2 + 4x = 0$"] },
+    });
+    const firstAt = calls.filter((call) => call.method === "writeBlock").at(-1)!.args[0];
+    const focusedScale = currentView.scale;
+
+    applyCommand(handle, {
+      id: "continued-command",
+      op: "writeBlock",
+      args: {
+        jobId: "quadratic-work",
+        lines: Array.from({ length: 10 }, (_, i) => `$x_${i} = ${i}$`),
+      },
+    });
+    const secondAt = calls.filter((call) => call.method === "writeBlock").at(-1)!.args[0];
+
+    expect(secondAt).toEqual(firstAt);
+    expect(currentView.scale).toBe(focusedScale);
+    expect(views.length).toBeGreaterThan(0);
   });
 });

@@ -30,7 +30,7 @@ const X_MIN = -10,
   Y_MAX = 10;
 
 /** Mirrors MathCanvas.estimateBeatBox — keep in sync (see layout.ts). */
-function estimateBeatRect(b: Beat): WRect {
+export function estimateBeatRect(b: Beat): WRect {
   if (b.kind === "title")
     return { x: b.x, y: b.y, w: b.size === "h1" ? 980 : 720, h: b.size === "h1" ? 90 : 60 };
   if (b.kind === "text")
@@ -72,8 +72,7 @@ export function resolveTargets(
   // Parabola geometry (if this lesson has a diagram)
   let parabola: ParabolaGeom | null = null;
   const dia = beats.find((b) => b.kind === "diagram") as
-    | Extract<Beat, { kind: "diagram" }>
-    | undefined;
+    Extract<Beat, { kind: "diagram" }> | undefined;
   if (dia && dia.params) {
     const { a, b, c } = parabolaOverride ?? dia.params;
     const plotW = dia.w;

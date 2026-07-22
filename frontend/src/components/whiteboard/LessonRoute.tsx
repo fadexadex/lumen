@@ -4,7 +4,7 @@ import { useTutorStore } from "@/lib/tutor-store";
 import { getLessonScript } from "@/lib/lesson-scripts";
 import { Whiteboard } from "./Whiteboard";
 import { MathField, MATH_SHORTCUTS } from "./MathField";
-import { BlockMath } from "react-katex";
+import { BlockMath } from "@/lib/katex";
 import { insertMathOnBoard } from "@/lib/whiteboard-bridge";
 import { ConceptSwitcher } from "./ConceptSwitcher";
 import { getConcept, useDemoPlayer } from "@/lib/lesson-concepts";

@@ -5,7 +5,6 @@
 .env
 frontend/.env
 agent/.env.local
-token-server/.env
 # Python
 agent/.venv/
 __pycache__/

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BlockMath, InlineMath } from "react-katex";
+import { BlockMath, InlineMath } from "@/lib/katex";
 import type { LessonDiagram, LessonScript, LessonStep } from "./types";
 import { getHints } from "./mock-live-hints";
 import { MathCanvas } from "@/components/math-canvas/MathCanvas";
@@ -581,7 +581,7 @@ const RuledBoard: React.FC<ConceptProps> = (p) => {
   );
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turnsByLine, setTurnsByLine] = useState<Record<string, Turn[]>>({});
   const [draft, setDraft] = useState("");
   const [doodles, setDoodles] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -604,19 +604,32 @@ const RuledBoard: React.FC<ConceptProps> = (p) => {
     (line: BoardLine) => {
       setSelected(line.key);
       const step = p.script.steps[line.stepIndex];
-      setTurns(seedTurns(line, step, p.script.moduleId));
+      setTurnsByLine((history) =>
+        history[line.key]
+          ? history
+          : { ...history, [line.key]: seedTurns(line, step, p.script.moduleId) },
+      );
     },
     [p.script],
   );
 
   const closeChat = () => setSelected(null);
+  const turns = selected ? (turnsByLine[selected] ?? []) : [];
+
+  const appendTurns = (...next: Turn[]) => {
+    if (!selected) return;
+    setTurnsByLine((history) => ({
+      ...history,
+      [selected]: [...(history[selected] ?? []), ...next],
+    }));
+  };
 
   const send = () => {
     const text = draft.trim();
     if (!text) return;
     const you: Turn = { from: "you", text };
     const reply: Turn = { from: "tutor", text: mockReply(text) };
-    setTurns((prev) => [...prev, you, reply]);
+    appendTurns(you, reply);
     setDraft("");
   };
 
@@ -625,11 +638,10 @@ const RuledBoard: React.FC<ConceptProps> = (p) => {
     const kind = lines.find((l) => l.key === selected)?.kind ?? "body";
     const svg = analogyDoodle(kind);
     setDoodles((d) => ({ ...d, [selected]: svg }));
-    setTurns((prev) => [
-      ...prev,
+    appendTurns(
       { from: "you", text: "Draw it for me?" },
       { from: "tutor", text: "Sketching it beside that line — take a look ✍️" },
-    ]);
+    );
   };
 
   const total = p.script.steps.length;

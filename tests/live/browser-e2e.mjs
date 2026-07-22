@@ -1,7 +1,8 @@
 /**
  * Browser Live E2E via gstack browse (headless Chromium).
  *
- * Prerequisites: vite :8080, token-server :8787, agent.py dev.
+ * Prerequisites: vite (frontend) + agent.py dev.
+ * Token minting is same-origin via TanStack Start `/api/lumen-token`.
  *
  * Usage:
  *   B=~/.claude/skills/gstack/browse/dist/browse
@@ -24,7 +25,8 @@ function browse(...args) {
   if (r.error) throw r.error;
   const out = (r.stdout || "").trim();
   const err = (r.stderr || "").trim();
-  if (r.status !== 0) throw new Error(`browse ${args[0]} failed: ${err || out}`);
+  if (r.status !== 0)
+    throw new Error(`browse ${args[0]} failed: ${err || out}`);
   return out;
 }
 
@@ -57,15 +59,21 @@ async function main() {
     browse("goto", `${APP}/`);
     js(`(function(){
       var profile={name:"Alex",grade:10,subject:"Math",topic:"Quadratic Equations",style:"step-by-step",audio:"off"};
-      localStorage.setItem("tutor:state", JSON.stringify({state:{profile:profile,stepByModule:{"quad-1":0},completed:{},lastModuleId:"quad-1"},version:1}));
+      var subscription={status:"active",credits:100,paymentReference:"e2e",paidAt:new Date().toISOString()};
+      localStorage.setItem("tutor:state", JSON.stringify({state:{profile:profile,subscription:subscription,stepByModule:{"quad-1":0},completed:{},lastModuleId:"quad-1"},version:2}));
       localStorage.setItem("lumen.concept","math-canvas");
       return "seeded";
     })()`);
+    // Let persisted state hydrate and rebuild its non-persisted roadmap before opening a lesson.
+    browse("goto", `${APP}/roadmap`);
+    await sleep(1000);
     browse("goto", `${APP}/lesson/quad-1`);
     await sleep(2000);
 
     const boot = parseJson(
-      js(`(function(){var e=window.__lumenE2E;return JSON.stringify({path:location.pathname,e2e:!!e,ctrl:e&&e.hasController()});})()`),
+      js(
+        `(function(){var e=window.__lumenE2E;return JSON.stringify({path:location.pathname,e2e:!!e,ctrl:e&&e.hasController()});})()`,
+      ),
     );
     if (boot.path !== "/lesson/quad-1" || !boot.e2e || !boot.ctrl) {
       results.push(fail("lesson-boot", JSON.stringify(boot)));
@@ -89,17 +97,28 @@ async function main() {
       return "fake-mic";
     })()`);
 
-    js(`(async function(){await window.__lumenE2E.start("quad-1",{mic:true});return "started";})()`);
+    js(
+      `(async function(){await window.__lumenE2E.start("quad-1",{mic:true});return "started";})()`,
+    );
     let live = { status: "idle", err: null, overlay: false };
     for (let i = 0; i < 20; i++) {
       await sleep(500);
       live = parseJson(
-        js(`(function(){var e=window.__lumenE2E;return JSON.stringify({status:e.getStatus(),err:e.getError(),overlay:!!document.querySelector(".lumen-overlay")});})()`),
+        js(
+          `(function(){var e=window.__lumenE2E;return JSON.stringify({status:e.getStatus(),err:e.getError(),overlay:!!document.querySelector(".lumen-overlay")});})()`,
+        ),
       );
-      if (live.status === "listening" || live.status === "speaking" || live.status === "error") break;
+      if (
+        live.status === "listening" ||
+        live.status === "speaking" ||
+        live.status === "error"
+      )
+        break;
     }
     results.push(
-      (live.status === "listening" || live.status === "speaking") && !live.err && live.overlay
+      (live.status === "listening" || live.status === "speaking") &&
+        !live.err &&
+        live.overlay
         ? ok("live-connect", JSON.stringify(live))
         : fail("live-connect", JSON.stringify(live)),
     );
@@ -113,11 +132,25 @@ async function main() {
         setPara:e.apply({id:"e2e-5",op:"setParabola",args:{a:1,b:-5,c:6}})
       });})()`),
     );
-    const cmdFail = Object.entries(cmds).filter(([, v]) => !String(v).startsWith("ok"));
-    results.push(cmdFail.length ? fail("canvas-ops", JSON.stringify(cmds)) : ok("canvas-ops", JSON.stringify(cmds)));
+    const cmdFail = Object.entries(cmds).filter(
+      ([, v]) => !String(v).startsWith("ok"),
+    );
+    results.push(
+      cmdFail.length
+        ? fail("canvas-ops", JSON.stringify(cmds))
+        : ok("canvas-ops", JSON.stringify(cmds)),
+    );
 
-    js(`(async function(){await window.__lumenE2E.sendText("Circle the vertex and say if a is positive.");return "sent";})()`);
-    let talk = { status: "idle", turnCount: 0, tutorChars: 0, preview: "", writeOnBoard: [] };
+    js(
+      `(async function(){await window.__lumenE2E.sendText("Circle the vertex and say if a is positive.");return "sent";})()`,
+    );
+    let talk = {
+      status: "idle",
+      turnCount: 0,
+      tutorChars: 0,
+      preview: "",
+      writeOnBoard: [],
+    };
     for (let attempt = 0; attempt < 2; attempt++) {
       for (let i = 0; i < 20; i++) {
         await sleep(1000);
@@ -133,7 +166,9 @@ async function main() {
         if (talk.tutorChars > 20 || talk.status === "speaking") break;
       }
       if (talk.tutorChars > 20 || talk.status === "speaking") break;
-      js(`(async function(){await window.__lumenE2E.sendText("Please say hello and mention the parabola on the board.");return "retry";})()`);
+      js(
+        `(async function(){await window.__lumenE2E.sendText("Please say hello and mention the parabola on the board.");return "retry";})()`,
+      );
     }
     const spoke = talk.tutorChars > 20 || talk.status === "speaking";
     results.push(
@@ -142,15 +177,47 @@ async function main() {
         : fail("lumen-reply-transcript", JSON.stringify(talk)),
     );
 
-    js(`(async function(){await window.__lumenE2E.stop();return "stopped";})()`);
+    js(
+      `(async function(){await window.__lumenE2E.stop();return "stopped";})()`,
+    );
     await sleep(800);
     const stop = parseJson(
-      js(`(function(){var e=window.__lumenE2E;return JSON.stringify({status:e.getStatus(),err:e.getError(),toast:!!document.querySelector(".lumen-toast")});})()`),
+      js(
+        `(function(){var e=window.__lumenE2E;return JSON.stringify({status:e.getStatus(),err:e.getError(),toast:!!document.querySelector(".lumen-toast")});})()`,
+      ),
     );
     results.push(
       stop.status === "idle" && !stop.err && !stop.toast
         ? ok("clean-stop", JSON.stringify(stop))
         : fail("clean-stop", JSON.stringify(stop)),
+    );
+
+    // Regression: reconnecting the same learner/module must create a fresh room + agent job.
+    js(
+      `(async function(){await window.__lumenE2E.start("quad-1",{mic:true});return "restarted";})()`,
+    );
+    await sleep(1200);
+    js(
+      `(async function(){await window.__lumenE2E.sendText("Reconnect check: reply with ready.");return "sent";})()`,
+    );
+    let reconnect = { status: "idle", turnCount: 0, tutorChars: 0, err: null };
+    for (let i = 0; i < 20; i++) {
+      await sleep(1000);
+      reconnect = parseJson(
+        js(`(function(){var e=window.__lumenE2E;var turns=e.getTurns()||[];return JSON.stringify({
+          status:e.getStatus(),err:e.getError(),turnCount:turns.length,
+          tutorChars:turns.filter(function(t){return t.from==="tutor";}).reduce(function(n,t){return n+t.text.length;},0)
+        });})()`),
+      );
+      if (reconnect.tutorChars > 10 || reconnect.status === "error") break;
+    }
+    results.push(
+      reconnect.tutorChars > 10 && !reconnect.err
+        ? ok("live-reconnect", JSON.stringify(reconnect))
+        : fail("live-reconnect", JSON.stringify(reconnect)),
+    );
+    js(
+      `(async function(){await window.__lumenE2E.stop();return "stopped-again";})()`,
     );
   } catch (e) {
     results.push(fail("browser-e2e-crash", String(e)));
@@ -158,7 +225,18 @@ async function main() {
 
   const failed = results.filter((r) => !r.pass);
   console.log(
-    JSON.stringify({ summary: { pass: failed.length === 0, failed: failed.length, total: results.length }, results }, null, 2),
+    JSON.stringify(
+      {
+        summary: {
+          pass: failed.length === 0,
+          failed: failed.length,
+          total: results.length,
+        },
+        results,
+      },
+      null,
+      2,
+    ),
   );
   process.exit(failed.length ? 1 : 0);
 }

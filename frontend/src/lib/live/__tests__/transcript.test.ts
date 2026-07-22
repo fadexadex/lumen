@@ -1,13 +1,58 @@
 import { describe, it, expect } from "vitest";
 import { __transcriptTest, type TranscriptTurn } from "@/lib/live/tutor-session";
+import {
+  __transcriptHistoryTest,
+  loadTranscriptHistory,
+  saveTranscriptHistory,
+} from "@/lib/live/transcript-history";
 
 const {
   isNoiseTranscript,
+  appendTranscriptionChunk,
   mergeTutorText,
   shouldMergeTutor,
   suffixPrefixOverlap,
   TUTOR_TURN_GAP_MS,
 } = __transcriptTest;
+
+describe("LiveKit transcription stream assembly", () => {
+  it("accumulates the incremental chunks from one text stream", () => {
+    const chunks = ["Hello!", " What", " can", " we", " explore", " today?"];
+    expect(chunks.reduce(appendTranscriptionChunk, "")).toBe("Hello! What can we explore today?");
+  });
+});
+
+describe("persisted live transcript history", () => {
+  it("restores the previous turns for the same lesson", () => {
+    localStorage.removeItem(__transcriptHistoryTest.STORAGE_KEY);
+    const turns: TranscriptTurn[] = [
+      { id: "you-1", from: "you", text: "Why does it open upward?", final: true },
+      { id: "tutor-1", from: "tutor", text: "Because a is positive.", final: true },
+    ];
+
+    saveTranscriptHistory("quad-1", turns);
+
+    expect(loadTranscriptHistory("quad-1")).toEqual(turns);
+    expect(loadTranscriptHistory("quad-2")).toEqual([]);
+    localStorage.removeItem(__transcriptHistoryTest.STORAGE_KEY);
+  });
+
+  it("keeps only the most recent bounded history", () => {
+    const turns: TranscriptTurn[] = Array.from({ length: 18 }, (_, index) => ({
+      id: `turn-${index}`,
+      from: index % 2 ? "tutor" : "you",
+      text: `Turn ${index}`,
+      final: true,
+    }));
+
+    saveTranscriptHistory("quad-1", turns);
+
+    const restored = loadTranscriptHistory("quad-1");
+    expect(restored).toHaveLength(__transcriptHistoryTest.MAX_TURNS);
+    expect(restored[0]?.id).toBe("turn-6");
+    localStorage.removeItem(__transcriptHistoryTest.STORAGE_KEY);
+  });
+});
 
 describe("transcript noise filter", () => {
   it("drops Gemini noise tokens and bare punctuation", () => {
@@ -62,10 +107,7 @@ describe("tutor transcript merge (word-stream → one bubble)", () => {
 
   it("joins consecutive sentences into one paragraph", () => {
     expect(
-      mergeTutorText(
-        "The parabola opens upward.",
-        "Since a is positive, that makes sense.",
-      ),
+      mergeTutorText("The parabola opens upward.", "Since a is positive, that makes sense."),
     ).toBe("The parabola opens upward. Since a is positive, that makes sense.");
   });
 });
@@ -79,15 +121,9 @@ describe("shouldMergeTutor (stable paragraphs)", () => {
   });
 
   it("merges while status is speaking even across sentence finals", () => {
+    expect(shouldMergeTutor(tutor("The parabola opens upward."), 50, "speaking")).toBe(true);
     expect(
-      shouldMergeTutor(tutor("The parabola opens upward."), 50, "speaking"),
-    ).toBe(true);
-    expect(
-      shouldMergeTutor(
-        tutor("The parabola opens upward."),
-        TUTOR_TURN_GAP_MS + 500,
-        "speaking",
-      ),
+      shouldMergeTutor(tutor("The parabola opens upward."), TUTOR_TURN_GAP_MS + 500, "speaking"),
     ).toBe(true);
   });
 

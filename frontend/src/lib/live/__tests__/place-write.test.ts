@@ -12,7 +12,7 @@ describe("place-write free space", () => {
   it("estimates a sensible box from line lengths", () => {
     const s = estimateWriteSize(["Sample Quadratic Equation:", "y = x^2"]);
     expect(s.w).toBeGreaterThan(200);
-    expect(s.h).toBe(16 + 2 * 28);
+    expect(s.h).toBe(16 + 2 * 40);
   });
 
   it("keeps preferred spot when nothing is occupied", () => {

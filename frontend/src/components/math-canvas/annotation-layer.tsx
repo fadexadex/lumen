@@ -1,11 +1,6 @@
-import {
-  forwardRef,
-  useImperativeHandle,
-  useRef,
-  useState,
-  useCallback,
-  useEffect,
-} from "react";
+import { forwardRef, useImperativeHandle, useRef, useState, useCallback, useEffect } from "react";
+import { MathText } from "@/lib/math-text";
+import { estimateWriteSize, writeBlockRect } from "@/lib/live/place-write";
 
 /** World-space rectangle/point. */
 export type WRect = { x: number; y: number; w: number; h: number };
@@ -38,6 +33,8 @@ export interface LumenCanvasController {
   drawPath(d: string, color?: string): string;
   /** Multi-line board writing with typewriter. Same jobId replaces in place (resume-safe). */
   writeBlock(at: WPoint, lines: string[], opts?: { jobId?: string }): string;
+  /** Stable anchor for an existing write job, used when a calculation continues. */
+  writeBlockPosition(jobId: string): WPoint | null;
   cancelWriting(jobId?: string): void;
   remove(id: string): void;
   clear(): void;
@@ -61,6 +58,8 @@ export interface AnnotationLayerProps {
 export const AnnotationLayer = forwardRef<LumenCanvasController, AnnotationLayerProps>(
   function AnnotationLayer({ width, height }, ref) {
     const [annos, setAnnos] = useState<Anno[]>([]);
+    const annosRef = useRef(annos);
+    annosRef.current = annos;
     const seq = useRef(0);
     const newId = () => `ai-${++seq.current}`;
 
@@ -97,9 +96,6 @@ export const AnnotationLayer = forwardRef<LumenCanvasController, AnnotationLayer
       return () => clearInterval(t);
     }, [writingActive]);
 
-    const annosRef = useRef(annos);
-    annosRef.current = annos;
-
     useImperativeHandle(
       ref,
       (): LumenCanvasController => ({
@@ -119,22 +115,28 @@ export const AnnotationLayer = forwardRef<LumenCanvasController, AnnotationLayer
           add({ id: newId(), kind: "path", d, color: COLORS[color] ?? color }),
         writeBlock: (at, lines, o) => {
           const id = o?.jobId ?? newId();
-          const clean = lines.map((l) => l.trimEnd()).filter((l, i, arr) => l.length || i < arr.length - 1);
-          setAnnos((xs) => {
-            const without = xs.filter((a) => a.id !== id);
-            return [
-              ...without,
-              {
-                id,
-                kind: "writeBlock",
-                at,
-                lines: clean.length ? clean : [""],
-                revealed: 0,
-                writing: true,
-              },
-            ];
-          });
+          const clean = lines
+            .map((l) => l.trimEnd())
+            .filter((l, i, arr) => l.length || i < arr.length - 1);
+          const without = annosRef.current.filter((a) => a.id !== id);
+          const next: Anno[] = [
+            ...without,
+            {
+              id,
+              kind: "writeBlock",
+              at,
+              lines: clean.length ? clean : [""],
+              revealed: 0,
+              writing: true,
+            },
+          ];
+          annosRef.current = next;
+          setAnnos(next);
           return id;
+        },
+        writeBlockPosition: (jobId) => {
+          const block = annosRef.current.find((a) => a.id === jobId && a.kind === "writeBlock");
+          return block?.kind === "writeBlock" ? { ...block.at } : null;
         },
         cancelWriting: (jobId) => {
           setAnnos((xs) =>
@@ -308,9 +310,7 @@ function occupiedFromAnnos(annos: Anno[], excludeId?: string): WRect[] {
   for (const a of annos) {
     if (excludeId && a.id === excludeId) continue;
     if (a.kind === "writeBlock") {
-      const w = Math.min(520, 28 + Math.max(...a.lines.map((l) => l.length), 8) * 11);
-      const h = 16 + Math.max(a.lines.length, 1) * 28;
-      out.push({ x: a.at.x - 12, y: a.at.y - 8, w, h });
+      out.push(writeBlockRect(a.at, a.lines));
     } else if (a.kind === "highlight") {
       out.push(a.rect);
     } else if (a.kind === "circle") {
@@ -323,16 +323,12 @@ function occupiedFromAnnos(annos: Anno[], excludeId?: string): WRect[] {
   return out;
 }
 
-function WriteBlockView({
-  a,
-}: {
-  a: Extract<Anno, { kind: "writeBlock" }>;
-}) {
+function WriteBlockView({ a }: { a: Extract<Anno, { kind: "writeBlock" }> }) {
   const full = a.lines.join("\n");
   const shown = full.slice(0, a.revealed);
   const shownLines = shown.split("\n");
-  const boxW = Math.min(520, 28 + Math.max(...a.lines.map((l) => l.length), 8) * 11);
-  const boxH = 16 + Math.max(shownLines.length, 1) * 28;
+  const { w: boxW } = estimateWriteSize(a.lines);
+  const { h: boxH } = estimateWriteSize(shownLines);
   return (
     <g className={`mc-anno mc-anno--write${a.writing ? " is-writing" : ""}`}>
       {/* Soft wash — ink on board, not a floating card */}
@@ -348,23 +344,21 @@ function WriteBlockView({
         stroke="none"
       />
       {shownLines.map((line, i) => (
-        <text
+        <foreignObject
           key={i}
-          className="mc-write-line"
           x={a.at.x}
-          y={a.at.y + 14 + i * 28}
-          fontSize={21}
-          fontFamily="var(--font-serif)"
-          fill={COLORS.ink}
-          style={{ paintOrder: "stroke", stroke: "oklch(0.99 0.01 95)", strokeWidth: 5 }}
+          y={a.at.y - 7 + i * 40}
+          width={Math.max(40, boxW - 16)}
+          height={44}
+          className="mc-write-foreign"
         >
-          {line}
-          {a.writing && i === shownLines.length - 1 ? (
-            <tspan className="mc-write-caret" fill="oklch(0.55 0.14 55)">
-              |
-            </tspan>
-          ) : null}
-        </text>
+          <div className="mc-write-line">
+            <MathText text={line} />
+            {a.writing && i === shownLines.length - 1 ? (
+              <span className="mc-write-caret">|</span>
+            ) : null}
+          </div>
+        </foreignObject>
       ))}
     </g>
   );

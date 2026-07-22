@@ -4,7 +4,6 @@ import asyncio
 import logging
 
 from dotenv import load_dotenv
-
 from livekit import agents, rtc
 from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions
 from livekit.plugins import google, openai
@@ -91,6 +90,34 @@ async def entrypoint(ctx: JobContext):
         max_tool_steps=8,
         userdata={"room": ctx.room, "user_identity": participant.identity},
     )
+
+    # Keep enough interruption telemetry to distinguish acoustic barge-ins from
+    # model/session failures without logging learner transcript content.
+    @session.on("user_state_changed")
+    def _on_user_state_changed(event):
+        if event.new_state == "speaking" and session.agent_state == "speaking":
+            logger.info("learner activity detected while agent is speaking")
+
+    @session.on("agent_false_interruption")
+    def _on_false_interruption(event):
+        logger.info("false interruption detected; resumed=%s", event.resumed)
+
+    @session.on("user_input_transcribed")
+    def _on_user_input_transcribed(event):
+        # Confirm the server accepted a learner turn without logging its content.
+        logger.info(
+            "learner transcription received: final=%s chars=%d",
+            event.is_final,
+            len(event.transcript or ""),
+        )
+
+    @session.on("error")
+    def _on_session_error(event):
+        logger.error("voice session error: %s", event.error)
+
+    @session.on("close")
+    def _on_session_close(event):
+        logger.info("voice session closed: reason=%s error=%s", event.reason, event.error)
 
     agent = Agent(instructions=SYSTEM_PROMPT, tools=ALL_TOOLS)
     await session.start(agent=agent, room=ctx.room)

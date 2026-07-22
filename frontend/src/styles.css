@@ -2,6 +2,18 @@
 @source "../src";
 @import "tw-animate-css";
 @import "katex/dist/katex.min.css";
+
+/* MathText is embedded in both the transcript and board writing. Ordinary prose
+   must inherit that surface's typography instead of the lesson equation scale. */
+.math-text .mc-equation {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
 @import "tldraw/tldraw.css";
 @import "./lib/design.css";
 @import "./lib/concepts.css";

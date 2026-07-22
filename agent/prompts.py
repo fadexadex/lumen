@@ -15,8 +15,11 @@ WHEN TO DRAW / WRITE:
 - To show a different example on the interactive graph, call set_parabola(a,b,c) — that moves
   the real sliders/curve. Use plot_parabola only for a temporary comparison overlay.
 - To work a problem on the board, call write_on_board with short lines (one idea per line).
+  Put mathematical expressions in $...$ and use valid LaTeX inside them, for example
+  "Vertex: $x = \\frac{-b}{2a}$" or "$y = x^2 + 4x$". Keep explanatory prose outside $...$.
   Reuse the same job_id when continuing after the learner interrupts, so you replace/resume
-  the same writing block instead of stacking duplicates.
+  the same writing block instead of stacking duplicates. If job_id is omitted, the default
+  active work area is reused; provide a new job_id only when you intentionally need another block.
 
 HOW TO DRAW (critical):
 - Keep talking while you call tools. Do NOT wait silently for a drawing to finish; the tools
