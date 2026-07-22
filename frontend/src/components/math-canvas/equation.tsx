@@ -14,36 +14,42 @@ export function Equation({ children }: { children: string }) {
 
 /** Soften common KaTeX into hand-writable form the Equation parser can type. */
 export function toHandMath(latex: string): string {
-  return latex
-    .replace(/\\;/g, " ")
-    .replace(/\\,/g, " ")
-    .replace(/\\quad/g, "  ")
-    .replace(/\\qquad/g, "   ")
-    .replace(/\\Rightarrow/g, " ⇒ ")
-    .replace(/\\rightarrow/g, " → ")
-    .replace(/\\pm/g, " ± ")
-    .replace(/\\mp/g, " ∓ ")
-    .replace(/\\times/g, " × ")
-    .replace(/\\cdot/g, " · ")
-    .replace(/\\div/g, " ÷ ")
-    .replace(/\\leq/g, " ≤ ")
-    .replace(/\\geq/g, " ≥ ")
-    .replace(/\\neq/g, " ≠ ")
-    .replace(/\\approx/g, " ≈ ")
-    .replace(/\\infty/g, "∞")
-    .replace(/\\sqrt\{([^}]*)\}/g, "√($1)")
-    .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, "($1)/($2)")
-    .replace(/\\tfrac\{([^}]*)\}\{([^}]*)\}/g, "($1)/($2)")
-    .replace(/\\text\{([^}]*)\}/g, " $1 ")
-    .replace(/\\mathrm\{([^}]*)\}/g, "$1")
-    .replace(/\\left|\\right/g, "")
-    .replace(/[{}]/g, "")
-    .replace(/\\\\/g, "")
-    .replace(/\\/g, "")
-    .replace(/-/g, "−")
-    .replace(/\s*([+−=×÷±∓·≤≥≠≈⇒→])\s*/g, " $1 ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    latex
+      // Strip math delimiters ($…$, $$…$$, \(…\), \[…\]) — this is already a
+      // math-only context, so the wrappers must never render as literal glyphs.
+      .replace(/\${1,2}/g, "")
+      .replace(/\\[()[\]]/g, "")
+      .replace(/\\;/g, " ")
+      .replace(/\\,/g, " ")
+      .replace(/\\quad/g, "  ")
+      .replace(/\\qquad/g, "   ")
+      .replace(/\\Rightarrow/g, " ⇒ ")
+      .replace(/\\rightarrow/g, " → ")
+      .replace(/\\pm/g, " ± ")
+      .replace(/\\mp/g, " ∓ ")
+      .replace(/\\times/g, " × ")
+      .replace(/\\cdot/g, " · ")
+      .replace(/\\div/g, " ÷ ")
+      .replace(/\\leq/g, " ≤ ")
+      .replace(/\\geq/g, " ≥ ")
+      .replace(/\\neq/g, " ≠ ")
+      .replace(/\\approx/g, " ≈ ")
+      .replace(/\\infty/g, "∞")
+      .replace(/\\sqrt\{([^}]*)\}/g, "√($1)")
+      .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, "($1)/($2)")
+      .replace(/\\tfrac\{([^}]*)\}\{([^}]*)\}/g, "($1)/($2)")
+      .replace(/\\text\{([^}]*)\}/g, " $1 ")
+      .replace(/\\mathrm\{([^}]*)\}/g, "$1")
+      .replace(/\\left|\\right/g, "")
+      .replace(/[{}]/g, "")
+      .replace(/\\\\/g, "")
+      .replace(/\\/g, "")
+      .replace(/-/g, "−")
+      .replace(/\s*([+−=×÷±∓·≤≥≠≈⇒→])\s*/g, " $1 ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 function parse(input: string): ReactNode[] {

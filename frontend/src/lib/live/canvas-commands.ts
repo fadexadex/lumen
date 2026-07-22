@@ -193,17 +193,25 @@ export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): 
       const existingAt = anno.writeBlockPosition(jobId);
       const place = cmd.args.place ?? "below";
       // Confine writing to the CURRENT page so the learner sees it. Without an
-      // explicit on-page target, anchor to the top-left of the current page —
-      // never the whole board's origin (which is page 0, off screen).
+      // explicit on-page target, anchor near what the learner is CURRENTLY
+      // looking at (upper-left of the visible viewport) — not the page corner —
+      // so a write lands close to their focus and they barely have to move. Fall
+      // back to the page's top-left only when the viewport can't be measured.
       const region = ctrl.pageBounds?.() ?? {
         x: 0,
         y: 0,
         w: ctrl.boardSize.w,
         h: ctrl.boardSize.h,
       };
-      const anchor = (cmd.args.target
-        ? (T.point(cmd.args.target) ?? centerOf(T.rect(cmd.args.target)))
-        : null) ?? { x: region.x + region.w * 0.08, y: region.y + region.h * 0.14 };
+      const vpEl = ctrl.viewportEl();
+      const focusAnchor =
+        vpEl && vpEl.clientWidth > 0
+          ? ctrl.screenToWorld(vpEl.clientWidth * 0.16, vpEl.clientHeight * 0.26)
+          : { x: region.x + region.w * 0.08, y: region.y + region.h * 0.14 };
+      const anchor =
+        (cmd.args.target
+          ? (T.point(cmd.args.target) ?? centerOf(T.rect(cmd.args.target)))
+          : null) ?? focusAnchor;
 
       const occupied = [
         ...(ctrl.lessonRects ?? []),

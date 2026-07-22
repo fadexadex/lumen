@@ -48,6 +48,24 @@ describe("place-write free space", () => {
     expect(box.y + box.h).toBeLessThanOrEqual(region.h);
   });
 
+  it("lands near the learner's focus even when content sits elsewhere", () => {
+    // Prose occupies the top-left; the learner is focused lower/right. The write
+    // should appear by the focus anchor, not get shoved back up under the prose.
+    const lines = ["a = 2, b = 4"];
+    const focus = { x: 900, y: 520 };
+    const at = findFreeWriteSpot({
+      anchor: focus,
+      place: "below",
+      lines,
+      region,
+      occupied: [{ x: 40, y: 40, w: 640, h: 240 }],
+    });
+    const box = writeBlockRect(at, lines);
+    // Close to focus (within a block-height), nowhere near the top-left prose.
+    expect(Math.abs(box.y - focus.y)).toBeLessThan(120);
+    expect(box.x).toBeGreaterThan(700);
+  });
+
   it("writes onto the CURRENT page, not back at board origin", () => {
     // Deck page 3 lives at world x ∈ [4800, 6400]. A write here must stay there,
     // otherwise it lands off-screen for a learner who advanced past page 0.

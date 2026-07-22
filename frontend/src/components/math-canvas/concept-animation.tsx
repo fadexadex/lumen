@@ -72,7 +72,8 @@ export function ConceptAnimationPlayer({
       </div>
       <p className="mc-concept-caption">
         <span aria-hidden className="mc-concept-caption-mark" />
-        {scene.narration}
+        {/* Narration can carry inline math ($x^2$); render it, don't print the $ */}
+        <MathText text={scene.narration} />
       </p>
     </section>
   );

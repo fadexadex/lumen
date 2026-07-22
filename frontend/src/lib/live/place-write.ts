@@ -86,17 +86,21 @@ export function findFreeWriteSpot(opts: {
   }
 
   const candidates: WPoint[] = [];
-  if (contentBottom > R.y + 40) {
-    candidates.push({ x: readingX, y: contentBottom + 32 });
-    candidates.push({ x: readingX, y: contentBottom + 32 + size.h + 24 });
-    candidates.push({ x: Math.min(readingX + 220, R.x + R.w * 0.45), y: contentBottom + 32 });
-  }
 
+  // 1) Right next to the anchor (the learner's focus) — a write should appear
+  //    where they are looking, so they barely have to move to read it.
   const order: Place[] = [opts.place, "below", "right", "left", "above"].filter(
     (p, i, arr) => arr.indexOf(p) === i,
   ) as Place[];
   for (const place of order) {
     candidates.push(offsetPlace(opts.anchor, place));
+  }
+
+  // 2) Then a clean spot just below the reading content as a fallback.
+  if (contentBottom > R.y + 40) {
+    candidates.push({ x: readingX, y: contentBottom + 32 });
+    candidates.push({ x: readingX, y: contentBottom + 32 + size.h + 24 });
+    candidates.push({ x: Math.min(readingX + 220, R.x + R.w * 0.45), y: contentBottom + 32 });
   }
 
   for (const raw of candidates) {
