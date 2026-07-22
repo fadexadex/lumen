@@ -1,4 +1,5 @@
 import type { LessonScript } from "./types";
+import { useTutorStore } from "./tutor-store";
 
 export const lessonScripts: Record<string, LessonScript> = {
   "quad-1": {
@@ -140,6 +141,11 @@ export const lessonScripts: Record<string, LessonScript> = {
 };
 
 export function getLessonScript(moduleId: string, title: string): LessonScript {
+  // Store-first: a generated, ready module wins over the legacy hand-authored
+  // scripts, which now serve only as a fallback for un-generated modules.
+  const generated = useTutorStore.getState().course?.modules.find((m) => m.id === moduleId)?.script;
+  if (generated) return generated;
+
   return (
     lessonScripts[moduleId] ?? {
       moduleId,

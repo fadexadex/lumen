@@ -18,6 +18,7 @@ export function LessonRoute() {
   const { moduleId } = useParams({ from: "/lesson/$moduleId" });
   const navigate = useNavigate();
   const roadmap = useTutorStore((s) => s.roadmap);
+  const course = useTutorStore((s) => s.course);
   const subscription = useTutorStore((s) => s.subscription);
   const stepByModule = useTutorStore((s) => s.stepByModule);
   const setStep = useTutorStore((s) => s.setStep);
@@ -26,6 +27,7 @@ export function LessonRoute() {
   const setLastModule = useTutorStore((s) => s.setLastModule);
 
   const mod = roadmap?.modules.find((m) => m.id === moduleId);
+  const courseModule = course?.modules.find((m) => m.id === moduleId);
 
   const [hydrated, setHydrated] = useState(() => useTutorStore.persist.hasHydrated());
 
@@ -151,6 +153,39 @@ export function LessonRoute() {
   const boardTone = concept.boardTone;
 
   if (!roadmap || subscription?.status !== "active") return null;
+
+  // Guard: never mount the board on a generated module that isn't ready yet.
+  // (RoadmapView disables such cards, but a direct link could still land here.)
+  if (courseModule && courseModule.status !== "ready" && !courseModule.script) {
+    return (
+      <div className="tutor-app onboard-shell min-h-screen flex flex-col items-center justify-center px-6">
+        <div className="onboard-finish">
+          <div className="onboard-finish-status">
+            <span className="live-dot" />
+            <span className="text-sm" style={{ color: "var(--tutor-muted)" }}>
+              {courseModule.status === "failed"
+                ? "couldn't generate this lesson"
+                : "writing this lesson"}
+            </span>
+          </div>
+          <h1 className="tutor-serif text-3xl md:text-4xl">{mod?.title ?? "Your lesson"}</h1>
+          {courseModule.status !== "failed" && (
+            <div className="onboard-finish-bar" aria-hidden>
+              <span />
+            </div>
+          )}
+          <button
+            type="button"
+            className="tutor-primary-btn"
+            style={{ marginTop: "1.5rem" }}
+            onClick={() => navigate({ to: "/roadmap" })}
+          >
+            ← Back to your path
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="lesson-shell" data-board-tone={boardTone}>
