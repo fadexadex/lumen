@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { lessonScriptSchema, roadmapSchema } from "../schemas";
+import {
+  lessonContentGenerationSchema,
+  lessonScriptSchema,
+  normalizeGeneratedLessonContent,
+  roadmapSchema,
+} from "../schemas";
 import { assertLessonMath } from "../validation";
 
 const validSteps = [
@@ -59,6 +64,35 @@ describe("generated course schemas", () => {
         diagram: { parabola: { a: 0, b: 1, c: 2 } },
       }),
     ).toThrow();
+  });
+
+  it("recovers usable lesson content when generated choices do not match the answer", () => {
+    const generated = lessonContentGenerationSchema.parse({
+      moduleId: "m1",
+      title: "Lesson",
+      steps: [
+        validSteps[0],
+        validSteps[1],
+        {
+          kind: "practice",
+          title: "Classify all four",
+          prompt: "Classify the equations in order.",
+          options: ["yes", "no", "yes", "no"],
+          answer: "yes, no, yes, no",
+        },
+      ],
+      // Structured-output models sometimes emit incomplete optional diagrams.
+      diagram: { numberLine: { points: [] } },
+    });
+
+    const recovered = normalizeGeneratedLessonContent(generated);
+
+    expect(recovered.steps[2]).toMatchObject({
+      kind: "practice",
+      answer: "yes, no, yes, no",
+    });
+    expect(recovered.steps[2]).not.toHaveProperty("options");
+    expect(recovered).not.toHaveProperty("diagram");
   });
 });
 

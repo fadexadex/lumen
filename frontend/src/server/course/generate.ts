@@ -1,6 +1,11 @@
 import { streamObject, generateObject } from "ai";
 import { mistral } from "@ai-sdk/mistral";
-import { roadmapSchema, lessonScriptSchema, lessonContentSchema } from "@/lib/course-gen/schemas";
+import {
+  lessonContentGenerationSchema,
+  lessonScriptSchema,
+  normalizeGeneratedLessonContent,
+  roadmapSchema,
+} from "@/lib/course-gen/schemas";
 import type { LearnerProfile, RoadmapModule } from "@/lib/types";
 
 const SMALL = "mistral-small-latest";
@@ -87,14 +92,10 @@ export async function repairLessonContent(args: {
 }) {
   const { object } = await generateObject({
     model: mistral(LARGE),
-    schema: lessonContentSchema,
-    prompt: `${buildLessonPrompt(args)}
-
-Both attempts to generate the rich visual object failed (${args.cause ?? "invalid visual JSON"}).
-Return the core lesson content only. Omit visual entirely; the server will attach a safe visual.
-Return ONLY valid JSON matching the provided schema. moduleId MUST be "${args.module.id}".`,
+    schema: lessonContentGenerationSchema,
+    prompt: buildLessonContentRecoveryPrompt(args),
   });
-  return object;
+  return normalizeGeneratedLessonContent(object);
 }
 
 function buildRoadmapPrompt(p: LearnerProfile) {
@@ -148,5 +149,32 @@ Rules:
 - Voice: warm, short sentences, age-appropriate for grade ${profile.grade}.
 - Style "${profile.style}": stories -> narrative framing; examples -> more worked lines;
   step-by-step -> numbered clarity; challenge -> leaner prose, harder practice.
+`.trim();
+}
+
+function buildLessonContentRecoveryPrompt(args: {
+  profile: LearnerProfile;
+  module: LessonModule;
+  priorModules: LessonModule[];
+  cause?: string;
+}) {
+  const { profile, module, priorModules } = args;
+  const priorTitles = priorModules.map((item) => item.title).join(", ") || "(none yet)";
+  return `
+You are Lumen teaching "${module.title}".
+Module goal: ${module.blurb}
+Learner: grade ${profile.grade}, prefers "${profile.style}" learning.
+Earlier modules (build on these, don't repeat): ${priorTitles}
+
+The rich lesson attempt could not be validated (${args.cause ?? "invalid structured output"}).
+Return a compact core lesson with 3-6 steps mixing explanation, example, and practice.
+- moduleId MUST be exactly "${module.id}".
+- Return only moduleId, title, and steps. Do not return visual or diagram fields.
+- Every math field MUST be valid KaTeX: use x^2, \\frac{a}{b}, \\pm, and \\sqrt{}.
+- Prose must be plain text, not Markdown.
+- Every practice step needs an answer.
+- Only include options for a single-answer question, and copy the correct option exactly into answer.
+- Keep explanations concise and age-appropriate for grade ${profile.grade}.
+Return ONLY valid JSON matching the provided schema. Do not add commentary.
 `.trim();
 }

@@ -285,10 +285,14 @@ export const diagramSchema = z
   })
   .optional();
 
-const lessonContentShape = {
+const lessonCoreShape = {
   moduleId: z.string().min(1),
   title: z.string().min(2).max(120),
   steps: z.array(lessonStepSchema).min(3).max(10),
+};
+
+const lessonContentShape = {
+  ...lessonCoreShape,
   diagram: diagramSchema,
 };
 
@@ -308,6 +312,32 @@ function validatePracticeAnswers(steps: z.infer<typeof lessonStepSchema>[], ctx:
 export const lessonContentSchema = z
   .object(lessonContentShape)
   .superRefine(({ steps }, ctx) => validatePracticeAnswers(steps, ctx));
+
+/**
+ * Provider-facing recovery schema. Keep this deliberately smaller than the
+ * rendered lesson schema: optional diagrams and cross-field choice validation
+ * are common structured-output failure points and can be handled safely on the
+ * server after generation.
+ */
+export const lessonContentGenerationSchema = z.object(lessonCoreShape);
+
+export function normalizeGeneratedLessonContent(
+  content: z.infer<typeof lessonContentGenerationSchema>,
+): z.infer<typeof lessonContentSchema> {
+  const steps = content.steps.map((step) => {
+    if (step.kind !== "practice" || !step.options || step.options.includes(step.answer)) {
+      return step;
+    }
+
+    // A mismatched option list is unsafe as multiple-choice UI, but the model's
+    // answer remains useful as a free-response exercise. Dropping only the
+    // choices preserves the lesson rather than rejecting the whole module.
+    const { options: _options, ...freeResponse } = step;
+    return freeResponse;
+  });
+
+  return lessonContentSchema.parse({ ...content, steps });
+}
 
 export const lessonScriptSchema = z
   .object({ ...lessonContentShape, visual: lessonVisualSchema })
