@@ -1,21 +1,43 @@
 import { useEffect } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useTutorStore } from "@/lib/tutor-store";
+import { retryCourseModule } from "@/lib/course-gen/client";
+import {
+  courseIsSettled,
+  resumeCourseGeneration,
+  startCourseGeneration,
+} from "@/lib/course-gen/session";
+import type { ModuleGenStatus } from "@/lib/course-gen/types";
 
 export function RoadmapView() {
   const navigate = useNavigate();
   const profile = useTutorStore((s) => s.profile);
   const roadmap = useTutorStore((s) => s.roadmap);
+  const course = useTutorStore((s) => s.course);
+  const genPhase = useTutorStore((s) => s.genPhase);
   const subscription = useTutorStore((s) => s.subscription);
   const completed = useTutorStore((s) => s.completed);
   const lastModuleId = useTutorStore((s) => s.lastModuleId);
   const ensureRoadmap = useTutorStore((s) => s.ensureRoadmap);
   const reset = useTutorStore((s) => s.reset);
+  const patchModule = useTutorStore((s) => s.patchModule);
 
   useEffect(() => {
     // A returning learner may have a profile but no rebuilt roadmap yet.
     if (profile && !roadmap) ensureRoadmap();
   }, [profile, roadmap, ensureRoadmap]);
+
+  useEffect(() => {
+    // Safety net: a paid learner with no generated course (e.g. generation never
+    // ran, or errored) should have it start here rather than see a dead path.
+    if (profile && subscription?.status === "active" && !course && genPhase === "idle") {
+      startCourseGeneration(profile);
+    }
+  }, [profile, subscription, course, genPhase]);
+
+  useEffect(() => {
+    if (course && !courseIsSettled(course)) resumeCourseGeneration(course);
+  }, [course]);
 
   useEffect(() => {
     if (!profile) {
@@ -27,9 +49,34 @@ export function RoadmapView() {
     }
   }, [profile, subscription, navigate]);
 
-  if (!profile || !roadmap || subscription?.status !== "active") return null;
+  if (!profile || subscription?.status !== "active") return null;
+
+  if (!roadmap) {
+    return (
+      <div className="tutor-app onboard-shell min-h-screen flex flex-col items-center justify-center px-6">
+        <div className="onboard-finish" aria-live="polite">
+          <div className="onboard-finish-status">
+            <span className="live-dot" />
+            <span className="text-sm" style={{ color: "var(--tutor-muted)" }}>
+              outlining your path
+            </span>
+          </div>
+          <h1 className="tutor-serif text-3xl md:text-4xl">Lumen is planning your course…</h1>
+          <div className="onboard-finish-bar" aria-hidden>
+            <span />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const modules = roadmap.modules;
+  // Per-module generation status (falls back to "ready" for legacy/mock roadmaps).
+  const statusOf = (id: string): ModuleGenStatus =>
+    course?.modules.find((m) => m.id === id)?.status ?? "ready";
+  const resourcesOf = (id: string) => course?.modules.find((m) => m.id === id)?.resources;
+  const readyCount = modules.filter((m) => statusOf(m.id) === "ready").length;
+  const generating = genPhase === "planning" || genPhase === "writing";
   const doneCount = modules.filter((m) => completed[m.id]).length;
   const allDone = doneCount === modules.length;
   // Where to resume: last opened module, else the first unfinished one.
@@ -43,6 +90,19 @@ export function RoadmapView() {
     navigate({ to: "/" });
   };
   const open = (id: string) => navigate({ to: "/lesson/$moduleId", params: { moduleId: id } });
+  const retry = async (id: string) => {
+    if (!course) return;
+    patchModule(id, { status: "generating", error: undefined });
+    try {
+      const module = await retryCourseModule(course.id, id);
+      patchModule(id, module);
+    } catch (error) {
+      patchModule(id, {
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
   const ROW = 220;
   const AMP = 90; // sideways swing of the spine
   const CX = 50; // percent, spine centered
@@ -76,7 +136,10 @@ export function RoadmapView() {
           ← start over
         </button>
         <div className="flex items-center gap-3">
-          <span className="text-xs uppercase tracking-widest" style={{ color: "var(--tutor-muted)" }}>
+          <span
+            className="text-xs uppercase tracking-widest"
+            style={{ color: "var(--tutor-muted)" }}
+          >
             Grade {profile.grade} · {profile.subject}
           </span>
           {subscription?.credits != null && (
@@ -95,15 +158,29 @@ export function RoadmapView() {
         <p className="roadmap-hero-sub">
           {modules.length} short modules woven together. Begin with the first, or wander.
         </p>
+        {course && readyCount < modules.length && (
+          <p className="roadmap-gen-status" aria-live="polite">
+            <span className="live-dot" />
+            {readyCount} of {modules.length} lessons ready
+            {generating ? " · still writing the rest…" : " · finishing in the background"}
+          </p>
+        )}
 
         {resumeMod && (
           <div className="roadmap-resume">
-            <button type="button" className="tutor-primary-btn" onClick={() => open(resumeMod.id)}>
+            <button
+              type="button"
+              className="tutor-primary-btn"
+              disabled={statusOf(resumeMod.id) !== "ready"}
+              onClick={() => statusOf(resumeMod.id) === "ready" && open(resumeMod.id)}
+            >
               {allDone
                 ? "Revisit your path"
                 : doneCount > 0
                   ? `Continue · ${resumeMod.title}`
-                  : `Start · ${resumeMod.title}`}
+                  : statusOf(resumeMod.id) === "ready"
+                    ? `Start · ${resumeMod.title}`
+                    : `Writing · ${resumeMod.title}`}
               <span aria-hidden> →</span>
             </button>
             <div className="roadmap-resume-track" aria-hidden>
@@ -139,14 +216,23 @@ export function RoadmapView() {
           const side = idx % 2 === 0 ? "right" : "left";
           const top = idx * ROW;
           const done = !!completed[m.id];
-          const current = m.id === resumeId && !allDone;
+          const status = statusOf(m.id);
+          const actionable = status === "ready" || status === "failed";
+          const current = m.id === resumeId && !allDone && status === "ready";
+          const resources = resourcesOf(m.id);
           const eyebrow = done
             ? "Complete"
-            : current
-              ? doneCount > 0
-                ? "Continue here"
-                : "Start here"
-              : `Module ${idx + 1}`;
+            : status === "generating"
+              ? "Writing lesson…"
+              : status === "pending"
+                ? "Waiting…"
+                : status === "failed"
+                  ? "Couldn't generate"
+                  : current
+                    ? doneCount > 0
+                      ? "Continue here"
+                      : "Start here"
+                    : `Module ${idx + 1}`;
           return (
             <div
               key={m.id}
@@ -161,13 +247,33 @@ export function RoadmapView() {
                 className="roadmap-card"
                 data-current={current || undefined}
                 data-done={done || undefined}
-                onClick={() => open(m.id)}
+                data-status={status}
+                disabled={!actionable}
+                aria-disabled={!actionable}
+                onClick={() => {
+                  if (status === "failed") void retry(m.id);
+                  else if (status === "ready") open(m.id);
+                }}
               >
                 <p className="roadmap-card-eyebrow">{eyebrow}</p>
                 <h3 className="tutor-serif roadmap-card-title">{m.title}</h3>
                 <p className="roadmap-card-blurb">{m.blurb}</p>
+                {resources?.citations?.length ? (
+                  <span className="roadmap-card-sources">
+                    {resources.citations.length} source
+                    {resources.citations.length > 1 ? "s" : ""} added
+                  </span>
+                ) : null}
                 <span className="roadmap-card-cta">
-                  {done ? "Revisit →" : "Open on the whiteboard →"}
+                  {status === "generating"
+                    ? "Writing…"
+                    : status === "pending"
+                      ? "Queued"
+                      : status === "failed"
+                        ? "Retry lesson"
+                        : done
+                          ? "Revisit →"
+                          : "Open on the whiteboard →"}
                 </span>
               </button>
             </div>

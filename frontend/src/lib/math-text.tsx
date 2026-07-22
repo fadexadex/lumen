@@ -86,12 +86,19 @@ export function MathText({ text, className }: { text: string; className?: string
           {segment.kind === "math" ? (
             <StreamingMath value={segment.value} />
           ) : (
-            <Equation>{segment.value}</Equation>
+            <Equation>{stripMarkdownDecoration(segment.value)}</Equation>
           )}
         </Fragment>
       ))}
     </span>
   );
+}
+
+export function stripMarkdownDecoration(value: string): string {
+  return value
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/`([^`]+)`/g, "$1");
 }
 
 function StreamingMath({ value }: { value: string }) {

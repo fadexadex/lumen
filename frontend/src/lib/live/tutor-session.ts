@@ -1,6 +1,6 @@
 import { createRoom, fetchToken, makeIdentity, roomName, RoomEvent, Track } from "./livekit-client";
 import type { Room, RemoteTrack } from "./livekit-client";
-import type { CanvasCommand } from "./canvas-commands";
+import { createCommandDeduper, isCanvasCommand, type CanvasCommand } from "./canvas-commands";
 import { loadTranscriptHistory, saveTranscriptHistory } from "./transcript-history";
 
 export type SessionStatus = "idle" | "connecting" | "listening" | "speaking" | "thinking" | "error";
@@ -72,6 +72,7 @@ export class TutorSession {
   private speakQuietMs = 0;
   private lastAmpTs = 0;
   private activeModuleId: string | null = null;
+  private acceptCommandId = createCommandDeduper(32);
 
   on<K extends keyof Listeners>(ev: K, fn: Listeners[K]) {
     this.listeners[ev] = fn;
@@ -143,7 +144,9 @@ export class TutorSession {
 
       r.registerRpcMethod("lumen.canvas", async (data) => {
         try {
-          const cmd = JSON.parse(data.payload) as CanvasCommand;
+          const cmd = JSON.parse(data.payload) as unknown;
+          if (!isCanvasCommand(cmd)) return "invalid-command";
+          if (!this.acceptCommandId(cmd.id)) return "ok:duplicate";
           // Apply immediately; don't flip status to "thinking" (that starved follow-up UX).
           return this.listeners.command?.(cmd) ?? "no-handler";
         } catch (e) {

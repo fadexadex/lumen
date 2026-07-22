@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Generative Courses — Build Blueprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #14201c;
+    --ink-soft: #3a4a44;
+    --paper: #f3f0e8;
+    --mistral: #5b3d8f;
+    --mistral-bg: rgba(91,61,143,0.09);
+    --gemini: #1f6b4a;
+    --gemini-bg: rgba(31,107,74,0.08);
+    --tavily: #2a5f7a;
+    --tavily-bg: rgba(42,95,122,0.09);
+    --shared: #b85c38;
+    --shared-bg: rgba(184,92,56,0.09);
+    --amber: #c9922a;
+    --line: rgba(20, 32, 28, 0.14);
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --sans: "Source Sans 3", system-ui, sans-serif;
+    --display: "Fraunces", Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse 70% 45% at 8% -8%, rgba(91,61,143,0.10), transparent 50%),
+      radial-gradient(ellipse 55% 40% at 95% 0%, rgba(31,107,74,0.09), transparent 45%),
+      linear-gradient(180deg, #f7f4ec 0%, var(--paper) 45%, #ebe7db 100%);
+    line-height: 1.55;
+    font-size: 17px;
+  }
+  a { color: var(--tavily); text-underline-offset: 3px; }
+  a:hover { color: var(--gemini); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.25rem 5rem; }
+
+  header.hero {
+    padding: 3.25rem 0 2.25rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 0.7rem;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.9rem, 4.5vw, 2.9rem);
+    line-height: 1.12;
+    margin: 0 0 1rem;
+    letter-spacing: -0.02em;
+  }
+  .lede { font-size: 1.12rem; color: var(--ink-soft); max-width: 46rem; margin: 0 0 1.5rem; }
+  .changelog {
+    padding: 0.9rem 1rem; background: rgba(255,255,255,0.55);
+    border: 1px solid var(--line); border-radius: 6px; font-size: 0.9rem;
+  }
+  .changelog strong { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.45rem; }
+  .changelog ul { margin: 0; padding-left: 1.1rem; }
+  .changelog li { margin-bottom: 0.25rem; }
+
+  nav.toc {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(243,240,232,0.9); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    margin: 0 -1.25rem 2.5rem; padding: 0.65rem 1.25rem; overflow-x: auto;
+  }
+  nav.toc ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 1rem; white-space: nowrap; font-size: 0.85rem; }
+  nav.toc a { color: var(--ink-soft); text-decoration: none; font-weight: 500; }
+  nav.toc a:hover { color: var(--ink); }
+
+  section { margin-bottom: 3.25rem; scroll-margin-top: 3.5rem; }
+  h2 { font-family: var(--display); font-size: 1.7rem; font-weight: 700; margin: 0 0 0.35rem; letter-spacing: -0.015em; }
+  .section-sub { color: var(--ink-soft); margin: 0 0 1.4rem; max-width: 44rem; }
+  h3 { font-family: var(--display); font-size: 1.2rem; margin: 1.75rem 0 0.6rem; }
+  h4 { font-size: 0.95rem; font-weight: 700; margin: 1.1rem 0 0.45rem; }
+  p { margin: 0 0 1rem; }
+  ul.clean { margin: 0 0 1rem; padding-left: 1.15rem; }
+  ul.clean li { margin-bottom: 0.35rem; }
+  code { font-family: var(--mono); font-size: 0.86em; background: rgba(20,32,28,0.06); padding: 0.05rem 0.32rem; border-radius: 3px; }
+
+  .pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.35rem 0.75rem; border-radius: 999px;
+    font-family: var(--mono); font-size: 0.75rem;
+    border: 1px solid var(--line); background: rgba(255,255,255,0.55);
+  }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .pill.mistral .dot { background: var(--mistral); }
+  .pill.gemini .dot { background: var(--gemini); }
+  .pill.tavily .dot { background: var(--tavily); }
+  .pill.shared .dot { background: var(--shared); }
+
+  .mem {
+    margin: 1.35rem 0 1.75rem; border: 1px solid var(--line); border-radius: 8px;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(20,32,28,0.03) 23px, rgba(20,32,28,0.03) 24px),
+      rgba(255,255,255,0.62);
+    overflow: hidden;
+  }
+  .mem-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+    padding: 0.7rem 1rem; border-bottom: 1px solid var(--line); background: rgba(232,228,216,0.7);
+  }
+  .mem-head strong { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .mem-head span { font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft); }
+  .mem-body { padding: 1.1rem 1rem 1.25rem; }
+  .mem-caption { font-size: 0.86rem; color: var(--ink-soft); margin: -0.35rem 0 1.4rem; }
+
+  .region { border: 1.5px solid var(--ink); border-radius: 4px; padding: 0.65rem 0.75rem; background: rgba(255,255,255,0.75); }
+  .region.mistral-r { border-color: var(--mistral); background: var(--mistral-bg); }
+  .region.gemini-r { border-color: var(--gemini); background: var(--gemini-bg); }
+  .region.tavily-r { border-color: var(--tavily); background: var(--tavily-bg); }
+  .region.shared-r { border-color: var(--shared); background: var(--shared-bg); }
+  .region-label { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.3rem; }
+  .region-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.2rem; }
+  .region-meta { font-family: var(--mono); font-size: 0.72rem; color: var(--ink-soft); line-height: 1.45; }
+  .slot {
+    display: flex; gap: 0.5rem; align-items: flex-start;
+    padding: 0.3rem 0.4rem; margin: 0.22rem 0; border-radius: 3px;
+    background: rgba(20,32,28,0.04); font-size: 0.82rem;
+  }
+  .slot code { font-family: var(--mono); font-size: 0.72rem; color: var(--mistral); flex-shrink: 0; min-width: 5.2rem; background: none; padding: 0; }
+  .region.gemini-r .slot code { color: var(--gemini); }
+  .region.tavily-r .slot code { color: var(--tavily); }
+
+  .mem-grid { display: grid; gap: 0.7rem; }
+  .mem-grid.cols-2, .mem-grid.cols-3, .mem-grid.cols-4 { grid-template-columns: 1fr; }
+  @media (min-width: 700px) {
+    .mem-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+    .mem-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .mem-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  .svg-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .svg-wrap svg { display: block; min-width: 680px; width: 100%; height: auto; }
+
+  table.cmp { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0 1.4rem; }
+  table.cmp th, table.cmp td { text-align: left; padding: 0.6rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.cmp th { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; background: rgba(232,228,216,0.5); }
+  table.cmp td code { background: none; padding: 0; }
+
+  .flow { counter-reset: step; list-style: none; padding: 0; margin: 1rem 0 1.4rem; }
+  .flow li {
+    position: relative; padding: 0.8rem 0.85rem 0.8rem 3rem; margin-bottom: 0.45rem;
+    border: 1px solid var(--line); border-radius: 6px; background: rgba(255,255,255,0.45);
+  }
+  .flow li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0.7rem; top: 0.8rem;
+    width: 1.55rem; height: 1.55rem; border-radius: 50%;
+    background: var(--ink); color: var(--paper);
+    font-family: var(--mono); font-size: 0.72rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .flow li strong { display: block; margin-bottom: 0.12rem; }
+  .flow li span { color: var(--ink-soft); font-size: 0.9rem; }
+
+  .callout { border-left: 3px solid var(--shared); padding: 0.85rem 1rem; margin: 1.2rem 0; background: var(--shared-bg); border-radius: 0 4px 4px 0; }
+  .callout.mistral { border-left-color: var(--mistral); background: var(--mistral-bg); }
+  .callout.gemini { border-left-color: var(--gemini); background: var(--gemini-bg); }
+  .callout.tavily { border-left-color: var(--tavily); background: var(--tavily-bg); }
+  .callout strong { color: var(--shared); }
+  .callout.mistral strong { color: var(--mistral); }
+  .callout.gemini strong { color: var(--gemini); }
+  .callout.tavily strong { color: var(--tavily); }
+
+  .tag { display: inline-block; font-family: var(--mono); font-size: 0.66rem; padding: 0.12rem 0.4rem; border-radius: 3px; margin-right: 0.2rem; background: rgba(20,32,28,0.08); }
+  .tag.new { background: rgba(184,92,56,0.18); color: var(--shared); }
+  .tag.mistral { background: rgba(91,61,143,0.15); color: var(--mistral); }
+  .tag.tavily { background: rgba(42,95,122,0.15); color: var(--tavily); }
+
+  pre.code {
+    font-family: var(--mono); font-size: 0.78rem; line-height: 1.5;
+    background: #1c2622; color: #e8e4d8; border-radius: 8px;
+    padding: 1rem 1.1rem; overflow-x: auto; margin: 1rem 0 1.4rem;
+  }
+  pre.code .c { color: #8a9a90; }
+  pre.code .k { color: #c9a8f0; }
+  pre.code .s { color: #9fd0a8; }
+
+  .phase-band { display: grid; gap: 0.5rem; margin: 1.2rem 0 1rem; }
+  .phase { display: grid; grid-template-columns: auto 1fr; gap: 0.8rem; align-items: center; padding: 0.6rem 0.8rem; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,0.55); }
+  .phase .num { font-family: var(--mono); font-size: 0.72rem; color: var(--paper); background: var(--ink); width: 1.7rem; height: 1.7rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .phase .t { font-weight: 700; font-size: 0.95rem; }
+  .phase .d { color: var(--ink-soft); font-size: 0.85rem; }
+  .phase.foreground { border-color: var(--mistral); }
+  .phase.foreground .num { background: var(--mistral); }
+  .phase.background { border-color: var(--tavily); border-style: dashed; }
+  .phase.background .num { background: var(--tavily); }
+
+  footer { margin-top: 2.5rem; padding-top: 1.4rem; border-top: 1px solid var(--line); font-size: 0.85rem; color: var(--ink-soft); }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">SparkLearn · plan-generative-courses · Build blueprint · Jul 2026</p>
+  <h1>Generative courses — what I'm going to build</h1>
+  <p class="lede">
+    Turn the static <code>buildRoadmap()</code> + three hand-authored <code>lessonScripts</code> into a
+    real generation pipeline. The learner watches Lumen <strong>outline the path</strong>, then
+    <strong>write the first lesson</strong>, then <strong>quietly fill in the rest and gather
+    resources from the web</strong> — all as live, honest actions on screen, not a fake progress bar.
+  </p>
+  <div class="changelog">
+    <strong>The three things this doc nails down</strong>
+    <ul>
+      <li><strong>Deterministic UI:</strong> the model only emits <em>params</em> that fill Zod schemas; we own every React component. No model-authored HTML/JS ever reaches MathCanvas.</li>
+      <li><strong>Modules-first, resources-after:</strong> lesson <em>content</em> streams first and unlocks fast; web research / sources / extra practice / concept animations stream in a <em>second background wave</em> — they never block reading.</li>
+      <li><strong>Actions-driven animation:</strong> the existing onboarding "building your path" state becomes a live feed of the real actions the pipeline is taking (outlining → writing → filling in → gathering).</li>
+    </ul>
+  </div>
+  <div class="pills">
+    <span class="pill mistral"><span class="dot"></span> Mistral · roadmap + lessons</span>
+    <span class="pill tavily"><span class="dot"></span> Tavily · background resources</span>
+    <span class="pill shared"><span class="dot"></span> Vercel AI SDK · streamObject</span>
+    <span class="pill gemini"><span class="dot"></span> LessonScript · one contract</span>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <ul>
+    <li><a href="#today">Where we are</a></li>
+    <li><a href="#waves">Two-wave model</a></li>
+    <li><a href="#deterministic">Deterministic UI</a></li>
+    <li><a href="#pipeline">Modules pipeline</a></li>
+    <li><a href="#actions">Actions animation</a></li>
+    <li><a href="#contracts">SSE contract</a></li>
+    <li><a href="#manifest">File manifest</a></li>
+    <li><a href="#order">Build order</a></li>
+  </ul>
+</nav>
+
+<!-- ========== TODAY ========== -->
+<section id="today">
+  <h2>Where the code is today</h2>
+  <p class="section-sub">
+    Honest starting line. Everything below the onboarding form is placeholder — that's exactly what this plan replaces.
+  </p>
+  <table class="cmp">
+    <thead><tr><th>Surface</th><th>Today</th><th>After this plan</th></tr></thead>
+    <tbody>
+      <tr><td><code>mock-roadmaps.ts</code></td><td>Static <code>buildRoadmap()</code> — two hard-coded lists</td><td>Deleted from the hot path; roadmap is generated + streamed</td></tr>
+      <tr><td><code>lesson-scripts.ts</code></td><td>3 hand-authored quad-* scripts</td><td>Legacy fallback only; scripts come from the course store</td></tr>
+      <tr><td>Onboarding finish</td><td><code>onboard-finish</code> fake bar, fixed 1600ms</td><td>Live action feed driven by real SSE events</td></tr>
+      <tr><td>API routes</td><td>None (all client-side)</td><td><code>POST /api/course/start</code> (SSE) + retry/boost</td></tr>
+      <tr><td>Store</td><td><code>roadmap: Roadmap | null</code></td><td><code>course: Course | null</code> with per-module status</td></tr>
+      <tr><td>Deps</td><td>no <code>ai</code>, no <code>@ai-sdk/mistral</code></td><td>installed + <code>MISTRAL_API_KEY</code> / <code>TAVILY_API_KEY</code> server-only</td></tr>
+    </tbody>
+  </table>
+  <div class="callout mistral">
+    <strong>Load-bearing constraint:</strong> the rendered contract — <code>LessonScript</code> in <code>src/lib/types.ts</code> — does <em>not</em> change shape. Generation writes exactly what MathCanvas and the Live tutor already read. One type system; no second lesson format.
+  </div>
+</section>
+
+<!-- ========== TWO WAVES ========== -->
+<section id="waves">
+  <h2>The two-wave streaming model <span class="tag new">the key idea</span></h2>
+  <p class="section-sub">
+    "Stream the modules first, then stream the resources in the background." Content is the foreground
+    promise; resources are an enrichment that arrives after — never a gate in front of the first lesson.
+  </p>
+
+  <div class="phase-band">
+    <div class="phase foreground"><div class="num">0</div><div><div class="t">Outline the path</div><div class="d"><code>streamObject(roadmapSchema)</code> — module cards pop in one at a time as Mistral emits them.</div></div></div>
+    <div class="phase foreground"><div class="num">1</div><div><div class="t">Write Module 1 (priority)</div><div class="d"><code>streamObject(lessonScriptSchema)</code> → Zod → <code>enrichParabola</code> → <em>ready</em>. Learner can enter within ~10–20s.</div></div></div>
+    <div class="phase foreground"><div class="num">2</div><div><div class="t">Fill in Modules 2…N</div><div class="d">Background promise pool (concurrency 2–3). Cards flip <code>generating → ready</code> while the learner reads Module 1.</div></div></div>
+    <div class="phase background"><div class="num">3</div><div><div class="t">Gather resources (web) — background wave</div><div class="d">Tavily research per ready module → citations, extra practice, concept animations. Modules enrich <em>in place</em>; a card shows "adding resources…" then a small sources chip.</div></div></div>
+  </div>
+
+  <div class="mem">
+    <div class="mem-head"><strong>Fig 1 · Content wave vs resource wave</strong><span>foreground unlocks · background enriches</span></div>
+    <div class="mem-body">
+      <div class="svg-wrap">
+        <svg viewBox="0 0 960 360" role="img" aria-label="Two-wave timeline">
+          <defs>
+            <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5b3d8f"/></marker>
+            <marker id="at" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2a5f7a"/></marker>
+          </defs>
+          <!-- timeline axis -->
+          <line x1="40" y1="40" x2="920" y2="40" stroke="#3a4a44" stroke-width="1"/>
+          <text x="40" y="28" font-size="10" fill="#3a4a44" font-family="IBM Plex Mono, monospace">t=0s</text>
+          <text x="300" y="28" font-size="10" fill="#3a4a44" font-family="IBM Plex Mono, monospace">~4s roadmap</text>
+          <text x="470" y="28" font-size="10" fill="#3a4a44" font-family="IBM Plex Mono, monospace">~18s Module 1 ready</text>
+          <text x="820" y="28" font-size="10" fill="#3a4a44" font-family="IBM Plex Mono, monospace">background</text>
+
+          <!-- FOREGROUND lane -->
+          <text x="40" y="80" font-size="11" fill="#5b3d8f" font-family="IBM Plex Mono, monospace" letter-spacing="1">WAVE A · CONTENT (foreground)</text>
+          <rect x="40" y="90" width="240" height="44" rx="5" fill="rgba(91,61,143,0.08)" stroke="#5b3d8f"/>
+          <text x="160" y="117" text-anchor="middle" font-size="12" fill="#14201c">roadmap streamObject</text>
+          <rect x="300" y="90" width="200" height="44" rx="5" fill="rgba(91,61,143,0.08)" stroke="#5b3d8f"/>
+          <text x="400" y="117" text-anchor="middle" font-size="12" fill="#14201c">Module 1 (priority)</text>
+          <rect x="520" y="90" width="400" height="44" rx="5" fill="rgba(91,61,143,0.05)" stroke="#5b3d8f" stroke-dasharray="4 3"/>
+          <text x="720" y="117" text-anchor="middle" font-size="12" fill="#14201c">Modules 2…N · pool(2–3)</text>
+          <path d="M400 134 L400 175" stroke="#5b3d8f" stroke-width="1.4" marker-end="url(#a)"/>
+          <text x="410" y="160" font-size="10" fill="#5b3d8f">unlock lesson</text>
+
+          <!-- learner -->
+          <rect x="300" y="178" width="620" height="34" rx="5" fill="#fff" stroke="#14201c"/>
+          <text x="610" y="200" text-anchor="middle" font-size="12" fill="#14201c">Learner is inside Module 1 · reading, practicing</text>
+
+          <!-- BACKGROUND lane -->
+          <text x="40" y="256" font-size="11" fill="#2a5f7a" font-family="IBM Plex Mono, monospace" letter-spacing="1">WAVE B · RESOURCES (background)</text>
+          <rect x="520" y="266" width="400" height="44" rx="5" fill="rgba(42,95,122,0.08)" stroke="#2a5f7a" stroke-dasharray="5 3"/>
+          <text x="720" y="288" text-anchor="middle" font-size="12" fill="#14201c">Tavily → citations · extra practice · anims</text>
+          <text x="720" y="303" text-anchor="middle" font-size="10" fill="#3a4a44">enriches ready modules in place</text>
+          <path d="M620 212 L620 266" stroke="#2a5f7a" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#at)"/>
+          <text x="628" y="245" font-size="10" fill="#2a5f7a">never blocks reading</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout tavily">
+    <strong>This reorders plan 05.</strong> The original orchestrator ran <code>maybeCurate()</code> <em>before</em> <code>streamLesson()</code> — research gated content. We flip it: generate the lesson from model priors first (fast, good enough to start), then a background <em>resource pass</em> researches and patches the module via <code>enrichModuleResources()</code>. Same Tavily curator from plan 04, moved to Wave B.
+  </div>
+</section>
+
+<!-- ========== DETERMINISTIC UI ========== -->
+<section id="deterministic">
+  <h2>Deterministic UI from generated content</h2>
+  <p class="section-sub">
+    "AI generates the UI" — but safely. The model chooses <em>which</em> trusted widget and with <em>what
+    numbers</em>. It never writes markup. Two channels, one component registry.
+  </p>
+
+  <div class="mem">
+    <div class="mem-head"><strong>Fig 2 · Params in, trusted component out</strong><span>the only way UI reaches the screen</span></div>
+    <div class="mem-body">
+      <div class="svg-wrap">
+        <svg viewBox="0 0 940 220" role="img" aria-label="Deterministic UI path">
+          <defs><marker id="d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#b85c38"/></marker></defs>
+          <rect x="20" y="70" width="200" height="80" rx="6" fill="rgba(91,61,143,0.08)" stroke="#5b3d8f" stroke-width="1.5"/>
+          <text x="120" y="100" text-anchor="middle" font-size="11" fill="#5b3d8f" font-family="IBM Plex Mono, monospace">MISTRAL</text>
+          <text x="120" y="122" text-anchor="middle" font-size="12" fill="#14201c">emits {a,b,c}</text>
+          <text x="120" y="138" text-anchor="middle" font-size="10" fill="#3a4a44">or tool call</text>
+          <path d="M220 110 L280 110" stroke="#b85c38" stroke-width="1.4" marker-end="url(#d)"/>
+          <rect x="280" y="60" width="220" height="100" rx="6" fill="rgba(184,92,56,0.09)" stroke="#b85c38" stroke-width="1.5"/>
+          <text x="390" y="88" text-anchor="middle" font-size="11" fill="#b85c38" font-family="IBM Plex Mono, monospace">GATE (server)</text>
+          <text x="390" y="110" text-anchor="middle" font-size="12" fill="#14201c">Zod parse · enrich</text>
+          <text x="390" y="128" text-anchor="middle" font-size="12" fill="#14201c">KaTeX smoke · answer∈options</text>
+          <text x="390" y="146" text-anchor="middle" font-size="10" fill="#3a4a44">invalid → repair or drop</text>
+          <path d="M500 110 L560 110" stroke="#b85c38" stroke-width="1.4" marker-end="url(#d)"/>
+          <rect x="560" y="60" width="180" height="100" rx="6" fill="#fff" stroke="#14201c"/>
+          <text x="650" y="90" text-anchor="middle" font-size="11" fill="#14201c" font-family="IBM Plex Mono, monospace">ui-registry.ts</text>
+          <text x="650" y="112" text-anchor="middle" font-size="12" fill="#14201c">name → component</text>
+          <text x="650" y="130" text-anchor="middle" font-size="10" fill="#3a4a44">allowlist only</text>
+          <path d="M740 110 L800 110" stroke="#b85c38" stroke-width="1.4" marker-end="url(#d)"/>
+          <rect x="800" y="70" width="120" height="80" rx="6" fill="rgba(31,107,74,0.08)" stroke="#1f6b4a" stroke-width="1.5"/>
+          <text x="860" y="105" text-anchor="middle" font-size="12" fill="#14201c">ParabolaWidget</text>
+          <text x="860" y="123" text-anchor="middle" font-size="10" fill="#3a4a44">you own this</text>
+        </svg>
+      </div>
+      <div class="mem-grid cols-2" style="margin-top:0.5rem">
+        <div class="region mistral-r">
+          <div class="region-label">Channel A · durable</div>
+          <div class="region-title">Schema generation</div>
+          <div class="slot"><code>streamObject</code> → LessonScript.diagram</div>
+          <div class="slot"><code>persists</code> on the Course, drives MathCanvas</div>
+          <div class="slot"><code>readers</code> layout + Live board-targets</div>
+        </div>
+        <div class="region">
+          <div class="region-label">Channel B · ephemeral</div>
+          <div class="region-title">Generative UI tools</div>
+          <div class="slot"><code>streamText</code> + tools → typed parts</div>
+          <div class="slot"><code>render</code> same registry components</div>
+          <div class="slot"><code>durable?</code> only via updateLessonDiagram</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p>The registry is the single source of truth both channels import from — no drift between "what the model can call" and "what we can render":</p>
+  <pre class="code"><span class="c">// src/lib/course-gen/ui-registry.ts — allowlist, imported by server tools AND client switch</span>
+<span class="k">export const</span> GEN_UI = {
+  showParabola:        { component: ParabolaWidget,        args: parabolaArgsSchema },
+  showAlgebraTiles:    { component: AlgebraTiles,          args: tilesArgsSchema },
+  showNumberLine:      { component: NumberLine,            args: numberLineArgsSchema },
+  showPracticeCard:    { component: PracticeCard,          args: practiceArgsSchema },
+  showWorkedExample:   { component: WorkedExample,         args: workedArgsSchema },
+  showConceptAnimation:{ component: ConceptAnimationPlayer,args: conceptAnimationSchema },
+  updateLessonDiagram: { component: <span class="k">null</span> <span class="c">/* mutates script, no render */</span>, args: diagramSchema },
+} <span class="k">as const</span>;</pre>
+
+  <ul class="clean">
+    <li><strong>Allowlist only</strong> — a tool name not in <code>GEN_UI</code> renders nothing. No <code>eval</code>, no model HTML/CSS/JS.</li>
+    <li><strong>Server owns arithmetic</strong> — <code>enrichParabola</code> recomputes roots/vertex from a,b,c before the client trusts them, so Live circles the right point.</li>
+    <li><strong>LaTeX sanitized</strong> — length + charset cap, then <code>katex.renderToString(&#123;throwOnError&#125;)</code> smoke test; a bad field is repaired or dropped, never streamed raw.</li>
+  </ul>
+</section>
+
+<!-- ========== PIPELINE ========== -->
+<section id="pipeline">
+  <h2>The modules pipeline, done well</h2>
+  <p class="section-sub">
+    One orchestrator, a priority queue, a validation gate, and failure isolation so a bad Module 3 can never take down Module 1.
+  </p>
+
+  <ol class="flow">
+    <li><strong>generateRoadmap — streamed</strong><span><code>streamObject(roadmapSchema)</code>. Emits <code>roadmap_partial</code> per module for the pop-in. Resolves in &lt; 5s to <code>Course{ modules: [{status:"pending"}] }</code>.</span></li>
+    <li><strong>generateOne(0) — priority, foreground</strong><span>Mistral <code>streamObject(lessonScriptSchema)</code>. Partials stream as <code>module_partial</code> (skeleton only). Final → Zod → <code>enrichDiagrams</code> → math checks → <code>ready</code>.</span></li>
+    <li><strong>mapPool(modules[1…], 2–3) — background content</strong><span>Same generator, no curation. Each flips <code>generating → ready | failed</code>, streamed as <code>module_status</code> / <code>module_ready</code>.</span></li>
+    <li><strong>resource pass — background, per ready module</strong><span><code>enrichModuleResources()</code>: Mistral + Tavily search → citations, one extra practice, optional concept animation → patched onto the script → <code>module_enriched</code>.</span></li>
+    <li><strong>boost on open</strong><span>Client opens Module k → <code>POST /api/course/boost</code> bumps k+1's weight so "next lesson" is usually ready by the time they finish.</span></li>
+    <li><strong>failure isolation</strong><span>Two failed gen attempts (small → large repair) → <code>status:"failed"</code> + retry on that card only. Soft fallback: inject a short placeholder script so the path never dead-ends.</span></li>
+  </ol>
+
+  <h3>The validation gate (server, before any <code>ready</code>)</h3>
+  <table class="cmp">
+    <thead><tr><th>Check</th><th>Action on fail</th></tr></thead>
+    <tbody>
+      <tr><td>Zod <code>lessonScriptSchema.parse</code></td><td>one repair call on <code>mistral-large-latest</code></td></tr>
+      <tr><td>Math consistency (recompute roots/vertex)</td><td>overwrite model's numbers with computed truth</td></tr>
+      <tr><td>KaTeX renders without throwing</td><td>repair or strip that one math field</td></tr>
+      <tr><td>practice <code>answer ∈ options</code></td><td>normalize, or repair</td></tr>
+      <tr><td>second failure</td><td><code>status:"failed"</code> — never stream garbage to the board</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Store shape change</h3>
+  <pre class="code"><span class="c">// tutor-store.ts — course replaces the bare roadmap (roadmap stays derivable for back-compat)</span>
+<span class="k">type</span> ModuleGenStatus = <span class="s">"pending"</span> | <span class="s">"generating"</span> | <span class="s">"ready"</span> | <span class="s">"failed"</span>;
+<span class="k">interface</span> CourseModule <span class="k">extends</span> RoadmapModule {
+  status: ModuleGenStatus;
+  script?: LessonScript;      <span class="c">// present when ready</span>
+  resources?: ModuleResources;<span class="c">// arrives in Wave B (citations, extras)</span>
+  error?: string;
+}
+<span class="c">// getLessonScript(id) now reads course store first, legacy scripts as fallback.</span></pre>
+</section>
+
+<!-- ========== ACTIONS ANIMATION ========== -->
+<section id="actions">
+  <h2>The actions animation <span class="tag mistral">Onboarding finish → live feed</span></h2>
+  <p class="section-sub">
+    The <code>onboard-finish</code> "building your path" state already exists — a status dot and an
+    indeterminate bar. We keep the shell and its motion, and feed it the <em>real</em> actions the
+    pipeline is taking, in order, from the SSE stream. The fake 1600ms timeout goes away.
+  </p>
+
+  <div class="mem">
+    <div class="mem-head"><strong>Fig 3 · SSE event → on-screen action line</strong><span>honest, not cosmetic</span></div>
+    <div class="mem-body">
+      <div class="mem-grid cols-4">
+        <div class="region mistral-r"><div class="region-label">on <code>roadmap</code></div><div class="region-title">Outlining your path</div><div class="region-meta">cards pop in as roadmap_partial arrives</div></div>
+        <div class="region mistral-r"><div class="region-label">on <code>module_status</code> m1</div><div class="region-title">Writing your first lesson</div><div class="region-meta">Module 1 = generating</div></div>
+        <div class="region"><div class="region-label">on <code>module_ready</code> m1</div><div class="region-title">Your first lesson is ready</div><div class="region-meta">unlock / auto-navigate beat</div></div>
+        <div class="region tavily-r"><div class="region-label">on <code>module_enriched</code></div><div class="region-title">Gathering resources…</div><div class="region-meta">background chip, non-blocking</div></div>
+      </div>
+    </div>
+  </div>
+
+  <ul class="clean">
+    <li><strong>Reuse the shell.</strong> Keep <code>.onboard-finish</code>, <code>.live-dot</code>, and <code>.onboard-finish-bar</code> markup + CSS. Swap the static caption for a small rolling list of action lines (each <code>tutor-fade-in</code>).</li>
+    <li><strong>Auto-advance on Module 1 ready.</strong> Navigate to <code>/roadmap</code> (or straight into the lesson) the moment <code>module_ready</code> for module 0 lands — not on a timer.</li>
+    <li><strong>Reduced-motion:</strong> collapse the rolling list to the single latest action line; no bar animation.</li>
+    <li><strong>The roadmap keeps animating after nav</strong> — remaining cards flip <code>generating → ready</code> live via the store; the resource chip appears as Wave B lands.</li>
+  </ul>
+</section>
+
+<!-- ========== SSE CONTRACT ========== -->
+<section id="contracts">
+  <h2>The one SSE contract</h2>
+  <p class="section-sub">
+    <code>POST /api/course/start</code> → <code>text/event-stream</code>, served as a <strong>same-origin
+    TanStack Start API route</strong> (<code>src/routes/api/course/start.ts</code>) — the pattern the app now uses for
+    <code>lumen-token</code> and <code>payments/*</code>. No proxy, no separate process. Both the actions animation and
+    the roadmap subscribe to the same events; <code>GET /api/course/:id</code> serves reconnect on a single-node server.
+  </p>
+  <div class="callout tavily">
+    <strong>Architecture note (reconciled after merge):</strong> the repo was refactored to <em>colocate server APIs</em>
+    — the old external token-server was removed and secrets now live in the app's server env, read via
+    <code>process.env</code> inside <code>createFileRoute(...).server.handlers</code>. So generation lives in
+    <code>src/server/course/</code> (TypeScript, importing the shared <code>@/lib/course-gen</code> schemas + math — no
+    JS duplication), the SSE route streams a <code>ReadableStream</code>, and the AI SDK installs in the frontend, never
+    the browser bundle. The in-memory course <code>Map</code> is pinned to <code>globalThis</code>; a Cloudflare/edge
+    deploy would swap it for KV/Durable Objects (the client also persists the course in localStorage).
+  </div>
+  <pre class="code"><span class="k">event:</span> course          <span class="c">// { id, topic }</span>
+<span class="k">event:</span> roadmap_partial <span class="c">// { modules: [...] }  ← pop-in animation</span>
+<span class="k">event:</span> roadmap         <span class="c">// { modules: [{id,title,blurb,status:"pending"}] }  final outline</span>
+<span class="k">event:</span> module_status   <span class="c">// { id, status:"generating" }</span>
+<span class="k">event:</span> module_partial  <span class="c">// { id, partial }  ← skeleton only, never practice answers</span>
+<span class="k">event:</span> module_ready    <span class="c">// { id, script }  ← Wave A content, board-ready</span>
+<span class="k">event:</span> module_enriched <span class="c">// { id, resources }  ← Wave B, background</span>
+<span class="k">event:</span> module_status   <span class="c">// { id, status:"failed", error }</span>
+<span class="k">event:</span> done            <span class="c">// {}</span></pre>
+  <ul class="clean">
+    <li>Keys are server-only: <code>MISTRAL_API_KEY</code>, <code>TAVILY_API_KEY</code> — never <code>VITE_</code>-prefixed. Generation runs inside TanStack Start server routes.</li>
+    <li>Course persisted in an in-memory <code>Map&lt;courseId, Course&gt;</code> for the demo; SQLite/Turso later. Reconnect: <code>GET /api/course/:id</code> polls status; replay only missed readies.</li>
+    <li>SSE only — no second realtime stack. LiveKit (the Live tutor) stays independent.</li>
+  </ul>
+</section>
+
+<!-- ========== FILE MANIFEST ========== -->
+<section id="manifest">
+  <h2>File manifest</h2>
+  <p class="section-sub">New files under <code>src/lib/course-gen/</code> and <code>src/routes/api/</code>; small edits to existing surfaces.</p>
+  <table class="cmp">
+    <thead><tr><th>File</th><th>New / edit</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><code>src/lib/course-gen/schemas.ts</code></td><td class="tag new">new</td><td>Zod mirrors of Roadmap / LessonScript / diagram / gen-ui args</td></tr>
+      <tr><td><code>src/lib/course-gen/math.ts</code></td><td class="tag new">new</td><td><code>enrichParabola</code> + diagram enrichers (server truth)</td></tr>
+      <tr><td><code>src/lib/course-gen/generate.ts</code></td><td class="tag new">new</td><td><code>generateRoadmap</code>, <code>streamLesson</code>, repair loop</td></tr>
+      <tr><td><code>src/lib/course-gen/orchestrator.ts</code></td><td class="tag new">new</td><td>priority queue, mapPool, Wave A/B, SSE send</td></tr>
+      <tr><td><code>src/lib/course-gen/resources.ts</code></td><td class="tag new">new</td><td>Tavily curator → <code>enrichModuleResources</code> (Wave B)</td></tr>
+      <tr><td><code>src/lib/course-gen/ui-registry.ts</code></td><td class="tag new">new</td><td>allowlist: tool name → component + args schema</td></tr>
+      <tr><td><code>src/lib/course-gen/types.ts</code></td><td class="tag new">new</td><td><code>Course</code>, <code>CourseModule</code>, <code>ModuleGenStatus</code>, <code>ModuleResources</code></td></tr>
+      <tr><td><code>src/server/course/{generate,orchestrator,store}.ts</code></td><td class="tag tavily">new</td><td>generation + repair + two-wave orchestrator + globalThis course Map</td></tr>
+      <tr><td><code>src/routes/api/course/start.ts</code> · <code>$id.ts</code></td><td class="tag tavily">new</td><td>SSE stream route + reconnect GET (colocated app routes)</td></tr>
+      <tr><td><code>frontend/.env</code></td><td class="tag mistral">edit</td><td><code>MISTRAL_API_KEY</code>, <code>TAVILY_API_KEY</code> (server-only, read via <code>process.env</code>)</td></tr>
+      <tr><td><code>src/components/course-gen/PracticeCard.tsx</code> · <code>WorkedExample.tsx</code></td><td class="tag new">new</td><td>registry components not yet built</td></tr>
+      <tr><td><code>src/lib/tutor-store.ts</code></td><td class="tag mistral">edit</td><td>add <code>course</code>, <code>patchModule</code>; derive <code>roadmap</code></td></tr>
+      <tr><td><code>src/components/tutor/Onboarding.tsx</code></td><td class="tag mistral">edit</td><td>finish state → SSE action feed; drop fake timeout</td></tr>
+      <tr><td><code>src/components/tutor/RoadmapView.tsx</code></td><td class="tag mistral">edit</td><td>status-aware cards + resource chip</td></tr>
+      <tr><td><code>src/components/whiteboard/LessonRoute.tsx</code></td><td class="tag mistral">edit</td><td>read script from course store; guard on <code>ready</code></td></tr>
+      <tr><td><code>src/lib/lesson-scripts.ts</code></td><td class="tag mistral">edit</td><td><code>getLessonScript</code> → store-first, legacy fallback</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ========== BUILD ORDER ========== -->
+<section id="order">
+  <h2>Build order — each slice demos on its own</h2>
+  <ol class="flow">
+    <li><strong>Phase A — schemas + math + types ✓ done</strong><span>Wrote <code>src/lib/course-gen/{types,schemas,math}.ts</code> + 6 passing unit tests. <code>enrichParabola</code> reproduces the quad-1 fixture (roots 2,3 / vertex 2.5,-0.25) and overrides model arithmetic.</span></li>
+    <li><strong>Phase B — roadmap generation (streamed) ✓ done</strong><span>AI SDK v7 + Mistral in the frontend; generation in <code>src/server/course/</code>. <code>streamRoadmap</code> + same-origin SSE <code>/api/course/start</code> emitting <code>roadmap_partial</code> (verified: 8 modules pop in ~4s). Onboarding <code>onboard-finish</code> now shows the live action feed + planning pop-in.</span></li>
+    <li><strong>Phase C — Module 1 foreground ✓ done</strong><span><code>streamLesson</code> + Zod gate + <code>enrichScript</code> (server owns roots/vertex) + one-shot repair on <code>mistral-large</code>. Store holds <code>course</code>; <code>getLessonScript</code> is store-first; LessonRoute guards non-ready modules. Verified end-to-end through the app route: 8/8 modules ready, 0 failed, all parabolas enriched.</span></li>
+    <li><strong>Phase D — background content pool ✓ done</strong><span><code>mapPool(2)</code> for Modules 2…N; status-aware roadmap cards (pending/generating shimmer/ready/failed) + "N of M lessons ready" header. Boost/retry endpoints still TODO.</span></li>
+    <li><strong>Phase E — resource wave (Tavily) · next</strong><span>Client + store already handle <code>module_enriched</code> and render a sources chip. Remaining: server <code>enrichModuleResources</code> (Tavily search → citations + extra practice) emitted as the background Wave B. <em>This is the "stream the rest in the background for resources" half.</em></span></li>
+    <li><strong>Phase F — generative UI channel</strong><span><code>/api/course/gen-ui</code> + <code>ui-registry</code> + <code>PracticeCard</code>/<code>WorkedExample</code>; live widgets in a side rail. Optional concept-animation player (plan 09) rides the same registry.</span></li>
+  </ol>
+
+  <div class="callout mistral">
+    <strong>Definition of done (v1):</strong> onboard on "quadratic equations" → watch the path outline itself → Module 1 opens with real generated steps + a correct parabola in ~10–20s → Modules 2–3 flip to ready while you read → a sources chip appears on Module 1 without ever interrupting it → the generated Module 1 works with Lumen Live board targets (vertex, roots).
+  </div>
+
+  <h3>Open questions to confirm before Phase C</h3>
+  <ul class="clean">
+    <li><strong>Persistence:</strong> in-memory <code>Map</code> for the demo, or wire SQLite/Turso now so courses survive a server restart?</li>
+    <li><strong>Resource depth (Wave B):</strong> citations + one extra practice to start, or also auto-author a concept animation per module from day one?</li>
+    <li><strong>Auto-navigate:</strong> jump straight into Module 1 when ready, or land on the roadmap and let the learner press Start?</li>
+  </ul>
+</section>
+
+<footer>
+  <p>Source plans: <code>frontend/plan-generative-courses/</code> (00–09). This blueprint sequences them into build phases and locks the two-wave (content-first, resources-after) model.</p>
+  <p>File: <code>frontend/docs/plan-generative-courses-build.html</code> — open in a browser for the full diagrams.</p>
+</footer>
+
+</div>
+</body>
+</html>

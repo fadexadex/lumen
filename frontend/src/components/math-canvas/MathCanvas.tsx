@@ -5,6 +5,7 @@ import { TextNotes, type NotesHandle } from "./text-notes";
 import { ParabolaWidget } from "./parabola-widget";
 import { layoutScript, BOARD_W, LEFT_X, COL_W, type Beat } from "./layout";
 import { Equation, toHandMath } from "./equation";
+import { MathText } from "@/lib/math-text";
 import { useBeatPlayer } from "./use-beat-player";
 import { AnnotationLayer, type LumenCanvasController } from "./annotation-layer";
 import { setCanvasController } from "@/lib/live/canvas-agent-bridge";
@@ -400,7 +401,7 @@ export function MathCanvas(props: MathCanvasProps) {
               );
             })}
           </div>
-          <AnnotationLayer ref={annoRef} width={BOARD_W} height={BOARD_H} />
+          <AnnotationLayer ref={annoRef} width={BOARD_W} height={BOARD_H} viewScale={view.scale} />
         </div>
       </div>
 
@@ -613,7 +614,7 @@ function BeatView({
     const { shown, showCaret } = revealText(beat.text, charsRevealed, active);
     return (
       <div style={base} className="mc-text">
-        {shown}
+        <MathText text={shown} />
         {showCaret && <Caret />}
       </div>
     );

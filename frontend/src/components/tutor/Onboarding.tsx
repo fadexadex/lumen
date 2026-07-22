@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTutorStore } from "@/lib/tutor-store";
-import { buildRoadmap } from "@/lib/mock-roadmaps";
+import { startCourseGeneration } from "@/lib/course-gen/session";
 import type { AudioPref, LearnerProfile, LearningStyle } from "@/lib/types";
 
 const grades = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -41,10 +41,12 @@ function prefersReducedMotion() {
 export function Onboarding() {
   const navigate = useNavigate();
   const setProfile = useTutorStore((s) => s.setProfile);
-  const setRoadmap = useTutorStore((s) => s.setRoadmap);
   const savedProfile = useTutorStore((s) => s.profile);
   const subscription = useTutorStore((s) => s.subscription);
   const ensureRoadmap = useTutorStore((s) => s.ensureRoadmap);
+  const genPhase = useTutorStore((s) => s.genPhase);
+  const genLog = useTutorStore((s) => s.genLog);
+  const planningModules = useTutorStore((s) => s.planningModules);
 
   // Returning learner: skip questions. Paid → path; unpaid → paywall.
   useEffect(() => {
@@ -164,10 +166,11 @@ export function Onboarding() {
       audio: audio!,
     };
     setProfile(profile);
-    setRoadmap(buildRoadmap(profile.topic, profile.grade));
+    // Kick off real generation now; the stream survives navigation (session
+    // singleton → store), so the path keeps building through the paywall.
+    startCourseGeneration(profile);
     setFinishing(true);
-    // Paywall sits between onboarding and the platform.
-    setTimeout(() => navigate({ to: "/subscribe" }), 1600);
+    // Navigation to the paywall is driven by generation progress — see effect below.
   };
 
   const advance = () => {
@@ -202,21 +205,60 @@ export function Onboarding() {
     autoTimer.current = setTimeout(() => advanceRef.current(), delay);
   };
 
+  // Once the path is outlined (or if generation stalls), move to the paywall.
+  // The stream keeps running in the background via the session singleton.
+  useEffect(() => {
+    if (!finishing) return;
+    const outlined = genPhase === "writing" || genPhase === "ready" || genPhase === "done";
+    const go = () => navigate({ to: "/subscribe" });
+    // Let the learner see the outline settle, then continue.
+    const t = setTimeout(go, outlined ? 1100 : 9000);
+    return () => clearTimeout(t);
+  }, [finishing, genPhase, navigate]);
+
   if (returningRef.current) return null;
 
   if (finishing) {
+    const phaseLabel =
+      genPhase === "planning"
+        ? "outlining your path"
+        : genPhase === "writing"
+          ? "writing your first lesson"
+          : genPhase === "ready" || genPhase === "done"
+            ? "your first lesson is ready"
+            : "getting started";
     return (
       <div className="tutor-app onboard-shell min-h-screen flex flex-col items-center justify-center px-6">
         <div className="onboard-finish">
           <div className="onboard-finish-status">
             <span className="live-dot" />
             <span className="text-sm" style={{ color: "var(--tutor-muted)" }}>
-              building your path
+              {phaseLabel}
             </span>
           </div>
-          <h1 className="tutor-serif text-4xl md:text-5xl">
-            Getting things ready for you, {name}…
-          </h1>
+          <h1 className="tutor-serif text-4xl md:text-5xl">Designing {name}'s path…</h1>
+
+          {planningModules.length > 0 && (
+            <ul className="onboard-plan-list" aria-label="Modules being planned">
+              {planningModules.map((m, idx) => (
+                <li
+                  key={m.id ?? idx}
+                  className="onboard-plan-item tutor-fade-in"
+                  style={{ animationDelay: `${idx * 60}ms` }}
+                >
+                  <span className="onboard-plan-num">{idx + 1}</span>
+                  <span className="onboard-plan-title">{m.title ?? "…"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {genLog.length > 0 && (
+            <p className="onboard-plan-action" aria-live="polite">
+              {genLog[genLog.length - 1].label}…
+            </p>
+          )}
+
           <div className="onboard-finish-bar" aria-hidden>
             <span />
           </div>

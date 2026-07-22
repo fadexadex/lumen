@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MathText, normalizeMathNotation, splitMathText } from "@/lib/math-text";
+import {
+  MathText,
+  normalizeMathNotation,
+  splitMathText,
+  stripMarkdownDecoration,
+} from "@/lib/math-text";
 
 describe("math-aware tutor text", () => {
+  it("removes model-authored Markdown decoration from prose", () => {
+    expect(stripMarkdownDecoration("Use **<** and `x`.")).toBe("Use < and x.");
+  });
+
   it("extracts inline LaTeX without treating the surrounding explanation as math", () => {
     expect(splitMathText("Use $x = \\frac{-b}{2a}$ for the vertex.")).toEqual([
       { kind: "text", value: "Use " },

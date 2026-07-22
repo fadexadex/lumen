@@ -1,5 +1,7 @@
 import type { LessonScript } from "@/lib/types";
 import { resolveTargets } from "./board-targets";
+import type { TargetDescription } from "./board-targets";
+import type { CanvasTargetDescription } from "@/components/math-canvas/annotation-layer";
 import { prettifyLatex } from "@/lib/whiteboard-bridge";
 import { getCanvasController } from "./canvas-agent-bridge";
 
@@ -11,6 +13,7 @@ export interface BoardState {
   equation: string; // human-readable
   parabola: { a: number; b: number; c: number } | null;
   targets: string[]; // names the model may reference
+  targetDetails: Array<TargetDescription | CanvasTargetDescription>;
 }
 
 export function buildBoardState(
@@ -20,9 +23,10 @@ export function buildBoardState(
   parabolaOverride?: { a: number; b: number; c: number } | null,
 ): BoardState {
   // Prefer explicit override, then live canvas controller params, then script defaults.
-  const live = getCanvasController()?.targets.parabola;
-  const override =
-    parabolaOverride ?? (live ? { a: live.a, b: live.b, c: live.c } : null);
+  const controller = getCanvasController();
+  const live = controller?.targets.parabola;
+  const writingTargets = controller?.anno()?.targetDescriptions() ?? [];
+  const override = parabolaOverride ?? (live ? { a: live.a, b: live.b, c: live.c } : null);
 
   const T = resolveTargets(script, override);
   const step = script.steps[stepIndex];
@@ -41,7 +45,8 @@ export function buildBoardState(
     stepTitle: step?.title ?? script.title,
     equation: stepMath ? prettifyLatex(stepMath) : "",
     parabola: T.parabola ? { a: T.parabola.a, b: T.parabola.b, c: T.parabola.c } : null,
-    targets: T.names,
+    targets: [...T.names, ...writingTargets.map((target) => target.name)],
+    targetDetails: [...T.descriptions, ...writingTargets],
   };
 }
 

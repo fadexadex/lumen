@@ -79,6 +79,7 @@
 }
 .mc-title--h2 {
   font-size: clamp(1.35rem, 2vw, 1.75rem);
+  max-width: 36rem;
   font-family: var(--font-serif);
   font-weight: 400;
   letter-spacing: -0.015em;
@@ -778,9 +779,9 @@
 .mc-annotation-layer {
   z-index: 5; /* above lesson layer, below chrome */
 }
-.mc-anno--highlight rect {
-  animation: anno-pop 360ms var(--ease-tutor) both;
-  will-change: transform;
+.mc-anno--highlight path {
+  animation: anno-highlight-in 420ms var(--ease-tutor) both;
+  will-change: opacity;
 }
 .mc-anno--label {
   animation: anno-rise 340ms var(--ease-tutor) both;
@@ -852,6 +853,14 @@
     transform: scale(1);
   }
 }
+@keyframes anno-highlight-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 @keyframes anno-rise {
   from {
     opacity: 0;
@@ -860,5 +869,13 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-anno--highlight path,
+  .mc-anno--label,
+  .mc-anno--write {
+    animation: none;
   }
 }

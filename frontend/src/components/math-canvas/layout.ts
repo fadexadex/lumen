@@ -23,30 +23,59 @@ export const BOARD_H = 1000;
 export const LEFT_X = 88;
 export const COL_W = 680;
 const LINE_H = 34;
-const H1_H = 68;
-const H2_H = 40;
+const H1_LINE_H = 72;
+const H2_LINE_H = 40;
 const MATH_H = 58;
 const INTRA = 12; // tight: heading → body / body → math
 const SECTION = 48; // generous: between lesson sections
 const QUIZ_GAP = 56;
 
+/** Approximate CSS word wrapping so absolute-positioned beats never overlap. */
+export function wrappedLineCount(text: string, charsPerLine: number): number {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return 1;
+  let lines = 1;
+  let used = 0;
+  for (const word of words) {
+    const wordLines = Math.max(1, Math.ceil(word.length / charsPerLine));
+    if (wordLines > 1) {
+      if (used > 0) lines += 1;
+      lines += wordLines - 1;
+      used = word.length % charsPerLine;
+      continue;
+    }
+    const needed = used === 0 ? word.length : word.length + 1;
+    if (used + needed > charsPerLine) {
+      lines += 1;
+      used = word.length;
+    } else {
+      used += needed;
+    }
+  }
+  return lines;
+}
+
+const h2Height = (title: string) => wrappedLineCount(title, 42) * H2_LINE_H;
+const bodyLineCount = (text: string) => wrappedLineCount(text, 62);
+
 function measure(step: LessonStep): number {
   if (step.kind === "explanation") {
-    const bodyLines = Math.max(1, Math.ceil(step.body.length / 62));
-    return H2_H + INTRA + bodyLines * LINE_H + (step.math ? INTRA + MATH_H : 0) + SECTION;
+    const bodyLines = bodyLineCount(step.body);
+    return (
+      h2Height(step.title) + INTRA + bodyLines * LINE_H + (step.math ? INTRA + MATH_H : 0) + SECTION
+    );
   }
   if (step.kind === "example") {
     const lines = step.lines.reduce(
-      (a, l) =>
-        a + (l.math ? MATH_H + 8 : LINE_H * Math.max(1, Math.ceil((l.text ?? "").length / 62))),
+      (a, l) => a + (l.math ? MATH_H + 8 : LINE_H * bodyLineCount(l.text ?? "")),
       0,
     );
-    return H2_H + INTRA + lines + SECTION;
+    return h2Height(step.title) + INTRA + lines + SECTION;
   }
   return (
-    H2_H +
+    h2Height(step.title) +
     INTRA +
-    LINE_H * Math.max(1, Math.ceil(step.prompt.length / 62)) +
+    LINE_H * bodyLineCount(step.prompt) +
     (step.math ? INTRA + MATH_H : 0) +
     (step.options ? QUIZ_GAP : 0) +
     SECTION
@@ -58,16 +87,16 @@ export function layoutScript(script: LessonScript): { beats: Beat[]; height: num
   let y = 72;
 
   beats.push({ kind: "title", text: script.title, x: LEFT_X, y, size: "h1", step: 0 });
-  y += H1_H + SECTION;
+  y += wrappedLineCount(script.title, 18) * H1_LINE_H + SECTION;
 
   script.steps.forEach((step, i) => {
     const startY = y;
     beats.push({ kind: "title", text: step.title, x: LEFT_X, y, size: "h2", step: i });
-    y += H2_H + INTRA;
+    y += h2Height(step.title) + INTRA;
 
     if (step.kind === "explanation") {
       beats.push({ kind: "text", text: step.body, x: LEFT_X, y, size: "body", step: i });
-      const bodyLines = Math.max(1, Math.ceil(step.body.length / 62));
+      const bodyLines = bodyLineCount(step.body);
       y += bodyLines * LINE_H;
       if (step.math) {
         y += INTRA;
@@ -82,12 +111,12 @@ export function layoutScript(script: LessonScript): { beats: Beat[]; height: num
           y += MATH_H;
         } else if (l.text) {
           beats.push({ kind: "text", text: l.text, x: LEFT_X, y, size: "body", step: i });
-          y += LINE_H * Math.max(1, Math.ceil(l.text.length / 62));
+          y += LINE_H * bodyLineCount(l.text);
         }
       });
     } else {
       beats.push({ kind: "text", text: step.prompt, x: LEFT_X, y, size: "body", step: i });
-      y += LINE_H * Math.max(1, Math.ceil(step.prompt.length / 62));
+      y += LINE_H * bodyLineCount(step.prompt);
       if (step.math) {
         y += INTRA;
         beats.push({ kind: "math", latex: step.math, x: LEFT_X, y, step: i });

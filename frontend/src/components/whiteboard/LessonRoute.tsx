@@ -18,7 +18,10 @@ export function LessonRoute() {
   const { moduleId } = useParams({ from: "/lesson/$moduleId" });
   const navigate = useNavigate();
   const roadmap = useTutorStore((s) => s.roadmap);
+  const course = useTutorStore((s) => s.course);
+  const profile = useTutorStore((s) => s.profile);
   const subscription = useTutorStore((s) => s.subscription);
+  const ensureRoadmap = useTutorStore((s) => s.ensureRoadmap);
   const stepByModule = useTutorStore((s) => s.stepByModule);
   const setStep = useTutorStore((s) => s.setStep);
   const completed = useTutorStore((s) => s.completed);
@@ -26,8 +29,9 @@ export function LessonRoute() {
   const setLastModule = useTutorStore((s) => s.setLastModule);
 
   const mod = roadmap?.modules.find((m) => m.id === moduleId);
+  const courseModule = course?.modules.find((m) => m.id === moduleId);
 
-  const [hydrated, setHydrated] = useState(() => useTutorStore.persist.hasHydrated());
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setHydrated(useTutorStore.persist.hasHydrated());
@@ -37,13 +41,23 @@ export function LessonRoute() {
   useEffect(() => {
     if (!hydrated) return;
     if (!roadmap) {
-      navigate({ to: "/" });
-      return;
+      if (profile || course) {
+        ensureRoadmap();
+        return;
+      }
+      // A direct URL can render before Zustand has applied synchronous browser
+      // storage. Defer the redirect one task so a saved lesson is not bounced.
+      const timer = setTimeout(() => {
+        const state = useTutorStore.getState();
+        if (state.profile || state.course) state.ensureRoadmap();
+        else navigate({ to: "/" });
+      }, 0);
+      return () => clearTimeout(timer);
     }
     if (subscription?.status !== "active") {
       navigate({ to: "/subscribe" });
     }
-  }, [hydrated, roadmap, subscription, navigate]);
+  }, [hydrated, roadmap, profile, course, subscription, ensureRoadmap, navigate]);
 
   // Remember this as the module to resume from.
   useEffect(() => {
@@ -51,8 +65,8 @@ export function LessonRoute() {
   }, [roadmap, subscription, moduleId, setLastModule]);
 
   const script = useMemo(
-    () => getLessonScript(moduleId, mod?.title ?? "Lesson"),
-    [moduleId, mod?.title],
+    () => courseModule?.script ?? getLessonScript(moduleId, mod?.title ?? "Lesson"),
+    [courseModule?.script, moduleId, mod?.title],
   );
 
   const stepIndex = stepByModule[moduleId] ?? 0;
@@ -100,11 +114,21 @@ export function LessonRoute() {
       navigate({ to: "/roadmap" });
       return;
     }
+    const nextCourseModule = course?.modules.find((module) => module.id === nextMod.id);
+    if (nextCourseModule && nextCourseModule.status !== "ready") {
+      navigate({ to: "/roadmap" });
+      return;
+    }
     setStep(nextMod.id, 0);
     navigate({ to: "/lesson/$moduleId", params: { moduleId: nextMod.id } });
   };
 
   const goToModule = (id: string) => {
+    const selected = course?.modules.find((module) => module.id === id);
+    if (selected && selected.status !== "ready") {
+      navigate({ to: "/roadmap" });
+      return;
+    }
     setStep(id, 0);
     navigate({ to: "/lesson/$moduleId", params: { moduleId: id } });
   };
@@ -151,6 +175,39 @@ export function LessonRoute() {
   const boardTone = concept.boardTone;
 
   if (!roadmap || subscription?.status !== "active") return null;
+
+  // Guard: never mount the board on a generated module that isn't ready yet.
+  // (RoadmapView disables such cards, but a direct link could still land here.)
+  if (courseModule && courseModule.status !== "ready" && !courseModule.script) {
+    return (
+      <div className="tutor-app onboard-shell min-h-screen flex flex-col items-center justify-center px-6">
+        <div className="onboard-finish">
+          <div className="onboard-finish-status">
+            <span className="live-dot" />
+            <span className="text-sm" style={{ color: "var(--tutor-muted)" }}>
+              {courseModule.status === "failed"
+                ? "couldn't generate this lesson"
+                : "writing this lesson"}
+            </span>
+          </div>
+          <h1 className="tutor-serif text-3xl md:text-4xl">{mod?.title ?? "Your lesson"}</h1>
+          {courseModule.status !== "failed" && (
+            <div className="onboard-finish-bar" aria-hidden>
+              <span />
+            </div>
+          )}
+          <button
+            type="button"
+            className="tutor-primary-btn"
+            style={{ marginTop: "1.5rem" }}
+            onClick={() => navigate({ to: "/roadmap" })}
+          >
+            ← Back to your path
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="lesson-shell" data-board-tone={boardTone}>
