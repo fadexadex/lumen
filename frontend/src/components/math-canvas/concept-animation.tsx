@@ -2,6 +2,7 @@ import type { ConceptAnimation, ConceptScene } from "@/lib/types";
 import { activeConceptScene } from "@/lib/concept-visual";
 import { Equation, toHandMath } from "./equation";
 import { MathText } from "@/lib/math-text";
+import { ParabolaWidget } from "./parabola-widget";
 
 export function ConceptAnimationPlayer({
   animation,
@@ -12,6 +13,7 @@ export function ConceptAnimationPlayer({
   plotOverride,
   sceneIndex,
   onSceneChange,
+  onPlotChange,
 }: {
   animation: ConceptAnimation;
   stepIndex: number;
@@ -21,6 +23,7 @@ export function ConceptAnimationPlayer({
   plotOverride?: { a: number; b: number; c: number } | null;
   sceneIndex?: number;
   onSceneChange?: (index: number) => void;
+  onPlotChange?: (params: { a: number; b: number; c: number }) => void;
 }) {
   const { scene, index } = activeConceptScene(animation, stepIndex, stepTotal, sceneIndex);
   const renderedScene =
@@ -65,7 +68,7 @@ export function ConceptAnimationPlayer({
         </nav>
       ) : null}
       <div className="mc-concept-stage" key={`${index}-${scene.primitive}`}>
-        <SceneView scene={renderedScene} />
+        <SceneView scene={renderedScene} onPlotChange={onPlotChange} />
       </div>
       <p className="mc-concept-caption">
         <span aria-hidden className="mc-concept-caption-mark" />
@@ -89,7 +92,23 @@ function sceneLabel(primitive: ConceptScene["primitive"]): string {
   }[primitive];
 }
 
-function SceneView({ scene }: { scene: ConceptScene }) {
+function SceneView({
+  scene,
+  onPlotChange,
+}: {
+  scene: ConceptScene;
+  onPlotChange?: (params: { a: number; b: number; c: number }) => void;
+}) {
+  if (scene.primitive === "plotFunction" && scene.fn === "parabola") {
+    return (
+      <ParabolaWidget
+        width={560}
+        height={330}
+        value={{ a: scene.a, b: scene.b, c: scene.c }}
+        onChange={onPlotChange}
+      />
+    );
+  }
   const Primitive = VISUAL_PRIMITIVES[scene.primitive];
   return <Primitive scene={scene} />;
 }
@@ -163,7 +182,25 @@ function PlotFunction({ scene }: { scene: SceneOf<"plotFunction"> }) {
       </g>
       <line className="mc-vis-axis" x1={pad} x2={W - pad} y1={sy(0)} y2={sy(0)} />
       <line className="mc-vis-axis" x1={sx(0)} x2={sx(0)} y1={pad} y2={H - pad} />
-      <path className="mc-vis-stroke mc-vis-draw" d={path} />
+      {Array.from({ length: 7 }, (_, i) => (i - 3) * 2)
+        .filter(Boolean)
+        .map((value) => (
+          <g key={`tick-${value}`}>
+            <text className="mc-vis-axis-number" x={sx(value)} y={sy(0) + 17} textAnchor="middle">
+              {value}
+            </text>
+            <text className="mc-vis-axis-number" x={sx(0) + 7} y={sy(value) - 4}>
+              {value}
+            </text>
+          </g>
+        ))}
+      <text className="mc-vis-axis-name" x={W - pad - 2} y={sy(0) - 8}>
+        x
+      </text>
+      <text className="mc-vis-axis-name" x={sx(0) + 8} y={pad + 12}>
+        y
+      </text>
+      <path className="mc-vis-stroke" d={path} />
       {vertex && scene.highlight?.includes("vertex") && inPlot(vertex[0], vertex[1]) ? (
         <g className="mc-vis-pop" style={{ animationDelay: "380ms" }}>
           <circle className="mc-vis-point" cx={sx(vertex[0])} cy={sy(vertex[1])} r="6" />

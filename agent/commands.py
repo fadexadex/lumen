@@ -48,6 +48,10 @@ def set_parabola(a: float, b: float, c: float) -> str:
     return _cmd("setParabola", a=a, b=b, c=c)
 
 
+def set_visual_scene(index: int) -> str:
+    return _cmd("setVisualScene", index=index)
+
+
 def write_block(
     lines: list[str],
     target: Optional[str] = None,

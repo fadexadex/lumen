@@ -1,4 +1,5 @@
 import type { ConceptAnimation, LessonScript, LessonStep } from "@/lib/types";
+import { isLegacyDuplicativeVisual } from "@/lib/concept-visual";
 
 export type Beat =
   | { kind: "title"; text: string; x: number; y: number; size: "h1" | "h2"; step: number }
@@ -90,16 +91,19 @@ function measure(step: LessonStep): number {
   );
 }
 
-export function layoutScript(script: LessonScript): { beats: Beat[]; height: number } {
+export function layoutScript(
+  script: LessonScript,
+  visualStepIndex = 0,
+): { beats: Beat[]; height: number } {
   const beats: Beat[] = [];
-  let tallestStep = 0;
+  const stepStarts: number[] = [];
+  let y = 104;
 
   script.steps.forEach((step, i) => {
-    // Each lesson step uses the same stable teaching frame. Previous steps stay
-    // available through the progress controls instead of accumulating into one
-    // enormous document that becomes unreadable at later steps.
-    let y = 104;
+    // A lesson is one persistent document. Each section gets measured space so
+    // completed reasoning remains above the active section without overlapping it.
     const startY = y;
+    stepStarts.push(startY);
     beats.push({ kind: "title", text: step.title, x: LEFT_X, y, size: "h2", step: i });
     y += h2Height(step.title) + INTRA;
 
@@ -145,33 +149,40 @@ export function layoutScript(script: LessonScript): { beats: Beat[]; height: num
       }
     }
     y = Math.max(y + SECTION * 0.25, startY + measure(step));
-    tallestStep = Math.max(tallestStep, y);
   });
 
-  if (script.visual?.kind === "animation") {
+  const safeVisualStep = Math.max(0, Math.min(script.steps.length - 1, visualStepIndex));
+  const visualY = Math.max(88, (stepStarts[safeVisualStep] ?? 104) - 16);
+
+  const hasUsefulVisual =
+    script.visual?.kind === "animation" && !isLegacyDuplicativeVisual(script.visual);
+
+  if (hasUsefulVisual && script.visual.kind === "animation") {
     beats.push({
       kind: "visual",
       animation: script.visual,
       x: LEFT_X + COL_W + 72,
-      y: 88,
+      y: visualY,
       w: 620,
       h: 510,
       step: 0,
     });
   } else if (script.diagram?.parabola) {
+    const diagramStep = Math.min(2, script.steps.length - 1);
     beats.push({
       kind: "diagram",
       widget: "parabola",
       x: LEFT_X + COL_W + 72,
-      y: 96,
+      y: Math.max(96, (stepStarts[diagramStep] ?? 112) - 8),
       w: 620,
       h: 600,
-      step: Math.min(2, script.steps.length - 1),
+      step: diagramStep,
       params: script.diagram.parabola,
     });
   }
 
-  return { beats, height: Math.max(BOARD_H, tallestStep + 100) };
+  const visualBottom = hasUsefulVisual ? visualY + 510 : 0;
+  return { beats, height: Math.max(BOARD_H, y + 100, visualBottom + 100) };
 }
 
 export function beatCharCount(b: Beat): number {

@@ -63,7 +63,7 @@ export function resolveTargets(
   stepIndex = 0,
   visualSceneIndex?: number,
 ): ResolvedTargets {
-  const { beats } = layoutScript(script);
+  const { beats } = layoutScript(script, stepIndex);
   const names: string[] = [];
   const descriptions: TargetDescription[] = [];
   const rects = new Map<string, WRect>();
@@ -221,14 +221,17 @@ export function resolveTargets(
   if ((dia && dia.params) || visualParabola) {
     const source = dia?.params ?? visualParabola!;
     const { a, b, c } = parabolaOverride ?? source;
-    const graphXMin = dia ? X_MIN : -6;
-    const graphXMax = dia ? X_MAX : 6;
-    const graphYMin = dia ? Y_MIN : -6;
-    const graphYMax = dia ? Y_MAX : 6;
-    const plotX = dia ? dia.x : visualParabola!.beat.x + 38;
-    const plotY = dia ? dia.y : visualParabola!.beat.y + 88;
-    const plotW = dia ? dia.w : visualParabola!.beat.w - 76;
-    const plotH = dia ? dia.h - 130 : visualParabola!.beat.h - 178;
+    const graphXMin = X_MIN;
+    const graphXMax = X_MAX;
+    const graphYMin = Y_MIN;
+    const graphYMax = Y_MAX;
+    const visualHasTabs = !!visualParabola && visualParabola.beat.animation.scenes.length > 1;
+    // Concept card: 18px shell padding, 56px heading, optional 50px tabs,
+    // then the shared 560×200 interactive ParabolaWidget plot.
+    const plotX = dia ? dia.x : visualParabola!.beat.x + 30;
+    const plotY = dia ? dia.y : visualParabola!.beat.y + 18 + 56 + (visualHasTabs ? 50 : 0);
+    const plotW = dia ? dia.w : 560;
+    const plotH = dia ? dia.h - 130 : 200;
     const graphToWorld = (gx: number, gy: number): WPoint => ({
       x: plotX + ((gx - graphXMin) / (graphXMax - graphXMin)) * plotW,
       y: plotY + (plotH - ((gy - graphYMin) / (graphYMax - graphYMin)) * plotH),

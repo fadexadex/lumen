@@ -18,6 +18,7 @@ export type CanvasCommand =
   | { id: string; op: "drawAxis"; args: { target?: string } }
   | { id: string; op: "plotParabola"; args: { a: number; b: number; c: number } }
   | { id: string; op: "setParabola"; args: { a: number; b: number; c: number } }
+  | { id: string; op: "setVisualScene"; args: { index: number } }
   | {
       id: string;
       op: "writeBlock";
@@ -68,6 +69,8 @@ export function isCanvasCommand(x: unknown): x is CanvasCommand {
     case "plotParabola":
     case "setParabola":
       return isRecord(args) && finiteNumber(args.a) && finiteNumber(args.b) && finiteNumber(args.c);
+    case "setVisualScene":
+      return isRecord(args) && Number.isInteger(args.index) && Number(args.index) >= 0;
     case "writeBlock":
       return (
         isRecord(args) &&
@@ -109,7 +112,7 @@ export function createCommandDeduper(limit = 32): (id: string) => boolean {
 
 export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): string {
   const anno = ctrl.anno();
-  if (!anno && cmd.op !== "setParabola") return "no-canvas";
+  if (!anno && cmd.op !== "setParabola" && cmd.op !== "setVisualScene") return "no-canvas";
   const T = ctrl.targets;
 
   switch (cmd.op) {
@@ -165,6 +168,11 @@ export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): 
     case "setParabola": {
       if (!ctrl.setParabola) return "no-parabola-control";
       ctrl.setParabola(cmd.args.a, cmd.args.b, cmd.args.c);
+      return "ok";
+    }
+    case "setVisualScene": {
+      if (!ctrl.setVisualScene) return "no-visual-scene-control";
+      ctrl.setVisualScene(cmd.args.index);
       return "ok";
     }
     case "writeBlock": {

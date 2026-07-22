@@ -159,6 +159,9 @@ function makeHandle(): {
     setParabola: () => {
       calls.push({ method: "setParabola", args: [] });
     },
+    setVisualScene: (index) => {
+      calls.push({ method: "setVisualScene", args: [index] });
+    },
   };
   return { handle, calls };
 }
@@ -200,6 +203,7 @@ describe("canvas-commands contract (TS<->Py dispatch + resolver guard)", () => {
     },
     { id: "c10", op: "clear" },
     { id: "c11", op: "cancelWriting", args: {} },
+    { id: "c12", op: "setVisualScene", args: { index: 2 } },
   ];
 
   it.each(CMDS)("dispatches %o and returns ok", (cmd) => {
@@ -224,6 +228,7 @@ describe("canvas-commands contract (TS<->Py dispatch + resolver guard)", () => {
       "writeBlock",
       "clear",
       "cancelWriting",
+      "setVisualScene",
     ]);
   });
 

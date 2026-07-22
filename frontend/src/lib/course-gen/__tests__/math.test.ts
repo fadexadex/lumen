@@ -130,7 +130,7 @@ describe("cleanGeneratedProse", () => {
     );
   });
 
-  it("builds a safe step visual when rich visual generation cannot be repaired", () => {
+  it("does not duplicate lesson prose when a rich visual cannot be repaired", () => {
     const script: LessonScript = {
       moduleId: "fallback",
       title: "Solving simple equations",
@@ -148,11 +148,8 @@ describe("cleanGeneratedProse", () => {
     };
 
     const visual = createFallbackVisual(script);
-    expect(visual.kind).toBe("animation");
-    if (visual.kind !== "animation") throw new Error("expected animation fallback");
-    expect(visual.scenes[0].primitive).toBe("stepReveal");
-    const scene = visual.scenes[0];
-    if (scene.primitive !== "stepReveal") throw new Error("expected step reveal");
-    expect(scene.lines.some((line) => line.math === "x=3")).toBe(true);
+    expect(visual.kind).toBe("none");
+    if (visual.kind !== "none") throw new Error("expected deliberate none fallback");
+    expect(visual.reason).toContain("trustworthy interactive visual");
   });
 });

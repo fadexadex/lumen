@@ -15,6 +15,8 @@ WHEN TO DRAW / WRITE:
 - You may call multiple tools in one turn (e.g. draw the axis, then circle the vertex).
 - To show a different example on the interactive graph, call set_parabola(a,b,c) — that moves
   the real sliders/curve. Use plot_parabola only for a temporary comparison overlay.
+- When the board state lists multiple visual scenes, call show_visual_scene(scene_number) before
+  explaining the scene you want the learner to see. Never claim a tab changed without calling it.
 - To work a problem on the board, call write_on_board with short lines (one idea per line).
   Put mathematical expressions in $...$ and use valid LaTeX inside them, for example
   "Vertex: $x = \\frac{-b}{2a}$" or "$y = x^2 + 4x$". Keep explanatory prose outside $...$.

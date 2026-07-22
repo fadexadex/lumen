@@ -7,7 +7,6 @@ import { ConceptAnimationPlayer } from "./concept-animation";
 import { layoutScript, BOARD_W, LEFT_X, COL_W, type Beat } from "./layout";
 import { Equation, toHandMath } from "./equation";
 import { MathText } from "@/lib/math-text";
-import { useBeatPlayer } from "./use-beat-player";
 import { AnnotationLayer, type LumenCanvasController } from "./annotation-layer";
 import { setCanvasController } from "@/lib/live/canvas-agent-bridge";
 import { estimateBeatRect, resolveTargets } from "@/lib/live/board-targets";
@@ -63,8 +62,6 @@ function estimateBeatBox(beat: Beat): Bounds {
  * whole point: the learner always recognizes "the view."
  */
 const READING_FRAME: Bounds = { x: 0, y: 24, w: LEFT_X + COL_W + 40, h: 640 };
-const SPLIT_FRAME: Bounds = { x: 24, y: 48, w: 1460, h: 650 };
-
 function fitFrame(el: HTMLElement, frame: Bounds, maxScale = 1.05, alignTop = false): View {
   const pad = chromePad(el);
   const availW = Math.max(120, el.clientWidth - pad.left - pad.right);
@@ -77,9 +74,17 @@ function fitFrame(el: HTMLElement, frame: Bounds, maxScale = 1.05, alignTop = fa
   return { x, y, scale };
 }
 
-/** Fit the standard reading column: width-first, centered horizontally, top-aligned. */
-function fitStandard(el: HTMLElement): View {
-  return fitFrame(el, READING_FRAME, 1.05, true);
+function teachingFrame(beats: Beat[], stepIndex: number, includeVisual: boolean): Bounds {
+  const active = beats.filter(
+    (beat) => beat.step === stepIndex || (includeVisual && beat.kind === "visual"),
+  );
+  const boxes = active.map(estimateBeatBox);
+  if (!boxes.length) return READING_FRAME;
+  const x = Math.min(...boxes.map((box) => box.x)) - 32;
+  const y = Math.min(...boxes.map((box) => box.y)) - 32;
+  const right = Math.max(...boxes.map((box) => box.x + box.w)) + 32;
+  const bottom = Math.max(...boxes.map((box) => box.y + box.h)) + 32;
+  return { x, y, w: right - x, h: Math.max(420, bottom - y) };
 }
 
 export interface MathCanvasProps {
@@ -102,10 +107,6 @@ export function MathCanvas(props: MathCanvasProps) {
   const [vp, setVp] = useState({ w: 0, h: 0 });
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const [spaceDown, setSpaceDown] = useState(false);
-  // Chrome (step nav / tools / zoom) fades away while reading, returns on activity.
-  const [idle, setIdle] = useState(false);
-  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const inkRef = useRef<InkHandle | null>(null);
   const notesRef = useRef<NotesHandle | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -151,7 +152,10 @@ export function MathCanvas(props: MathCanvasProps) {
     setParaParams(scriptPara);
   }, [scriptPara]);
 
-  const { beats, height: BOARD_H } = useMemo(() => layoutScript(script), [script]);
+  const { beats, height: BOARD_H } = useMemo(
+    () => layoutScript(script, stepIndex),
+    [script, stepIndex],
+  );
 
   // Register the Lumen Live canvas controller: annotations + view/coord helpers.
   // Re-resolve targets when the lesson OR live parabola params change.
@@ -185,24 +189,10 @@ export function MathCanvas(props: MathCanvasProps) {
         setParaParams(next);
         emitLiveParabola(next);
       },
+      setVisualScene: selectVisualScene,
     });
     return () => setCanvasController(null);
-  }, [script, beats, BOARD_H, paraParams, stepIndex, visualSceneIndex]);
-
-  // Reset the idle countdown on any interaction; ~2.6s of stillness fades chrome.
-  const bumpActivity = useCallback(() => {
-    setIdle(false);
-    if (idleTimer.current) clearTimeout(idleTimer.current);
-    idleTimer.current = setTimeout(() => setIdle(true), 2600);
-  }, []);
-  useEffect(() => {
-    bumpActivity();
-    window.addEventListener("keydown", bumpActivity);
-    return () => {
-      window.removeEventListener("keydown", bumpActivity);
-      if (idleTimer.current) clearTimeout(idleTimer.current);
-    };
-  }, [bumpActivity]);
+  }, [script, beats, BOARD_H, paraParams, stepIndex, visualSceneIndex, selectVisualScene]);
 
   // Viewport size (for full-screen ink layer)
   useEffect(() => {
@@ -214,29 +204,10 @@ export function MathCanvas(props: MathCanvasProps) {
     return () => ro.disconnect();
   }, []);
 
-  // Playback — timer-based +1 char typewriter (same model as math-canvas-ai)
-  const player = useBeatPlayer({
-    beats,
-    stepIndex,
-    totalSteps: script.steps.length,
-    lessonKey: script.moduleId,
-    onAdvanceStep: () => goto(stepIndex + 1),
-  });
-  const { state: playerState, play, pause, restart, next, charsFor } = player;
-
   const activeBeats = useMemo(() => beats.filter((b) => b.step === stepIndex), [beats, stepIndex]);
   const visibleBeats = useMemo(
-    () =>
-      beats.filter((b, i) => {
-        if (b.kind === "visual" || b.kind === "diagram") return playerState.stepDone;
-        if (b.step !== stepIndex) return false;
-        if (b.kind === "options" || b.kind === "diagram" || b.kind === "visual") {
-          return playerState.stepDone;
-        }
-        if (i === playerState.activeBeatIndex) return true;
-        return charsFor(i) > 0;
-      }),
-    [beats, stepIndex, playerState.stepDone, playerState.activeBeatIndex, charsFor],
+    () => beats.filter((beat) => beat.kind === "visual" || beat.step <= stepIndex),
+    [beats, stepIndex],
   );
 
   // Standard opening view — identical framing for every module (see READING_FRAME).
@@ -244,7 +215,14 @@ export function MathCanvas(props: MathCanvasProps) {
   const applyOverview = () => {
     const el = viewportRef.current;
     if (!el || el.clientWidth === 0 || el.clientHeight === 0) return;
-    setView(fitStandard(el));
+    const includeVisual = el.clientWidth >= 1360;
+    const frame = teachingFrame(beats, stepIndex, includeVisual);
+    const visual = beats.find((beat) => beat.kind === "visual");
+    setView(
+      !includeVisual && visual
+        ? fitFrame(el, estimateBeatBox(visual), 1.05)
+        : fitFrame(el, frame, 1.05),
+    );
   };
 
   useEffect(() => {
@@ -260,7 +238,8 @@ export function MathCanvas(props: MathCanvasProps) {
     applyOverview();
   }, [BOARD_H, beats, script.title, vp.w, vp.h]);
 
-  // Soft-follow the active step — only nudge if it would leave the safe inset
+  // Every section opens in one deterministic teaching frame. Earlier sections
+  // remain in world-space above it and are available by panning or zooming out.
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
@@ -269,23 +248,8 @@ export function MathCanvas(props: MathCanvasProps) {
     if (!first) return;
     // Skip until the initial overview has been applied
     if (!fittedKeyRef.current) return;
-    setView(fitStandard(el));
+    applyOverview();
   }, [stepIndex, activeBeats]);
-
-  // Once the prose has landed, give a generated scene its own stable camera beat.
-  // The next lesson step returns to the reading column through the effect above.
-  useEffect(() => {
-    const el = viewportRef.current;
-    if (!el || !playerState.stepDone || performance.now() < lessonFollowPausedUntilRef.current) {
-      return;
-    }
-    const visual = beats.find((beat) => beat.kind === "visual");
-    if (!visual) return;
-    const visualFrame = estimateBeatBox(visual);
-    setView(
-      el.clientWidth >= 1180 ? fitFrame(el, SPLIT_FRAME, 1) : fitFrame(el, visualFrame, 1.05),
-    );
-  }, [beats, playerState.stepDone, stepIndex, vp.w, vp.h]);
 
   // Wheel: pinch-zoom or pan
   useEffect(() => {
@@ -358,42 +322,28 @@ export function MathCanvas(props: MathCanvasProps) {
   };
 
   const total = script.steps.length;
+  const finished = stepIndex >= total - 1;
 
   const onRestart = () => {
-    // Step change resets the playhead; only call restart when already on step 0
-    if (stepIndex !== 0) {
-      goto(0);
-      return;
-    }
-    restart();
+    goto(0);
   };
-  const onNext = () => next();
+  const onNext = () => {
+    if (finished) onNextModule?.();
+    else goto(stepIndex + 1);
+  };
   const onPrev = () => {
     if (stepIndex > 0) goto(stepIndex - 1);
-  };
-  const onTogglePlay = () => {
-    if (playerState.finished) {
-      // Full replay from the start so pause/play works again
-      if (stepIndex !== 0) goto(0);
-      else play();
-      return;
-    }
-    if (playerState.playing) pause();
-    else play();
   };
 
   return (
     <div
       ref={viewportRef}
       className="mc-viewport"
-      data-idle={idle || undefined}
       style={{ cursor: panning.current ? "grabbing" : panActive ? "grab" : "default" }}
       onPointerDown={(e) => {
-        bumpActivity();
         onDown(e);
       }}
       onPointerMove={(e) => {
-        bumpActivity();
         onMove(e);
       }}
       onPointerUp={onUp}
@@ -412,12 +362,8 @@ export function MathCanvas(props: MathCanvasProps) {
                   key={beatIndex}
                   beat={b}
                   beatIndex={beatIndex}
-                  charsRevealed={charsFor(beatIndex)}
-                  active={
-                    beatIndex === playerState.activeBeatIndex &&
-                    !playerState.stepDone &&
-                    !playerState.finished
-                  }
+                  charsRevealed={Infinity}
+                  active={false}
                   picked={picked}
                   onPick={(bi, oi) => setPicked((p) => ({ ...p, [bi]: oi }))}
                   paraParams={paraParams}
@@ -493,7 +439,7 @@ export function MathCanvas(props: MathCanvasProps) {
       </div>
 
       {/* Bottom lesson controls — next topic lives here (thumb reach), not as a floating banner */}
-      <div className="mc-controls" data-no-pan data-finished={playerState.finished || undefined}>
+      <div className="mc-controls" data-no-pan data-finished={finished || undefined}>
         <button className="mc-ctrl" onClick={onRestart} aria-label="Restart" title="Restart lesson">
           ↺
         </button>
@@ -506,7 +452,7 @@ export function MathCanvas(props: MathCanvasProps) {
         >
           ‹
         </button>
-        {playerState.finished ? (
+        {finished ? (
           <button
             className="mc-ctrl mc-ctrl--continue"
             onClick={() => onNextModule?.()}
@@ -517,34 +463,14 @@ export function MathCanvas(props: MathCanvasProps) {
           </button>
         ) : (
           <button
-            className="mc-ctrl mc-ctrl--primary"
-            onClick={onTogglePlay}
-            aria-label={playerState.playing ? "Pause" : "Play"}
-            title={playerState.playing ? "Pause" : "Play"}
+            className="mc-ctrl mc-ctrl--continue"
+            onClick={onNext}
+            aria-label="Continue to next section"
+            title="Continue"
           >
-            {playerState.playing ? "❚❚" : "▶"}
+            Continue
           </button>
         )}
-        <button
-          className="mc-ctrl"
-          onClick={() => {
-            // › is step control only while learning; module jump only after the lesson ends
-            if (playerState.finished) onNextModule?.();
-            else onNext();
-          }}
-          aria-label={
-            playerState.finished ? (nextModule ? "Next topic" : "Back to path") : "Next step"
-          }
-          title={
-            playerState.finished
-              ? nextModule
-                ? `Next: ${nextModule.title}`
-                : "Back to path"
-              : "Next step"
-          }
-        >
-          ›
-        </button>
         <span className="mc-ctrl-sep" />
         <div className="mc-progress">
           {script.steps.map((s, i) => (
@@ -561,7 +487,7 @@ export function MathCanvas(props: MathCanvasProps) {
         <div className="mc-count">
           {stepIndex + 1} / {total}
         </div>
-        {playerState.finished && nextModule ? (
+        {finished && nextModule ? (
           <span className="mc-continue-hint" title={nextModule.title}>
             <span className="mc-continue-hint-label">up next</span>
             <span className="mc-continue-hint-title">{nextModule.title}</span>
@@ -708,6 +634,7 @@ function BeatView({
           plotOverride={paraParams}
           sceneIndex={visualSceneIndex}
           onSceneChange={onVisualSceneChange}
+          onPlotChange={onParaChange}
         />
       </div>
     );

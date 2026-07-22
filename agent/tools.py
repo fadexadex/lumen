@@ -105,6 +105,14 @@ async def set_parabola(ctx: RunContext, a: float, b: float, c: float) -> str:
 
 
 @function_tool
+async def show_visual_scene(ctx: RunContext, scene_number: int) -> str:
+    """Show one of the visual-model tabs on the learner's board. scene_number is 1-based; read the available scene count from get_board_state first."""
+    if scene_number < 1:
+        return "invalid-scene-number: use 1 for the first visual scene"
+    return await _send(ctx, C.set_visual_scene(scene_number - 1))
+
+
+@function_tool
 async def write_on_board(
     ctx: RunContext,
     lines: list[str],
@@ -153,6 +161,6 @@ async def get_board_state(ctx: RunContext) -> str:
 
 ALL_TOOLS = [
     highlight_region, circle_point, add_label, draw_arrow, draw_axis_of_symmetry,
-    plot_parabola, set_parabola, write_on_board, cancel_writing,
+    plot_parabola, set_parabola, show_visual_scene, write_on_board, cancel_writing,
     focus_on, clear_annotations, get_board_state,
 ]

@@ -70,7 +70,13 @@ export function ParabolaWidget({
 
   return (
     <div className="mc-para">
-      <svg width={plotW} height={plotH} className="block">
+      <svg
+        width={plotW}
+        height={plotH}
+        className="block"
+        role="img"
+        aria-label={`Interactive graph of y equals ${fmt(a)} x squared ${sign(b)} ${fmt(Math.abs(b))} x ${sign(c)} ${fmt(Math.abs(c))}`}
+      >
         {gridXs.map((x) => {
           const [px] = toPx(x, 0);
           return (
@@ -99,6 +105,32 @@ export function ParabolaWidget({
             />
           );
         })}
+        {gridXs
+          .filter((x) => x % 2 === 0 && x !== 0)
+          .map((x) => {
+            const [px, py] = toPx(x, 0);
+            return (
+              <text key={`tx${x}`} className="mc-para-tick" x={px} y={py + 15} textAnchor="middle">
+                {x}
+              </text>
+            );
+          })}
+        {gridYs
+          .filter((y) => y % 2 === 0 && y !== 0)
+          .map((y) => {
+            const [px, py] = toPx(0, y);
+            return (
+              <text key={`ty${y}`} className="mc-para-tick" x={px + 6} y={py - 4}>
+                {y}
+              </text>
+            );
+          })}
+        <text className="mc-para-axis-label" x={plotW - 10} y={toPx(0, 0)[1] - 7}>
+          x
+        </text>
+        <text className="mc-para-axis-label" x={toPx(0, 0)[0] + 8} y={13}>
+          y
+        </text>
         <path d={path} fill="none" stroke="oklch(0.55 0.16 55)" strokeWidth={2.8} />
         {roots.map((r, i) => {
           const [px, py] = toPx(r, 0);

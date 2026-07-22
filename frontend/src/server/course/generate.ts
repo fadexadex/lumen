@@ -140,9 +140,12 @@ Rules:
   balanceScale for preserving equality; partitionGrid for area, arrays, multiplication, or
   probability; fractionBar for fractions/ratios; countObjects for grouping; geometryTransform
   for spatial transformations; stepReveal for a calculation whose changing lines are the visual.
+- Prefer an interactive relationship model over stepReveal. Never use stepReveal to copy lesson
+  headings, prose, or equations into a second card; use kind "none" when no spatial model helps.
 - Sequence scenes so each one adds one idea. Keep narration to one short spoken sentence. Vary
   primitives when that makes the concept clearer; never add a decorative or unrelated graphic.
-- Set visual.advance to "step". All values must be internally consistent and inside the schema.
+- Set visual.advance to "step". The UI shows every selected scene completely; do not rely on slow
+  timed reveals for comprehension. All values must be internally consistent and inside the schema.
 - If a visual scene is plotFunction with fn "parabola", also include diagram.parabola with the
   same a, b, c ONLY (no roots or vertex). This preserves the live tutor's interactive graph tools.
 - Keep plot coefficients and other counts small enough to read on a classroom whiteboard.

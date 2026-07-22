@@ -3,7 +3,7 @@ import { layoutScript, wrappedLineCount } from "../layout";
 import type { LessonScript } from "@/lib/types";
 
 describe("dynamic MathCanvas layout", () => {
-  it("keeps every generated lesson step in one stable teaching frame", () => {
+  it("keeps completed lesson steps on the board without overlapping the next step", () => {
     const script: LessonScript = {
       moduleId: "inequalities",
       title: "Understanding Inequalities and Their Symbols",
@@ -23,7 +23,8 @@ describe("dynamic MathCanvas layout", () => {
       (beat): beat is Extract<(typeof beats)[number], { kind: "title" }> => beat.kind === "title",
     );
     expect(wrappedLineCount(script.title, 18)).toBeGreaterThan(1);
-    expect(stepTitles.map((beat) => beat.y)).toEqual([104, 104, 104]);
+    expect(stepTitles[1]!.y).toBeGreaterThan(stepTitles[0]!.y + 100);
+    expect(stepTitles[2]!.y).toBeGreaterThan(stepTitles[1]!.y + 80);
   });
 
   it("accounts for long generated step titles", () => {
@@ -81,5 +82,59 @@ describe("dynamic MathCanvas layout", () => {
     const visual = beats.filter((beat) => beat.kind === "visual");
     expect(visual).toHaveLength(1);
     expect(visual[0].x).toBeGreaterThan(700);
+  });
+
+  it("moves the visual beside the active section while preserving document positions", () => {
+    const script: LessonScript = {
+      moduleId: "moving-visual",
+      title: "Functions",
+      steps: [
+        { kind: "explanation", title: "First", body: "Start here." },
+        { kind: "example", title: "Second", lines: [{ math: "y=x^2" }] },
+      ],
+      visual: {
+        kind: "animation",
+        title: "Function graph",
+        goal: "Relate the equation and graph.",
+        advance: "step",
+        scenes: [
+          {
+            primitive: "plotFunction",
+            fn: "parabola",
+            a: 1,
+            b: 0,
+            c: 0,
+            narration: "The graph matches the equation.",
+          },
+        ],
+      },
+    };
+
+    const first = layoutScript(script, 0).beats.find((beat) => beat.kind === "visual")!;
+    const second = layoutScript(script, 1).beats.find((beat) => beat.kind === "visual")!;
+    expect(second.y).toBeGreaterThan(first.y + 80);
+  });
+
+  it("does not lay out the legacy prose-copying fallback as a visual", () => {
+    const script: LessonScript = {
+      moduleId: "legacy-fallback",
+      title: "Slope",
+      steps: [{ kind: "explanation", title: "What is slope?", body: "Slope measures change." }],
+      visual: {
+        kind: "animation",
+        title: "See slope as a story of change",
+        goal: "Reveal the lesson's mathematical reasoning one clear step at a time.",
+        advance: "step",
+        scenes: [
+          {
+            primitive: "stepReveal",
+            narration: "Follow how each line builds on the idea before it.",
+            lines: [{ text: "What is slope?" }, { text: "Slope measures change." }],
+          },
+        ],
+      },
+    };
+
+    expect(layoutScript(script).beats.some((beat) => beat.kind === "visual")).toBe(false);
   });
 });

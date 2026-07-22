@@ -22,6 +22,8 @@ export interface CanvasControllerHandle {
   boardSize: { w: number; h: number };
   /** Drive the live parabola widget (sliders + curve), not just an overlay stroke. */
   setParabola?: (a: number, b: number, c: number) => void;
+  /** Select the same generated visual scene the learner can choose from the tabs. */
+  setVisualScene?: (index: number) => void;
 }
 
 let handle: CanvasControllerHandle | null = null;

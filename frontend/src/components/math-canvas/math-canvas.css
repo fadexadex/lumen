@@ -11,30 +11,6 @@
   pointer-events: auto;
 }
 
-/*
-  Idle immersion: after a few still seconds, the chrome (step nav, tool rail,
-  zoom) fades away so nothing sits between the learner and the material. Any
-  pointer move or key press brings it straight back (handled in JS). Pointer
-  events are dropped while faded so a mouse move over the hidden bar still
-  reaches the viewport and wakes the chrome.
-*/
-.mc-viewport[data-idle] .mc-controls,
-.mc-viewport[data-idle] .mc-toolrail,
-.mc-viewport[data-idle] .mc-zoom {
-  opacity: 0;
-  pointer-events: none;
-}
-/* Gentle drift only on desktop, where the rail is left-docked and controls
-   are bottom-centered; mobile keeps its own transforms untouched. */
-@media (min-width: 721px) and (prefers-reduced-motion: no-preference) {
-  .mc-viewport[data-idle] .mc-controls {
-    transform: translateX(-50%) translateY(10px);
-  }
-  .mc-viewport[data-idle] .mc-toolrail {
-    transform: translateY(-50%) translateX(-10px);
-  }
-}
-
 .mc-world {
   position: absolute;
   left: 0;
@@ -350,6 +326,16 @@
   stroke-linecap: round;
 }
 
+.mc-vis-axis-number {
+  fill: oklch(0.48 0.01 55);
+  font: 500 10px/1 var(--font-sans);
+}
+
+.mc-vis-axis-name {
+  fill: var(--tutor-ink);
+  font: italic 600 13px/1 var(--font-serif);
+}
+
 .mc-vis-stroke,
 .mc-vis-hop {
   fill: none;
@@ -624,6 +610,19 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.mc-concept-stage .mc-para {
+  width: min(100%, 560px);
+}
+.mc-para-tick {
+  fill: oklch(0.46 0.01 55);
+  font: 500 10px/1 var(--font-sans);
+  pointer-events: none;
+}
+.mc-para-axis-label {
+  fill: var(--tutor-ink);
+  font: italic 600 13px/1 var(--font-serif);
+  pointer-events: none;
 }
 .mc-para-sliders {
   display: grid;

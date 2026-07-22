@@ -1,5 +1,22 @@
 import type { ConceptAnimation, ConceptScene, LessonScript } from "@/lib/types";
 
+/**
+ * Older generated courses used a prose-copying step reveal as their fallback
+ * "visual". It adds no mathematical representation and merely duplicates the
+ * lesson in a second card, so keep it out of both the canvas and agent context.
+ */
+export function isLegacyDuplicativeVisual(animation: ConceptAnimation): boolean {
+  if (animation.scenes.length !== 1 || animation.scenes[0]?.primitive !== "stepReveal") {
+    return false;
+  }
+  const narration = animation.scenes[0].narration.trim().toLowerCase();
+  const goal = animation.goal.trim().toLowerCase();
+  return (
+    narration === "follow how each line builds on the idea before it." &&
+    goal === "reveal the lesson's mathematical reasoning one clear step at a time."
+  );
+}
+
 /** Map lesson progress to one deterministic scene; no second timer can drift from narration. */
 export function sceneIndexForStep(
   stepIndex: number,
@@ -27,7 +44,8 @@ export function lessonVisualSummary(
   stepIndex: number,
   preferredIndex?: number,
 ): string {
-  if (!script.visual || script.visual.kind === "none") return "";
+  if (!script.visual || script.visual.kind === "none" || isLegacyDuplicativeVisual(script.visual))
+    return "";
   const { scene, index } = activeConceptScene(
     script.visual,
     stepIndex,
