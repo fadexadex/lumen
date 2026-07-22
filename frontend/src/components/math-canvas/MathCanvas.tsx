@@ -98,6 +98,11 @@ export function MathCanvas(props: MathCanvasProps) {
   const fittedKeyRef = useRef<string | null>(null);
   const lastFitVpRef = useRef({ w: 0, h: 0 });
   const lessonFollowPausedUntilRef = useRef(0);
+  // True once the learner has zoomed/panned by hand. Auto-framing must not fight
+  // a hand-set camera — a viewport resize (e.g. browser zoom changes clientWidth)
+  // would otherwise snap the board back to the page frame mid-zoom. Cleared when
+  // a deliberate step change re-frames (see applyOverview).
+  const userAdjustedRef = useRef(false);
   const panning = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const annoRef = useRef<LumenCanvasController | null>(null);
   const boardElRef = useRef<HTMLDivElement | null>(null);
@@ -213,6 +218,9 @@ export function MathCanvas(props: MathCanvasProps) {
     const wideEnough = el.clientWidth >= 1180;
     const frame = hasVisual && wideEnough ? pageFrame(stepIndex) : proseFrame(stepIndex);
     setView(fitFrame(el, frame, 1.05, true));
+    // The camera is back on a system-defined frame; the learner's hand-set view
+    // (if any) has been intentionally replaced.
+    userAdjustedRef.current = false;
   };
 
   useEffect(() => {
@@ -225,6 +233,10 @@ export function MathCanvas(props: MathCanvasProps) {
     if (!scriptChanged && !sizeChanged) return;
     fittedKeyRef.current = scriptKey;
     lastFitVpRef.current = { w: vp.w, h: vp.h };
+    // A new lesson always re-fits. A bare viewport resize (browser zoom, a
+    // scrollbar, an orientation nudge) must NOT clobber a view the learner has
+    // zoomed/panned by hand — that was the "zoom keeps resetting" bug.
+    if (!scriptChanged && userAdjustedRef.current) return;
     applyOverview();
   }, [BOARD_H, beats, script.title, vp.w, vp.h]);
 
@@ -242,7 +254,9 @@ export function MathCanvas(props: MathCanvasProps) {
     prevStepRef.current = stepIndex;
     if (stepChanged) {
       lessonFollowPausedUntilRef.current = 0; // navigation clears any write-hold
-    } else if (performance.now() < lessonFollowPausedUntilRef.current) {
+    } else if (performance.now() < lessonFollowPausedUntilRef.current || userAdjustedRef.current) {
+      // Same page: don't re-frame over an AI write in progress, nor over a view
+      // the learner has zoomed/panned by hand.
       return;
     }
     if (!activeBeats[0]) return;
@@ -255,6 +269,7 @@ export function MathCanvas(props: MathCanvasProps) {
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      userAdjustedRef.current = true;
       const rect = el.getBoundingClientRect();
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
@@ -298,6 +313,7 @@ export function MathCanvas(props: MathCanvasProps) {
   };
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!panning.current) return;
+    userAdjustedRef.current = true;
     const p = panning.current;
     setView({ ...viewRef.current, x: p.ox + (e.clientX - p.x), y: p.oy + (e.clientY - p.y) });
   };
@@ -308,6 +324,7 @@ export function MathCanvas(props: MathCanvasProps) {
   const zoomBy = (f: number) => {
     const el = viewportRef.current;
     if (!el) return;
+    userAdjustedRef.current = true;
     const cx = el.clientWidth / 2,
       cy = el.clientHeight / 2;
     const v = viewRef.current;
