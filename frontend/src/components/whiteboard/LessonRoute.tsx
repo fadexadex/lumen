@@ -6,8 +6,7 @@ import { Whiteboard } from "./Whiteboard";
 import { MathField, MATH_SHORTCUTS } from "./MathField";
 import { BlockMath } from "@/lib/katex";
 import { insertMathOnBoard } from "@/lib/whiteboard-bridge";
-import { ConceptSwitcher } from "./ConceptSwitcher";
-import { getConcept, useDemoPlayer } from "@/lib/lesson-concepts";
+import { getConcept } from "@/lib/lesson-concepts";
 import { PathNavigator } from "@/components/tutor/PathNavigator";
 import { useLumenSession } from "@/lib/live/use-lumen-session";
 import { LumenOverlay } from "@/components/live/LumenOverlay";
@@ -88,11 +87,7 @@ export function LessonRoute() {
   const [showMath, setShowMath] = useState(false);
   const [mathValue, setMathValue] = useState("");
   const [mathToast, setMathToast] = useState<string | null>(null);
-  const [conceptId, setConceptId] = useState<string>(() => {
-    if (typeof window === "undefined") return "math-canvas";
-    return localStorage.getItem("lumen.concept") ?? "math-canvas";
-  });
-  const [demoActive, setDemoActive] = useState(false);
+  const conceptId = "math-canvas";
   const concept = getConcept(conceptId);
 
   useEffect(() => {
@@ -112,18 +107,6 @@ export function LessonRoute() {
     }, 450);
     return () => clearTimeout(timer);
   }, [hydrated, subscription, courseModule, moduleId, lumen.status]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("lumen.concept", conceptId);
-    } catch {
-      /* ignore */
-    }
-  }, [conceptId]);
-
-  useEffect(() => {
-    setDemoActive(false);
-  }, [conceptId]);
 
   const goto = (i: number) => setStep(moduleId, Math.max(0, Math.min(script.steps.length - 1, i)));
 
@@ -156,14 +139,6 @@ export function LessonRoute() {
     setStep(id, 0);
     navigate({ to: "/lesson/$moduleId", params: { moduleId: id } });
   };
-
-  const demoTick = useDemoPlayer({
-    active: demoActive,
-    stepIndex: safeIndex,
-    total: script.steps.length,
-    goto,
-    onFinish: () => setDemoActive(false),
-  });
 
   // Ground Lumen whenever the visible step changes, or Live starts.
   useEffect(() => {
@@ -264,12 +239,6 @@ export function LessonRoute() {
           </p>
         </div>
         <div className="lesson-topbar-right">
-          <ConceptSwitcher
-            active={concept.id}
-            onChange={setConceptId}
-            demoActive={demoActive}
-            onToggleDemo={() => setDemoActive((v) => !v)}
-          />
           <button
             className="live-launch"
             onClick={() => lumen.start(moduleId)}
@@ -292,8 +261,8 @@ export function LessonRoute() {
           script={script}
           stepIndex={safeIndex}
           goto={goto}
-          demoTick={demoTick}
-          demoActive={demoActive}
+          demoTick={0}
+          demoActive={false}
           onWriteMath={() => setShowMath(true)}
           onOpenLive={() => lumen.start(moduleId)}
           onVisualSceneChange={setVisualSceneIndex}

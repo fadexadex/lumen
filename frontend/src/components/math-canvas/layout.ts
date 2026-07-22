@@ -93,7 +93,7 @@ function measure(step: LessonStep): number {
 
 export function layoutScript(
   script: LessonScript,
-  visualStepIndex = 0,
+  _visualStepIndex = 0,
 ): { beats: Beat[]; height: number } {
   const beats: Beat[] = [];
   const stepStarts: number[] = [];
@@ -151,8 +151,9 @@ export function layoutScript(
     y = Math.max(y + SECTION * 0.25, startY + measure(step));
   });
 
-  const safeVisualStep = Math.max(0, Math.min(script.steps.length - 1, visualStepIndex));
-  const visualY = Math.max(88, (stepStarts[safeVisualStep] ?? 104) - 16);
+  // The visual is one stable reference surface. Its scene may change, but its
+  // position must not jump whenever the learner advances to another section.
+  const visualY = 88;
 
   const hasUsefulVisual =
     script.visual?.kind === "animation" && !isLegacyDuplicativeVisual(script.visual);

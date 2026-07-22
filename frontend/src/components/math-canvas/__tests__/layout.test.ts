@@ -84,7 +84,7 @@ describe("dynamic MathCanvas layout", () => {
     expect(visual[0].x).toBeGreaterThan(700);
   });
 
-  it("moves the visual beside the active section while preserving document positions", () => {
+  it("keeps the visual in one stable position as the active section changes", () => {
     const script: LessonScript = {
       moduleId: "moving-visual",
       title: "Functions",
@@ -112,7 +112,7 @@ describe("dynamic MathCanvas layout", () => {
 
     const first = layoutScript(script, 0).beats.find((beat) => beat.kind === "visual")!;
     const second = layoutScript(script, 1).beats.find((beat) => beat.kind === "visual")!;
-    expect(second.y).toBeGreaterThan(first.y + 80);
+    expect(second.y).toBe(first.y);
   });
 
   it("does not lay out the legacy prose-copying fallback as a visual", () => {

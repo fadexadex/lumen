@@ -84,6 +84,22 @@ describe("board-targets geometry", () => {
     expect(targets.rect("does-not-exist")).toBeNull();
   });
 
+  it("keeps Lumen's vertex target inside an adaptively expanded graph", () => {
+    const highVertexScript: LessonScript = {
+      moduleId: "falling-ball",
+      title: "A falling ball",
+      steps: [{ kind: "explanation", title: "Model", body: "Track the height." }],
+      diagram: { parabola: { a: -1.2, b: 0, c: 20 } },
+    };
+    const highTargets = resolveTargets(highVertexScript);
+    const graph = highTargets.rect("graph")!;
+    const vertex = highTargets.point("vertex")!;
+
+    expect(highTargets.parabola?.Y_MAX).toBeGreaterThan(20);
+    expect(vertex.y).toBeGreaterThanOrEqual(graph.y);
+    expect(vertex.y).toBeLessThanOrEqual(graph.y + graph.h);
+  });
+
   it("gives every equation in a multi-line example its own described target", () => {
     expect(targets.names).toEqual(
       expect.arrayContaining(["step2.equation1", "step2.equation2", "step2.equation3"]),

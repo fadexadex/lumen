@@ -1,9 +1,5 @@
-import { useMemo, useState } from "react";
-
-const X_MIN = -10,
-  X_MAX = 10,
-  Y_MIN = -10,
-  Y_MAX = 10;
+import { useState } from "react";
+import { parabolaViewport } from "./parabola-geometry";
 
 export function ParabolaWidget({
   width,
@@ -34,20 +30,18 @@ export function ParabolaWidget({
 
   const plotH = height - 130;
   const plotW = width;
+  const { xMin, xMax, yMin, yMax, yTicks } = parabolaViewport(a, b, c);
   const toPx = (x: number, y: number) =>
-    [
-      ((x - X_MIN) / (X_MAX - X_MIN)) * plotW,
-      plotH - ((y - Y_MIN) / (Y_MAX - Y_MIN)) * plotH,
-    ] as const;
+    [((x - xMin) / (xMax - xMin)) * plotW, plotH - ((y - yMin) / (yMax - yMin)) * plotH] as const;
 
-  const path = useMemo(() => {
+  const path = (() => {
     const parts: string[] = [];
     const steps = 240;
     let penUp = true;
     for (let i = 0; i <= steps; i++) {
-      const x = X_MIN + ((X_MAX - X_MIN) * i) / steps;
+      const x = xMin + ((xMax - xMin) * i) / steps;
       const y = a * x * x + b * x + c;
-      if (y < Y_MIN - 5 || y > Y_MAX + 5) {
+      if (y < yMin || y > yMax) {
         penUp = true;
         continue;
       }
@@ -56,7 +50,7 @@ export function ParabolaWidget({
       penUp = false;
     }
     return parts.join(" ");
-  }, [a, b, c, plotH, plotW]);
+  })();
 
   const disc = b * b - 4 * a * c;
   const roots =
@@ -65,8 +59,7 @@ export function ParabolaWidget({
       : [];
   const vertex = a !== 0 ? ([-b / (2 * a), c - (b * b) / (4 * a)] as const) : null;
 
-  const gridXs = Array.from({ length: X_MAX - X_MIN + 1 }, (_, i) => X_MIN + i);
-  const gridYs = Array.from({ length: Y_MAX - Y_MIN + 1 }, (_, i) => Y_MIN + i);
+  const gridXs = Array.from({ length: xMax - xMin + 1 }, (_, i) => xMin + i);
 
   return (
     <div className="mc-para">
@@ -91,7 +84,7 @@ export function ParabolaWidget({
             />
           );
         })}
-        {gridYs.map((y) => {
+        {yTicks.map((y) => {
           const [, py] = toPx(0, y);
           return (
             <line
@@ -115,8 +108,8 @@ export function ParabolaWidget({
               </text>
             );
           })}
-        {gridYs
-          .filter((y) => y % 2 === 0 && y !== 0)
+        {yTicks
+          .filter((y) => y !== 0 && y !== yMin && y !== yMax)
           .map((y) => {
             const [px, py] = toPx(0, y);
             return (
@@ -149,7 +142,7 @@ export function ParabolaWidget({
             </g>
           );
         })}
-        {vertex && vertex[1] >= Y_MIN && vertex[1] <= Y_MAX
+        {vertex && vertex[1] >= yMin && vertex[1] <= yMax
           ? (() => {
               const [vx, vy] = toPx(vertex[0], vertex[1]);
               return (
@@ -163,8 +156,9 @@ export function ParabolaWidget({
                     strokeWidth={1.5}
                   />
                   <text
-                    x={vx + 8}
+                    x={vx - 8}
                     y={vy + 16}
+                    textAnchor="end"
                     fontSize={13}
                     fill="oklch(0.2 0 0)"
                     style={{ fontFamily: "var(--font-serif)" }}
@@ -179,7 +173,14 @@ export function ParabolaWidget({
       <div className="mc-para-sliders">
         <Slider label="a" value={a} min={-3} max={3} step={0.1} onChange={setA} />
         <Slider label="b" value={b} min={-10} max={10} step={0.5} onChange={setB} />
-        <Slider label="c" value={c} min={-10} max={10} step={0.5} onChange={setC} />
+        <Slider
+          label="c"
+          value={c}
+          min={Math.min(-10, Math.floor(c - 5))}
+          max={Math.max(10, Math.ceil(c + 5))}
+          step={0.5}
+          onChange={setC}
+        />
       </div>
       <p className="mc-para-caption">
         y = {fmt(a)}x² {sign(b)} {fmt(Math.abs(b))}x {sign(c)} {fmt(Math.abs(c))}

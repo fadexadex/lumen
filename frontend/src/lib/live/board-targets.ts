@@ -2,6 +2,7 @@ import { layoutScript, type Beat } from "@/components/math-canvas/layout";
 import type { LessonScript } from "@/lib/types";
 import { activeConceptScene } from "@/lib/concept-visual";
 import type { WPoint, WRect } from "@/components/math-canvas/annotation-layer";
+import { parabolaViewport } from "@/components/math-canvas/parabola-geometry";
 
 export interface ResolvedTargets {
   names: string[]; // sent to the agent as board context
@@ -32,11 +33,6 @@ export interface ParabolaGeom {
   vertex: WPoint | null;
   roots: WPoint[];
 }
-
-const X_MIN = -10,
-  X_MAX = 10,
-  Y_MIN = -10,
-  Y_MAX = 10;
 
 /** Mirrors MathCanvas.estimateBeatBox — keep in sync (see layout.ts). */
 export function estimateBeatRect(b: Beat): WRect {
@@ -221,10 +217,11 @@ export function resolveTargets(
   if ((dia && dia.params) || visualParabola) {
     const source = dia?.params ?? visualParabola!;
     const { a, b, c } = parabolaOverride ?? source;
-    const graphXMin = X_MIN;
-    const graphXMax = X_MAX;
-    const graphYMin = Y_MIN;
-    const graphYMax = Y_MAX;
+    const graphViewport = parabolaViewport(a, b, c);
+    const graphXMin = graphViewport.xMin;
+    const graphXMax = graphViewport.xMax;
+    const graphYMin = graphViewport.yMin;
+    const graphYMax = graphViewport.yMax;
     const visualHasTabs = !!visualParabola && visualParabola.beat.animation.scenes.length > 1;
     // Concept card: 18px shell padding, 56px heading, optional 50px tabs,
     // then the shared 560×200 interactive ParabolaWidget plot.
