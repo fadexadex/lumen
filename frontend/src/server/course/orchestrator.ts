@@ -65,12 +65,19 @@ async function generateOne(opts: {
   try {
     let raw: unknown;
     try {
+      // Throttle partials to ~5/sec — the SDK emits hundreds per lesson and the
+      // client only uses them for optional skeleton UX.
+      let lastPartial = 0;
       raw = await streamLesson({
         profile,
         module: mod,
         priorModules,
-        onPartial: (partial) =>
-          send({ type: "module_partial", id: mod.id, partial: partial as Partial<LessonScript> }),
+        onPartial: (partial) => {
+          const now = Date.now();
+          if (now - lastPartial < 200) return;
+          lastPartial = now;
+          send({ type: "module_partial", id: mod.id, partial: partial as Partial<LessonScript> });
+        },
       });
     } catch (streamErr) {
       // One repair pass on the stronger model before giving up.

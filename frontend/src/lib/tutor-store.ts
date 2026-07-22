@@ -70,7 +70,7 @@ const memoryStorage = {
  * Reduce one SSE course event into a store patch. Keeps the course + derived
  * roadmap in sync and maintains the onboarding action feed (genLog / genPhase).
  */
-function reduceCourseEvent(s: TutorState, event: CourseStreamEvent): Partial<TutorState> {
+function reduceCourseEvent(s: TutorState, event: CourseStreamEvent): Partial<TutorState> | null {
   switch (event.type) {
     case "course":
       return {
@@ -104,7 +104,7 @@ function reduceCourseEvent(s: TutorState, event: CourseStreamEvent): Partial<Tut
     }
 
     case "module_status": {
-      if (!s.course) return {};
+      if (!s.course) return null;
       const modules = s.course.modules.map((m) =>
         m.id === event.id ? { ...m, status: event.status, error: event.error } : m,
       );
@@ -113,7 +113,7 @@ function reduceCourseEvent(s: TutorState, event: CourseStreamEvent): Partial<Tut
     }
 
     case "module_ready": {
-      if (!s.course) return {};
+      if (!s.course) return null;
       const isFirst = s.course.modules[0]?.id === event.id;
       const modules = s.course.modules.map((m) =>
         m.id === event.id
@@ -134,7 +134,7 @@ function reduceCourseEvent(s: TutorState, event: CourseStreamEvent): Partial<Tut
     }
 
     case "module_enriched": {
-      if (!s.course) return {};
+      if (!s.course) return null;
       const modules = s.course.modules.map((m) =>
         m.id === event.id ? { ...m, resources: event.resources } : m,
       );
@@ -148,8 +148,13 @@ function reduceCourseEvent(s: TutorState, event: CourseStreamEvent): Partial<Tut
     case "done":
       return { genPhase: "done" };
 
+    // module_partial is streamed for skeleton UX we don't use in the store.
+    // Returning null skips set() entirely — critical: otherwise the persist
+    // middleware would serialize the whole course to localStorage on every one
+    // of the hundreds of partials per module, freezing the main thread.
+    case "module_partial":
     default:
-      return {};
+      return null;
   }
 }
 
@@ -176,7 +181,10 @@ export const useTutorStore = create<TutorState>()(
           const course = { ...s.course, modules, updatedAt: Date.now() };
           return { course, roadmap: deriveRoadmap(course) };
         }),
-      applyCourseEvent: (event) => set((s) => reduceCourseEvent(s, event)),
+      applyCourseEvent: (event) => {
+        const patch = reduceCourseEvent(get(), event);
+        if (patch) set(patch);
+      },
       resetCourseGen: () =>
         set({ course: null, planningModules: [], genPhase: "idle", genLog: [] }),
       setSubscription: (subscription) => set({ subscription }),
