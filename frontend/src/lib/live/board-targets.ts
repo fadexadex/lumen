@@ -1,5 +1,6 @@
 import { layoutScript, type Beat } from "@/components/math-canvas/layout";
 import type { LessonScript } from "@/lib/types";
+import { activeConceptScene } from "@/lib/concept-visual";
 import type { WPoint, WRect } from "@/components/math-canvas/annotation-layer";
 
 export interface ResolvedTargets {
@@ -8,6 +9,7 @@ export interface ResolvedTargets {
   point(name: string): WPoint | null;
   rect(name: string): WRect | null;
   parabola: ParabolaGeom | null;
+  visual: { primitive: string; narration: string; sceneIndex: number } | null;
 }
 
 export interface TargetDescription {
@@ -58,6 +60,7 @@ const centerOf = (r: WRect): WPoint => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
 export function resolveTargets(
   script: LessonScript,
   parabolaOverride?: { a: number; b: number; c: number } | null,
+  stepIndex = 0,
 ): ResolvedTargets {
   const { beats } = layoutScript(script);
   const names: string[] = [];
@@ -101,17 +104,128 @@ export function resolveTargets(
     });
   });
 
+  const visualBeat = beats.find(
+    (beat): beat is Extract<Beat, { kind: "visual" }> => beat.kind === "visual",
+  );
+  let visual: ResolvedTargets["visual"] = null;
+  let visualParabola: {
+    beat: Extract<Beat, { kind: "visual" }>;
+    a: number;
+    b: number;
+    c: number;
+  } | null = null;
+  if (visualBeat) {
+    const active = activeConceptScene(visualBeat.animation, stepIndex, script.steps.length);
+    const scene = active.scene;
+    visual = { primitive: scene.primitive, narration: scene.narration, sceneIndex: active.index };
+    const frame = { x: visualBeat.x, y: visualBeat.y, w: visualBeat.w, h: visualBeat.h };
+    addTarget("visual", "region", `${scene.primitive}: ${scene.narration}`, frame);
+
+    if (scene.primitive === "plotFunction") {
+      const plot = { x: frame.x + 38, y: frame.y + 88, w: frame.w - 76, h: frame.h - 178 };
+      addTarget("visual.curve", "region", `${scene.fn} function curve`, plot);
+      if (scene.fn === "parabola")
+        visualParabola = { beat: visualBeat, a: scene.a, b: scene.b, c: scene.c };
+    } else if (scene.primitive === "balanceScale") {
+      addTarget(
+        "visual.left",
+        "region",
+        `left side: ${scene.left.map((item) => item.label).join(" plus ")}`,
+        { x: frame.x + 40, y: frame.y + 145, w: 245, h: 220 },
+      );
+      addTarget(
+        "visual.right",
+        "region",
+        `right side: ${scene.right.map((item) => item.label).join(" plus ")}`,
+        { x: frame.x + 335, y: frame.y + 145, w: 245, h: 220 },
+      );
+      addTarget("visual.beam", "region", "balance beam", {
+        x: frame.x + 90,
+        y: frame.y + 175,
+        w: 440,
+        h: 55,
+      });
+    } else if (scene.primitive === "numberLineWalk") {
+      addTarget(
+        "visual.numberLine",
+        "region",
+        `number line from ${scene.range[0]} to ${scene.range[1]}`,
+        { x: frame.x + 55, y: frame.y + 250, w: frame.w - 110, h: 80 },
+      );
+      [scene.start, ...scene.hops.map((hop) => hop.to)].forEach((value, index) => {
+        const ratio = (value - scene.range[0]) / (scene.range[1] - scene.range[0]);
+        addTarget(`visual.stop${index + 1}`, "point", `number-line stop at ${value}`, {
+          x: frame.x + 55 + ratio * (frame.w - 110) - 20,
+          y: frame.y + 270,
+          w: 40,
+          h: 40,
+        });
+      });
+    } else if (scene.primitive === "stepReveal") {
+      const lineH = Math.min(62, 280 / scene.lines.length);
+      scene.lines.forEach((line, index) =>
+        addTarget(
+          `visual.line${index + 1}`,
+          "equation",
+          line.math ?? line.text ?? `worked line ${index + 1}`,
+          { x: frame.x + 55, y: frame.y + 105 + index * lineH, w: frame.w - 110, h: lineH },
+        ),
+      );
+    } else if (scene.primitive === "fractionBar") {
+      addTarget("visual.firstFraction", "region", `${scene.shaded} of ${scene.parts} parts`, {
+        x: frame.x + 70,
+        y: frame.y + 145,
+        w: frame.w - 140,
+        h: 105,
+      });
+      if (scene.compareTo)
+        addTarget(
+          "visual.secondFraction",
+          "region",
+          `${scene.compareTo.shaded} of ${scene.compareTo.parts} parts`,
+          { x: frame.x + 70, y: frame.y + 275, w: frame.w - 140, h: 105 },
+        );
+    } else if (scene.primitive === "geometryTransform") {
+      addTarget("visual.original", "region", `original ${scene.shape}`, {
+        x: frame.x + 100,
+        y: frame.y + 150,
+        w: 190,
+        h: 210,
+      });
+      addTarget("visual.transformed", "region", `${scene.transform}ed ${scene.shape}`, {
+        x: frame.x + 320,
+        y: frame.y + 150,
+        w: 210,
+        h: 210,
+      });
+    } else {
+      addTarget("visual.model", "region", `${scene.primitive} model`, {
+        x: frame.x + 45,
+        y: frame.y + 100,
+        w: frame.w - 90,
+        h: frame.h - 180,
+      });
+    }
+  }
+
   // Parabola geometry (if this lesson has a diagram)
   let parabola: ParabolaGeom | null = null;
   const dia = beats.find((b) => b.kind === "diagram") as
     Extract<Beat, { kind: "diagram" }> | undefined;
-  if (dia && dia.params) {
-    const { a, b, c } = parabolaOverride ?? dia.params;
-    const plotW = dia.w;
-    const plotH = dia.h - 130; // matches ParabolaWidget
+  if ((dia && dia.params) || visualParabola) {
+    const source = dia?.params ?? visualParabola!;
+    const { a, b, c } = parabolaOverride ?? source;
+    const graphXMin = dia ? X_MIN : -6;
+    const graphXMax = dia ? X_MAX : 6;
+    const graphYMin = dia ? Y_MIN : -6;
+    const graphYMax = dia ? Y_MAX : 6;
+    const plotX = dia ? dia.x : visualParabola!.beat.x + 38;
+    const plotY = dia ? dia.y : visualParabola!.beat.y + 88;
+    const plotW = dia ? dia.w : visualParabola!.beat.w - 76;
+    const plotH = dia ? dia.h - 130 : visualParabola!.beat.h - 178;
     const graphToWorld = (gx: number, gy: number): WPoint => ({
-      x: dia.x + ((gx - X_MIN) / (X_MAX - X_MIN)) * plotW,
-      y: dia.y + (plotH - ((gy - Y_MIN) / (Y_MAX - Y_MIN)) * plotH),
+      x: plotX + ((gx - graphXMin) / (graphXMax - graphXMin)) * plotW,
+      y: plotY + (plotH - ((gy - graphYMin) / (graphYMax - graphYMin)) * plotH),
     });
     const vx = a !== 0 ? -b / (2 * a) : 0;
     const vy = c - (b * b) / (4 * a);
@@ -123,7 +237,27 @@ export function resolveTargets(
             graphToWorld(r, 0),
           )
         : [];
-    parabola = { beat: dia, a, b, c, X_MIN, X_MAX, Y_MIN, Y_MAX, graphToWorld, vertex, roots };
+    const parabolaBeat =
+      dia ??
+      ({
+        ...visualParabola!.beat,
+        kind: "diagram",
+        widget: "parabola",
+        params: { a, b, c },
+      } as Extract<Beat, { kind: "diagram" }>);
+    parabola = {
+      beat: parabolaBeat,
+      a,
+      b,
+      c,
+      X_MIN: graphXMin,
+      X_MAX: graphXMax,
+      Y_MIN: graphYMin,
+      Y_MAX: graphYMax,
+      graphToWorld,
+      vertex,
+      roots,
+    };
 
     if (vertex) {
       points.set("vertex", vertex);
@@ -149,8 +283,8 @@ export function resolveTargets(
       });
     }
     // the graph area itself
-    rects.set("graph", { x: dia.x, y: dia.y, w: dia.w, h: plotH });
-    points.set("graph", { x: dia.x + dia.w / 2, y: dia.y + plotH / 2 });
+    rects.set("graph", { x: plotX, y: plotY, w: plotW, h: plotH });
+    points.set("graph", { x: plotX + plotW / 2, y: plotY + plotH / 2 });
     names.push("graph");
     descriptions.push({ name: "graph", kind: "region", text: "live parabola graph" });
   }
@@ -161,5 +295,13 @@ export function resolveTargets(
     point: (n) => points.get(n) ?? (rects.get(n) ? centerOf(rects.get(n)!) : null),
     rect: (n) => rects.get(n) ?? null,
     parabola,
+    visual,
   };
+
+  function addTarget(name: string, kind: TargetDescription["kind"], text: string, rect: WRect) {
+    rects.set(name, rect);
+    points.set(name, centerOf(rect));
+    names.push(name);
+    descriptions.push({ name, kind, text });
+  }
 }

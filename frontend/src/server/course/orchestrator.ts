@@ -1,5 +1,5 @@
-import { streamRoadmap, streamLesson, repairLesson } from "./generate";
-import { enrichScript } from "@/lib/course-gen/math";
+import { streamRoadmap, streamLesson, repairLesson, repairLessonContent } from "./generate";
+import { createFallbackVisual, enrichScript } from "@/lib/course-gen/math";
 import { lessonScriptSchema } from "@/lib/course-gen/schemas";
 import { assertLessonMath } from "@/lib/course-gen/validation";
 import type { LearnerProfile, LessonScript } from "@/lib/types";
@@ -81,8 +81,18 @@ async function generateOne(opts: {
         },
       });
     } catch (streamErr) {
-      // One repair pass on the stronger model before giving up.
-      raw = await repairLesson({ profile, module: mod, priorModules, cause: errMsg(streamErr) });
+      try {
+        raw = await repairLesson({ profile, module: mod, priorModules, cause: errMsg(streamErr) });
+      } catch (visualRepairErr) {
+        const content = await repairLessonContent({
+          profile,
+          module: mod,
+          priorModules,
+          cause: errMsg(visualRepairErr),
+        });
+        const core = { ...(content as object), moduleId: mod.id } as LessonScript;
+        raw = { ...core, visual: createFallbackVisual(core) };
+      }
     }
 
     let parsed;
@@ -90,12 +100,23 @@ async function generateOne(opts: {
       parsed = lessonScriptSchema.parse({ ...(raw as object), moduleId: mod.id });
       assertLessonMath(parsed);
     } catch (validationErr) {
-      raw = await repairLesson({
-        profile,
-        module: mod,
-        priorModules,
-        cause: errMsg(validationErr),
-      });
+      try {
+        raw = await repairLesson({
+          profile,
+          module: mod,
+          priorModules,
+          cause: errMsg(validationErr),
+        });
+      } catch (visualRepairErr) {
+        const content = await repairLessonContent({
+          profile,
+          module: mod,
+          priorModules,
+          cause: errMsg(visualRepairErr),
+        });
+        const core = { ...(content as object), moduleId: mod.id } as LessonScript;
+        raw = { ...core, visual: createFallbackVisual(core) };
+      }
       parsed = lessonScriptSchema.parse({ ...(raw as object), moduleId: mod.id });
       assertLessonMath(parsed);
     }

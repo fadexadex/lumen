@@ -46,4 +46,40 @@ describe("dynamic MathCanvas layout", () => {
     const firstBody = beats.find((beat) => beat.kind === "text")!;
     expect(firstBody.y - firstTitle.y).toBeGreaterThanOrEqual(80);
   });
+
+  it("places one stable visual frame for a generated animation", () => {
+    const script: LessonScript = {
+      moduleId: "fractions",
+      title: "Equivalent fractions",
+      steps: [
+        {
+          kind: "explanation",
+          title: "Start",
+          body: "Split the same whole into equal-sized pieces.",
+        },
+        { kind: "example", title: "Compare", lines: [{ math: "\\frac{1}{2}=\\frac{2}{4}" }] },
+        { kind: "practice", title: "Try", prompt: "Shade an equivalent amount.", answer: "2/4" },
+      ],
+      visual: {
+        kind: "animation",
+        title: "Same amount, more pieces",
+        goal: "Compare equivalent fractions.",
+        advance: "step",
+        scenes: [
+          {
+            primitive: "fractionBar",
+            narration: "Both bars show the same amount.",
+            parts: 4,
+            shaded: 2,
+            compareTo: { parts: 2, shaded: 1 },
+          },
+        ],
+      },
+    };
+
+    const { beats } = layoutScript(script);
+    const visual = beats.filter((beat) => beat.kind === "visual");
+    expect(visual).toHaveLength(1);
+    expect(visual[0].x).toBeGreaterThan(700);
+  });
 });

@@ -62,6 +62,7 @@ async def entrypoint(ctx: JobContext):
     board.step_title = ""
     board.equation = ""
     board.parabola = None
+    board.visual = ""
     board.targets = []
     board.target_details = []
 
@@ -80,6 +81,7 @@ async def entrypoint(ctx: JobContext):
         board.step_title = data.get("stepTitle", board.step_title)
         board.equation = data.get("equation", board.equation)
         board.parabola = data.get("parabola", board.parabola)
+        board.visual = data.get("visual", board.visual)
         board.targets = data.get("targets", board.targets)
         board.target_details = data.get("targetDetails", board.target_details)
 

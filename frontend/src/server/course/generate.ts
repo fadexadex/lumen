@@ -1,6 +1,6 @@
 import { streamObject, generateObject } from "ai";
 import { mistral } from "@ai-sdk/mistral";
-import { roadmapSchema, lessonScriptSchema } from "@/lib/course-gen/schemas";
+import { roadmapSchema, lessonScriptSchema, lessonContentSchema } from "@/lib/course-gen/schemas";
 import type { LearnerProfile, RoadmapModule } from "@/lib/types";
 
 const SMALL = "mistral-small-latest";
@@ -78,6 +78,25 @@ moduleId MUST be "${args.module.id}". Do not add commentary.`,
   return object;
 }
 
+/** Last-resort content pass. The server attaches a trusted step visual afterward. */
+export async function repairLessonContent(args: {
+  profile: LearnerProfile;
+  module: LessonModule;
+  priorModules: LessonModule[];
+  cause?: string;
+}) {
+  const { object } = await generateObject({
+    model: mistral(LARGE),
+    schema: lessonContentSchema,
+    prompt: `${buildLessonPrompt(args)}
+
+Both attempts to generate the rich visual object failed (${args.cause ?? "invalid visual JSON"}).
+Return the core lesson content only. Omit visual entirely; the server will attach a safe visual.
+Return ONLY valid JSON matching the provided schema. moduleId MUST be "${args.module.id}".`,
+  });
+  return object;
+}
+
 function buildRoadmapPrompt(p: LearnerProfile) {
   return `
 You are Lumen, a calm, encouraging tutor designing a learning path.
@@ -112,8 +131,20 @@ Rules:
 - Every math field MUST be valid KaTeX: use x^2, \\frac{a}{b}, \\pm, \\sqrt{}. No unicode math operators.
 - Prose fields must be plain text, not Markdown. Put inline math in $...$ and standalone equations in math fields.
 - Practice steps MUST include an "answer"; if "options" are given, the answer MUST match one option exactly.
-- If this module is about graphing a quadratic, include diagram.parabola with a, b, c ONLY
-  (do not include roots or vertex — those are computed for you). Keep a, b, c small integers.
+- Every lesson MUST include visual. Use kind "animation" with 2-5 coherent scenes whenever a
+  visual can improve understanding. Use kind "none" only when a visual would genuinely add no
+  instructional value, and state the specific reason.
+- Choose the visual primitive by meaning: plotFunction for graphs; numberLineWalk for ordering,
+  signed movement, intervals, or inequalities; algebraTiles for combining/factoring terms;
+  balanceScale for preserving equality; partitionGrid for area, arrays, multiplication, or
+  probability; fractionBar for fractions/ratios; countObjects for grouping; geometryTransform
+  for spatial transformations; stepReveal for a calculation whose changing lines are the visual.
+- Sequence scenes so each one adds one idea. Keep narration to one short spoken sentence. Vary
+  primitives when that makes the concept clearer; never add a decorative or unrelated graphic.
+- Set visual.advance to "step". All values must be internally consistent and inside the schema.
+- If a visual scene is plotFunction with fn "parabola", also include diagram.parabola with the
+  same a, b, c ONLY (no roots or vertex). This preserves the live tutor's interactive graph tools.
+- Keep plot coefficients and other counts small enough to read on a classroom whiteboard.
 - Voice: warm, short sentences, age-appropriate for grade ${profile.grade}.
 - Style "${profile.style}": stories -> narrative framing; examples -> more worked lines;
   step-by-step -> numbered clarity; challenge -> leaner prose, harder practice.

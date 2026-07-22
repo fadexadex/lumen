@@ -9,6 +9,7 @@ class BoardContext:
     step_title: str = ""
     equation: str = ""  # e.g. "y = x^2 - 5x + 6"
     parabola: dict | None = None  # {"a":1,"b":-5,"c":6}
+    visual: str = ""
     targets: list[str] = field(default_factory=list)  # ["vertex","axisOfSymmetry","root1",...]
     target_details: list[dict] = field(default_factory=list)
 
@@ -21,6 +22,8 @@ class BoardContext:
         if self.parabola:
             p = self.parabola
             lines.append(f"Parabola coefficients: a={p['a']}, b={p['b']}, c={p['c']}")
+        if self.visual:
+            lines.append(f"Visual on board: {self.visual}")
         if self.target_details:
             lines.append("Board targets (use the exact name before the colon):")
             for target in self.target_details:

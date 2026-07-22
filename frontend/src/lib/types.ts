@@ -58,7 +58,86 @@ export interface LessonScript {
   title: string;
   steps: LessonStep[];
   diagram?: LessonDiagram;
+  /** Trusted, model-parameterized UI. Optional here for legacy hand-authored lessons. */
+  visual?: LessonVisual;
 }
+
+export interface ConceptAnimation {
+  kind: "animation";
+  title: string;
+  goal: string;
+  /** The lesson step remains the single playback authority. */
+  advance: "step";
+  scenes: ConceptScene[];
+}
+
+export interface NoLessonVisual {
+  kind: "none";
+  reason: string;
+}
+
+export type LessonVisual = ConceptAnimation | NoLessonVisual;
+
+type SceneBase = { narration: string };
+
+export type ConceptScene =
+  | (SceneBase & {
+      primitive: "plotFunction";
+      fn: "parabola" | "line" | "absolute" | "cubic";
+      a: number;
+      b: number;
+      c: number;
+      highlight?: ("vertex" | "roots" | "intercept")[];
+    })
+  | (SceneBase & {
+      primitive: "numberLineWalk";
+      range: [number, number];
+      start: number;
+      hops: { to: number; label?: string }[];
+    })
+  | (SceneBase & {
+      primitive: "algebraTiles";
+      xSquared: number;
+      x: number;
+      unit: number;
+      factored?: [string, string];
+    })
+  | (SceneBase & {
+      primitive: "balanceScale";
+      left: { label: string; weight: number }[];
+      right: { label: string; weight: number }[];
+      operation?: string;
+    })
+  | (SceneBase & {
+      primitive: "partitionGrid";
+      rows: number;
+      cols: number;
+      shaded: number;
+      rowLabel?: string;
+      colLabel?: string;
+    })
+  | (SceneBase & {
+      primitive: "fractionBar";
+      parts: number;
+      shaded: number;
+      compareTo?: { parts: number; shaded: number };
+    })
+  | (SceneBase & {
+      primitive: "countObjects";
+      shape: "dot" | "square" | "star";
+      total: number;
+      groups: number;
+    })
+  | (SceneBase & {
+      primitive: "geometryTransform";
+      shape: "triangle" | "square" | "rectangle";
+      transform: "translate" | "rotate" | "reflect" | "scale";
+      amount: number;
+    })
+  | (SceneBase & {
+      primitive: "stepReveal";
+      lines: { text?: string; math?: string }[];
+    });
 
 export interface LessonDiagram {
   /** For a parabola y = ax² + bx + c */

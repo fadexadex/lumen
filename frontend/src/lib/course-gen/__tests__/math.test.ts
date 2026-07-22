@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { cleanGeneratedProse, enrichParabola, enrichScript } from "@/lib/course-gen/math";
+import {
+  cleanGeneratedProse,
+  createFallbackVisual,
+  enrichParabola,
+  enrichScript,
+} from "@/lib/course-gen/math";
 import { lessonScripts } from "@/lib/lesson-scripts";
 import type { LessonScript } from "@/lib/types";
 
@@ -49,6 +54,73 @@ describe("enrichParabola", () => {
     expect(new Set(fixed.roots)).toEqual(new Set([2, 3]));
     expect(fixed.vertex).toEqual([2.5, -0.25]);
   });
+
+  it("synchronizes a generated parabola scene with the live graph contract", () => {
+    const script: LessonScript = {
+      moduleId: "visual-graph",
+      title: "Graph it",
+      steps: [
+        {
+          kind: "explanation",
+          title: "Shape",
+          body: "A parabola has a turning point on its curve.",
+        },
+      ],
+      visual: {
+        kind: "animation",
+        title: "Parabola",
+        goal: "Show the turning point.",
+        advance: "step",
+        scenes: [
+          {
+            primitive: "plotFunction",
+            narration: "The curve turns at its vertex.",
+            fn: "parabola",
+            a: 1,
+            b: -4,
+            c: 3,
+          },
+        ],
+      },
+    };
+
+    const fixed = enrichScript(script).diagram!.parabola!;
+    expect(fixed).toEqual({ a: 1, b: -4, c: 3, roots: [3, 1], vertex: [2, -1] });
+  });
+
+  it("normalizes an explicitly requested number line when the model chose a line plot", () => {
+    const script: LessonScript = {
+      moduleId: "number-line-fix",
+      title: "Show the solution",
+      steps: [
+        { kind: "explanation", title: "Solution", body: "Mark the solution where it belongs." },
+      ],
+      visual: {
+        kind: "animation",
+        title: "Solution position",
+        goal: "Locate the solution.",
+        advance: "step",
+        scenes: [
+          {
+            primitive: "plotFunction",
+            narration: "Show the solution x = 4 on the number line.",
+            fn: "line",
+            a: 1,
+            b: -4,
+            c: 0,
+          },
+        ],
+      },
+    };
+
+    const visual = enrichScript(script).visual;
+    expect(visual?.kind).toBe("animation");
+    if (visual?.kind !== "animation") throw new Error("expected animation");
+    expect(visual.scenes[0]).toMatchObject({
+      primitive: "numberLineWalk",
+      hops: [{ to: 4, label: "x = 4" }],
+    });
+  });
 });
 
 describe("cleanGeneratedProse", () => {
@@ -56,5 +128,31 @@ describe("cleanGeneratedProse", () => {
     expect(cleanGeneratedProse("Use **<** and `$a^2 + b^2 = c^2$`.")).toBe(
       "Use < and $a^2 + b^2 = c^2$.",
     );
+  });
+
+  it("builds a safe step visual when rich visual generation cannot be repaired", () => {
+    const script: LessonScript = {
+      moduleId: "fallback",
+      title: "Solving simple equations",
+      steps: [
+        { kind: "explanation", title: "Keep balance", body: "Do the same thing to both sides." },
+        { kind: "example", title: "Work it", lines: [{ math: "x+2=5" }, { math: "x=3" }] },
+        {
+          kind: "practice",
+          title: "Try",
+          prompt: "Solve the equation.",
+          math: "x+4=9",
+          answer: "5",
+        },
+      ],
+    };
+
+    const visual = createFallbackVisual(script);
+    expect(visual.kind).toBe("animation");
+    if (visual.kind !== "animation") throw new Error("expected animation fallback");
+    expect(visual.scenes[0].primitive).toBe("stepReveal");
+    const scene = visual.scenes[0];
+    if (scene.primitive !== "stepReveal") throw new Error("expected step reveal");
+    expect(scene.lines.some((line) => line.math === "x=3")).toBe(true);
   });
 });

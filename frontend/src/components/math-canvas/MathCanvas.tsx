@@ -3,6 +3,7 @@ import type { LessonScript } from "@/lib/types";
 import { InkCanvas, type InkHandle, type MCTool } from "./ink-canvas";
 import { TextNotes, type NotesHandle } from "./text-notes";
 import { ParabolaWidget } from "./parabola-widget";
+import { ConceptAnimationPlayer } from "./concept-animation";
 import { layoutScript, BOARD_W, LEFT_X, COL_W, type Beat } from "./layout";
 import { Equation, toHandMath } from "./equation";
 import { MathText } from "@/lib/math-text";
@@ -11,6 +12,7 @@ import { AnnotationLayer, type LumenCanvasController } from "./annotation-layer"
 import { setCanvasController } from "@/lib/live/canvas-agent-bridge";
 import { estimateBeatRect, resolveTargets } from "@/lib/live/board-targets";
 import { emitLiveParabola } from "@/lib/live/board-live";
+import { activeConceptScene } from "@/lib/concept-visual";
 
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 3;
@@ -131,21 +133,29 @@ export function MathCanvas(props: MathCanvasProps) {
   const panning = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const annoRef = useRef<LumenCanvasController | null>(null);
   const boardElRef = useRef<HTMLDivElement | null>(null);
-  const scriptPara = script.diagram?.parabola ?? null;
+  const scriptPara = useMemo(() => {
+    const activeScene =
+      script.visual?.kind === "animation"
+        ? activeConceptScene(script.visual, stepIndex, script.steps.length).scene
+        : null;
+    return activeScene?.primitive === "plotFunction" && activeScene.fn === "parabola"
+      ? { a: activeScene.a, b: activeScene.b, c: activeScene.c }
+      : (script.diagram?.parabola ?? null);
+  }, [script, stepIndex]);
   const [paraParams, setParaParams] = useState<{ a: number; b: number; c: number } | null>(
     scriptPara,
   );
 
   useEffect(() => {
-    setParaParams(script.diagram?.parabola ?? null);
-  }, [script]);
+    setParaParams(scriptPara);
+  }, [scriptPara]);
 
   const { beats, height: BOARD_H } = useMemo(() => layoutScript(script), [script]);
 
   // Register the Lumen Live canvas controller: annotations + view/coord helpers.
   // Re-resolve targets when the lesson OR live parabola params change.
   useEffect(() => {
-    const targets = resolveTargets(script, paraParams);
+    const targets = resolveTargets(script, paraParams, stepIndex);
     setCanvasController({
       anno: () => annoRef.current,
       targets,
@@ -176,7 +186,7 @@ export function MathCanvas(props: MathCanvasProps) {
       },
     });
     return () => setCanvasController(null);
-  }, [script, beats, BOARD_H, paraParams]);
+  }, [script, beats, BOARD_H, paraParams, stepIndex]);
 
   // Reset the idle countdown on any interaction; ~2.6s of stillness fades chrome.
   const bumpActivity = useCallback(() => {
@@ -219,7 +229,9 @@ export function MathCanvas(props: MathCanvasProps) {
       beats.filter((b, i) => {
         if (b.step > stepIndex) return false;
         if (b.step < stepIndex) return true;
-        if (b.kind === "options" || b.kind === "diagram") return playerState.stepDone;
+        if (b.kind === "options" || b.kind === "diagram" || b.kind === "visual") {
+          return playerState.stepDone;
+        }
         if (i === playerState.activeBeatIndex) return true;
         return charsFor(i) > 0;
       }),
@@ -258,6 +270,18 @@ export function MathCanvas(props: MathCanvasProps) {
     if (!fittedKeyRef.current) return;
     setView((v) => ensureInView(el, v, first));
   }, [stepIndex, activeBeats]);
+
+  // Once the prose has landed, give a generated scene its own stable camera beat.
+  // The next lesson step returns to the reading column through the effect above.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el || !playerState.stepDone || performance.now() < lessonFollowPausedUntilRef.current) {
+      return;
+    }
+    const visual = beats.find((beat) => beat.kind === "visual");
+    if (!visual) return;
+    setView((current) => ensureInView(el, current, visual));
+  }, [beats, playerState.stepDone, stepIndex, vp.w, vp.h]);
 
   // Wheel: pinch-zoom or pan
   useEffect(() => {
@@ -393,6 +417,8 @@ export function MathCanvas(props: MathCanvasProps) {
                   picked={picked}
                   onPick={(bi, oi) => setPicked((p) => ({ ...p, [bi]: oi }))}
                   paraParams={paraParams}
+                  stepIndex={stepIndex}
+                  stepTotal={script.steps.length}
                   onParaChange={(p) => {
                     setParaParams(p);
                     emitLiveParabola(p);
@@ -590,6 +616,8 @@ function BeatView({
   onPick,
   paraParams,
   onParaChange,
+  stepIndex,
+  stepTotal,
 }: {
   beat: Beat;
   beatIndex: number;
@@ -599,6 +627,8 @@ function BeatView({
   onPick: (bi: number, oi: number) => void;
   paraParams: { a: number; b: number; c: number } | null;
   onParaChange: (p: { a: number; b: number; c: number }) => void;
+  stepIndex: number;
+  stepTotal: number;
 }) {
   const base = { position: "absolute" as const, left: beat.x, top: beat.y };
   if (beat.kind === "title") {
@@ -649,6 +679,24 @@ function BeatView({
             </button>
           );
         })}
+      </div>
+    );
+  }
+  if (beat.kind === "visual") {
+    return (
+      <div
+        style={{ ...base, width: beat.w, height: beat.h, pointerEvents: "auto" }}
+        className="mc-diagram mc-diagram--concept tutor-fade-in"
+        data-no-pan
+      >
+        <ConceptAnimationPlayer
+          animation={beat.animation}
+          stepIndex={stepIndex}
+          stepTotal={stepTotal}
+          width={beat.w - 36}
+          height={beat.h - 36}
+          plotOverride={paraParams}
+        />
       </div>
     );
   }

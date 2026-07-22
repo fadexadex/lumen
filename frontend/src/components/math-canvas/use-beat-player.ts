@@ -6,6 +6,7 @@ import { toHandMath } from "./equation";
 const CHAR_MS = 22;
 const BEAT_GAP_MS = 200;
 const STEP_ADVANCE_MS = 650;
+const VISUAL_STEP_ADVANCE_MS = 2200;
 const DIAGRAM_MS = 400;
 
 function beatText(beat: Beat): string {
@@ -63,6 +64,7 @@ export function useBeatPlayer({
     () => beats.map((b, i) => ({ b, i })).filter(({ b }) => b.step === stepIndex && isTypeable(b)),
     [beats, stepIndex],
   );
+  const hasConceptVisual = useMemo(() => beats.some((beat) => beat.kind === "visual"), [beats]);
 
   const [state, setState] = useState<BeatPlayerState>(() => initialState(typeable));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,9 +108,12 @@ export function useBeatPlayer({
         return;
       }
       if (!state.playing) return;
-      timer.current = setTimeout(() => {
-        advanceRef.current();
-      }, STEP_ADVANCE_MS);
+      timer.current = setTimeout(
+        () => {
+          advanceRef.current();
+        },
+        hasConceptVisual ? VISUAL_STEP_ADVANCE_MS : STEP_ADVANCE_MS,
+      );
       return clear;
     }
 
@@ -150,7 +155,7 @@ export function useBeatPlayer({
     }
 
     return clear;
-  }, [state, typeable, stepIndex, totalSteps]);
+  }, [state, typeable, stepIndex, totalSteps, hasConceptVisual]);
 
   const pause = useCallback(() => {
     clear();

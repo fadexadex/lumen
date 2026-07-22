@@ -4,6 +4,7 @@ import type { TargetDescription } from "./board-targets";
 import type { CanvasTargetDescription } from "@/components/math-canvas/annotation-layer";
 import { prettifyLatex } from "@/lib/whiteboard-bridge";
 import { getCanvasController } from "./canvas-agent-bridge";
+import { lessonVisualSummary } from "@/lib/concept-visual";
 
 export interface BoardState {
   moduleId: string;
@@ -12,6 +13,7 @@ export interface BoardState {
   stepTitle: string;
   equation: string; // human-readable
   parabola: { a: number; b: number; c: number } | null;
+  visual: string;
   targets: string[]; // names the model may reference
   targetDetails: Array<TargetDescription | CanvasTargetDescription>;
 }
@@ -28,7 +30,7 @@ export function buildBoardState(
   const writingTargets = controller?.anno()?.targetDescriptions() ?? [];
   const override = parabolaOverride ?? (live ? { a: live.a, b: live.b, c: live.c } : null);
 
-  const T = resolveTargets(script, override);
+  const T = resolveTargets(script, override, stepIndex);
   const step = script.steps[stepIndex];
 
   const stepMath =
@@ -45,6 +47,7 @@ export function buildBoardState(
     stepTitle: step?.title ?? script.title,
     equation: stepMath ? prettifyLatex(stepMath) : "",
     parabola: T.parabola ? { a: T.parabola.a, b: T.parabola.b, c: T.parabola.c } : null,
+    visual: lessonVisualSummary(script, stepIndex),
     targets: [...T.names, ...writingTargets.map((target) => target.name)],
     targetDetails: [...T.descriptions, ...writingTargets],
   };

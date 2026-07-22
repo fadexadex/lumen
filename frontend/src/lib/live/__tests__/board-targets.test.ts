@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { resolveTargets } from "@/lib/live/board-targets";
 import { layoutScript } from "@/components/math-canvas/layout";
 import { lessonScripts } from "@/lib/lesson-scripts";
+import type { LessonScript } from "@/lib/types";
 
 const X_MIN = -10,
   X_MAX = 10,
@@ -101,5 +102,39 @@ describe("board-targets geometry", () => {
     expect(rect).toBeTruthy();
     expect(rect!.h).toBeLessThanOrEqual(64);
     expect(rect!.w).toBeLessThan(260);
+  });
+
+  it("exposes semantic targets for the active generated visual scene", () => {
+    const visualScript: LessonScript = {
+      moduleId: "visual-targets",
+      title: "Keep equations balanced",
+      steps: [
+        {
+          kind: "explanation",
+          title: "Balance",
+          body: "Apply the same operation to both sides.",
+        },
+      ],
+      visual: {
+        kind: "animation",
+        title: "Equation balance",
+        goal: "Show equality as a balance.",
+        advance: "step",
+        scenes: [
+          {
+            primitive: "balanceScale",
+            narration: "Both sides carry the same total weight.",
+            left: [{ label: "x + 2", weight: 5 }],
+            right: [{ label: "5", weight: 5 }],
+          },
+        ],
+      },
+    };
+
+    const visualTargets = resolveTargets(visualScript, null, 0);
+    expect(visualTargets.names).toEqual(
+      expect.arrayContaining(["visual", "visual.left", "visual.right", "visual.beam"]),
+    );
+    expect(visualTargets.visual?.primitive).toBe("balanceScale");
   });
 });

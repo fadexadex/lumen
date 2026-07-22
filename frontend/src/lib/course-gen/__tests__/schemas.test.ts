@@ -19,6 +19,20 @@ const validSteps = [
   },
 ];
 
+const validVisual = {
+  kind: "animation" as const,
+  title: "See the steps",
+  goal: "Show how each equivalent line follows from the last.",
+  advance: "step" as const,
+  scenes: [
+    {
+      primitive: "stepReveal" as const,
+      narration: "Each line keeps the same solution.",
+      lines: [{ math: "x + 2 = 5" }, { math: "x = 3" }],
+    },
+  ],
+};
+
 describe("generated course schemas", () => {
   it("rejects duplicate module ids", () => {
     const module = { id: "same-id", title: "First module", blurb: "A useful module" };
@@ -30,9 +44,9 @@ describe("generated course schemas", () => {
   it("rejects a practice answer that is not one of the options", () => {
     const steps = validSteps.map((step) => ({ ...step }));
     steps[2] = { ...steps[2], answer: "3" } as (typeof validSteps)[number];
-    expect(() => lessonScriptSchema.parse({ moduleId: "m1", title: "Lesson", steps })).toThrow(
-      /match one option/,
-    );
+    expect(() =>
+      lessonScriptSchema.parse({ moduleId: "m1", title: "Lesson", steps, visual: validVisual }),
+    ).toThrow(/match one option/);
   });
 
   it("rejects a zero parabola coefficient", () => {
@@ -41,6 +55,7 @@ describe("generated course schemas", () => {
         moduleId: "m1",
         title: "Lesson",
         steps: validSteps,
+        visual: validVisual,
         diagram: { parabola: { a: 0, b: 1, c: 2 } },
       }),
     ).toThrow();
@@ -49,7 +64,12 @@ describe("generated course schemas", () => {
 
 describe("generated lesson math", () => {
   it("accepts valid KaTeX and rejects malformed expressions", () => {
-    const script = lessonScriptSchema.parse({ moduleId: "m1", title: "Lesson", steps: validSteps });
+    const script = lessonScriptSchema.parse({
+      moduleId: "m1",
+      title: "Lesson",
+      steps: validSteps,
+      visual: validVisual,
+    });
     expect(() => assertLessonMath(script)).not.toThrow();
     expect(() =>
       assertLessonMath({
@@ -60,5 +80,45 @@ describe("generated lesson math", () => {
         ],
       }),
     ).toThrow(/invalid KaTeX/);
+  });
+
+  it("requires either a trusted animation or a deliberate none", () => {
+    expect(() =>
+      lessonScriptSchema.parse({ moduleId: "m1", title: "Lesson", steps: validSteps }),
+    ).toThrow();
+
+    expect(() =>
+      lessonScriptSchema.parse({
+        moduleId: "m1",
+        title: "Lesson",
+        steps: validSteps,
+        visual: { kind: "none", reason: "A visual would not clarify this review lesson." },
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects internally inconsistent visual parameters", () => {
+    expect(() =>
+      lessonScriptSchema.parse({
+        moduleId: "m1",
+        title: "Lesson",
+        steps: validSteps,
+        visual: {
+          kind: "animation",
+          title: "Number line",
+          goal: "Walk through signed values.",
+          advance: "step",
+          scenes: [
+            {
+              primitive: "numberLineWalk",
+              narration: "Move to a value outside the line.",
+              range: [-5, 5],
+              start: 0,
+              hops: [{ to: 9 }],
+            },
+          ],
+        },
+      }),
+    ).toThrow(/number-line positions/);
   });
 });

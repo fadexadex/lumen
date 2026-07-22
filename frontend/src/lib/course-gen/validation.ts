@@ -22,5 +22,13 @@ export function lessonMathFields(script: LessonScript): string[] {
     }
     if (step.kind === "practice" && step.math) fields.push(step.math);
   }
+  if (script.visual?.kind === "animation") {
+    for (const scene of script.visual.scenes) {
+      if (scene.primitive === "stepReveal") {
+        for (const line of scene.lines) if (line.math) fields.push(line.math);
+      }
+      if (scene.primitive === "algebraTiles" && scene.factored) fields.push(...scene.factored);
+    }
+  }
   return fields;
 }

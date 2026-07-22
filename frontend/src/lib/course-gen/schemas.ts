@@ -74,6 +74,181 @@ export const lessonStepSchema = z.discriminatedUnion("kind", [
   stepPracticeSchema,
 ]);
 
+/* ---------- trusted generative visuals ---------- */
+
+const sceneNarration = z.string().min(4).max(160);
+const bounded = z.number().finite().min(-100).max(100);
+
+const plotFunctionSceneSchema = z.object({
+  primitive: z.literal("plotFunction"),
+  narration: sceneNarration,
+  fn: z.enum(["parabola", "line", "absolute", "cubic"]),
+  a: bounded,
+  b: bounded,
+  c: bounded,
+  highlight: z
+    .array(z.enum(["vertex", "roots", "intercept"]))
+    .max(3)
+    .optional(),
+});
+
+const numberLineWalkSceneSchema = z.object({
+  primitive: z.literal("numberLineWalk"),
+  narration: sceneNarration,
+  range: z.tuple([bounded, bounded]),
+  start: bounded,
+  hops: z
+    .array(z.object({ to: bounded, label: z.string().max(40).optional() }))
+    .min(1)
+    .max(10),
+});
+
+const algebraTilesSceneSchema = z.object({
+  primitive: z.literal("algebraTiles"),
+  narration: sceneNarration,
+  xSquared: z.number().int().min(-8).max(8),
+  x: z.number().int().min(-12).max(12),
+  unit: z.number().int().min(-24).max(24),
+  factored: z.tuple([z.string().min(1).max(80), z.string().min(1).max(80)]).optional(),
+});
+
+const balanceScaleSceneSchema = z.object({
+  primitive: z.literal("balanceScale"),
+  narration: sceneNarration,
+  left: z
+    .array(z.object({ label: z.string().min(1).max(30), weight: bounded }))
+    .min(1)
+    .max(5),
+  right: z
+    .array(z.object({ label: z.string().min(1).max(30), weight: bounded }))
+    .min(1)
+    .max(5),
+  operation: z.string().max(60).optional(),
+});
+
+const partitionGridSceneSchema = z.object({
+  primitive: z.literal("partitionGrid"),
+  narration: sceneNarration,
+  rows: z.number().int().min(1).max(12),
+  cols: z.number().int().min(1).max(12),
+  shaded: z.number().int().min(0).max(144),
+  rowLabel: z.string().max(30).optional(),
+  colLabel: z.string().max(30).optional(),
+});
+
+const fractionBarSceneSchema = z.object({
+  primitive: z.literal("fractionBar"),
+  narration: sceneNarration,
+  parts: z.number().int().min(1).max(24),
+  shaded: z.number().int().min(0).max(24),
+  compareTo: z
+    .object({
+      parts: z.number().int().min(1).max(24),
+      shaded: z.number().int().min(0).max(24),
+    })
+    .optional(),
+});
+
+const countObjectsSceneSchema = z.object({
+  primitive: z.literal("countObjects"),
+  narration: sceneNarration,
+  shape: z.enum(["dot", "square", "star"]),
+  total: z.number().int().min(1).max(60),
+  groups: z.number().int().min(1).max(12),
+});
+
+const geometryTransformSceneSchema = z.object({
+  primitive: z.literal("geometryTransform"),
+  narration: sceneNarration,
+  shape: z.enum(["triangle", "square", "rectangle"]),
+  transform: z.enum(["translate", "rotate", "reflect", "scale"]),
+  amount: z.number().finite().min(-360).max(360),
+});
+
+const stepRevealSceneSchema = z.object({
+  primitive: z.literal("stepReveal"),
+  narration: sceneNarration,
+  lines: z.array(workedLineSchema).min(1).max(8),
+});
+
+export const conceptSceneSchema = z.discriminatedUnion("primitive", [
+  plotFunctionSceneSchema,
+  numberLineWalkSceneSchema,
+  algebraTilesSceneSchema,
+  balanceScaleSceneSchema,
+  partitionGridSceneSchema,
+  fractionBarSceneSchema,
+  countObjectsSceneSchema,
+  geometryTransformSceneSchema,
+  stepRevealSceneSchema,
+]);
+
+const conceptAnimationBaseSchema = z.object({
+  kind: z.literal("animation"),
+  title: z.string().min(2).max(80),
+  goal: z.string().min(4).max(160),
+  advance: z.literal("step").default("step"),
+  scenes: z.array(conceptSceneSchema).min(1).max(5),
+});
+
+function validateConceptScenes(
+  scenes: z.infer<typeof conceptAnimationBaseSchema>["scenes"],
+  ctx: z.RefinementCtx,
+) {
+  scenes.forEach((scene, index) => {
+    if (scene.primitive === "plotFunction" && scene.a === 0 && scene.fn !== "line") {
+      ctx.addIssue({ code: "custom", path: ["scenes", index, "a"], message: "a must be non-zero" });
+    }
+    if (scene.primitive === "numberLineWalk") {
+      const [min, max] = scene.range;
+      if (
+        min >= max ||
+        scene.start < min ||
+        scene.start > max ||
+        scene.hops.some((hop) => hop.to < min || hop.to > max)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["scenes", index],
+          message: "number-line positions must fit an increasing range",
+        });
+      }
+    }
+    if (scene.primitive === "partitionGrid" && scene.shaded > scene.rows * scene.cols) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["scenes", index, "shaded"],
+        message: "shaded cells exceed the grid",
+      });
+    }
+    if (scene.primitive === "fractionBar") {
+      if (
+        scene.shaded > scene.parts ||
+        (scene.compareTo && scene.compareTo.shaded > scene.compareTo.parts)
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["scenes", index],
+          message: "shaded parts exceed total parts",
+        });
+      }
+    }
+  });
+}
+
+export const conceptAnimationSchema = conceptAnimationBaseSchema.superRefine(({ scenes }, ctx) =>
+  validateConceptScenes(scenes, ctx),
+);
+
+export const lessonVisualSchema = z
+  .discriminatedUnion("kind", [
+    conceptAnimationBaseSchema,
+    z.object({ kind: z.literal("none"), reason: z.string().min(8).max(160) }),
+  ])
+  .superRefine((visual, ctx) => {
+    if (visual.kind === "animation") validateConceptScenes(visual.scenes, ctx);
+  });
+
 /* ---------- diagram (model suggests a,b,c; server owns roots/vertex) ---------- */
 
 export const parabolaArgsSchema = z.object({
@@ -110,24 +285,33 @@ export const diagramSchema = z
   })
   .optional();
 
-export const lessonScriptSchema = z
-  .object({
-    moduleId: z.string().min(1),
-    title: z.string().min(2).max(120),
-    steps: z.array(lessonStepSchema).min(3).max(10),
-    diagram: diagramSchema,
-  })
-  .superRefine(({ steps }, ctx) => {
-    steps.forEach((step, index) => {
-      if (step.kind === "practice" && step.options && !step.options.includes(step.answer)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["steps", index, "answer"],
-          message: "answer must exactly match one option",
-        });
-      }
-    });
+const lessonContentShape = {
+  moduleId: z.string().min(1),
+  title: z.string().min(2).max(120),
+  steps: z.array(lessonStepSchema).min(3).max(10),
+  diagram: diagramSchema,
+};
+
+function validatePracticeAnswers(steps: z.infer<typeof lessonStepSchema>[], ctx: z.RefinementCtx) {
+  steps.forEach((step, index) => {
+    if (step.kind === "practice" && step.options && !step.options.includes(step.answer)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["steps", index, "answer"],
+        message: "answer must exactly match one option",
+      });
+    }
   });
+}
+
+/** Simpler recovery schema used only after both rich-visual generation attempts fail. */
+export const lessonContentSchema = z
+  .object(lessonContentShape)
+  .superRefine(({ steps }, ctx) => validatePracticeAnswers(steps, ctx));
+
+export const lessonScriptSchema = z
+  .object({ ...lessonContentShape, visual: lessonVisualSchema })
+  .superRefine(({ steps }, ctx) => validatePracticeAnswers(steps, ctx));
 export type LessonScriptInput = z.infer<typeof lessonScriptSchema>;
 
 /* ---------- generative-UI tool args (Channel B) ---------- */

@@ -1,4 +1,4 @@
-import type { LessonScript, LessonDiagram } from "@/lib/types";
+import type { ConceptScene, LessonScript, LessonDiagram, LessonVisual } from "@/lib/types";
 
 /**
  * Recompute roots and vertex from a, b, c. The model may *suggest* a parabola,
@@ -48,6 +48,23 @@ export function enrichDiagram(diagram: LessonDiagram | undefined): LessonDiagram
 
 /** Apply diagram enrichment to a whole script before it is marked `ready`. */
 export function enrichScript(script: LessonScript): LessonScript {
+  const generatedParabola =
+    script.visual?.kind === "animation"
+      ? script.visual.scenes.find(
+          (scene) => scene.primitive === "plotFunction" && scene.fn === "parabola",
+        )
+      : undefined;
+  const synchronizedDiagram = generatedParabola
+    ? {
+        ...script.diagram,
+        parabola: {
+          a: generatedParabola.a,
+          b: generatedParabola.b,
+          c: generatedParabola.c,
+        },
+      }
+    : script.diagram;
+
   return {
     ...script,
     title: cleanGeneratedProse(script.title),
@@ -78,7 +95,75 @@ export function enrichScript(script: LessonScript): LessonScript {
         hint: step.hint ? cleanGeneratedProse(step.hint) : step.hint,
       };
     }),
-    diagram: enrichDiagram(script.diagram),
+    // The first generated parabola is also the live tool's source of truth.
+    // This removes a fragile requirement for the model to duplicate coefficients perfectly.
+    diagram: enrichDiagram(synchronizedDiagram),
+    visual:
+      script.visual?.kind === "animation"
+        ? {
+            ...script.visual,
+            title: cleanGeneratedProse(script.visual.title),
+            goal: cleanGeneratedProse(script.visual.goal),
+            scenes: script.visual.scenes.map(normalizeConceptScene),
+          }
+        : script.visual,
+  };
+}
+
+function normalizeConceptScene(scene: ConceptScene): ConceptScene {
+  const narration = cleanGeneratedProse(scene.narration);
+  if (
+    scene.primitive === "plotFunction" &&
+    scene.fn === "line" &&
+    /number\s*line/i.test(narration) &&
+    scene.a !== 0
+  ) {
+    const target = round(-scene.b / scene.a);
+    const min = Math.min(-5, Math.floor(target - 4));
+    const max = Math.max(5, Math.ceil(target + 4));
+    return {
+      primitive: "numberLineWalk",
+      narration,
+      range: [min, max],
+      start: 0,
+      hops: [{ to: target, label: `x = ${target}` }],
+    };
+  }
+  return { ...scene, narration };
+}
+
+/** Deterministic recovery visual used only when rich visual generation fails twice. */
+export function createFallbackVisual(script: LessonScript): LessonVisual {
+  const lines: { text?: string; math?: string }[] = [];
+  for (const step of script.steps) {
+    if (step.kind === "explanation") {
+      if (step.math) lines.push({ math: step.math });
+      else lines.push({ text: step.title });
+    } else if (step.kind === "example") {
+      lines.push(...step.lines.slice(0, 3));
+    } else if (step.math) {
+      lines.push({ math: step.math });
+    } else {
+      lines.push({ text: step.prompt });
+    }
+    if (lines.length >= 6) break;
+  }
+
+  return {
+    kind: "animation",
+    title: `See ${cleanGeneratedProse(script.title)}`.slice(0, 80),
+    goal: "Reveal the lesson's mathematical reasoning one clear step at a time.",
+    advance: "step",
+    scenes: [
+      {
+        primitive: "stepReveal",
+        narration: "Follow how each line builds on the idea before it.",
+        lines: lines.slice(0, 6).map((line) => ({
+          text: line.text ? cleanGeneratedProse(line.text) : undefined,
+          math: line.math,
+        })),
+      },
+    ],
   };
 }
 

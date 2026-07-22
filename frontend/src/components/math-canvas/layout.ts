@@ -1,10 +1,19 @@
-import type { LessonScript, LessonStep } from "@/lib/types";
+import type { ConceptAnimation, LessonScript, LessonStep } from "@/lib/types";
 
 export type Beat =
   | { kind: "title"; text: string; x: number; y: number; size: "h1" | "h2"; step: number }
   | { kind: "text"; text: string; x: number; y: number; size: "body"; step: number }
   | { kind: "math"; latex: string; x: number; y: number; step: number }
   | { kind: "options"; options: string[]; answer: string; x: number; y: number; step: number }
+  | {
+      kind: "visual";
+      animation: ConceptAnimation;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      step: number;
+    }
   | {
       kind: "diagram";
       widget: "parabola";
@@ -138,7 +147,17 @@ export function layoutScript(script: LessonScript): { beats: Beat[]; height: num
     y = Math.max(y + SECTION * 0.25, startY + measure(step));
   });
 
-  if (script.diagram?.parabola) {
+  if (script.visual?.kind === "animation") {
+    beats.push({
+      kind: "visual",
+      animation: script.visual,
+      x: LEFT_X + COL_W + 72,
+      y: 146,
+      w: 620,
+      h: 510,
+      step: 0,
+    });
+  } else if (script.diagram?.parabola) {
     beats.push({
       kind: "diagram",
       widget: "parabola",
