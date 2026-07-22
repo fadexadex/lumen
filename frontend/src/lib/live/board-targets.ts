@@ -65,12 +65,21 @@ export function resolveTargets(
   const rects = new Map<string, WRect>();
   const points = new Map<string, WPoint>();
 
-  // Per-step equations/titles → step<N>.equation / step<N>.title
+  // Per-step equations/titles → step<N>.equation / step<N>.title.
+  //
+  // ONLY the current page is exposed as board context. The lesson is a
+  // horizontal deck: exactly one step is on screen, so if the agent could see
+  // every step's equations it would happily teach or mark a later step's
+  // problem while the board sits on this one (the height=25 / a=-4.9 desync).
+  // Scoping to `stepIndex` makes the board the single source of truth — to
+  // discuss other material the agent must go_to_step first, which re-publishes
+  // context for the new page.
   const mathByStep = new Map<
     number,
     Array<{ beat: Extract<Beat, { kind: "math" }>; index: number }>
   >();
   beats.forEach((b) => {
+    if (b.step !== stepIndex) return;
     if (b.kind === "math") {
       const equations = mathByStep.get(b.step) ?? [];
       equations.push({ beat: b, index: equations.length + 1 });

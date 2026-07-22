@@ -14,6 +14,8 @@ class CanvasCommandBuilderTests(unittest.TestCase):
             (commands.draw_axis(), "drawAxis"),
             (commands.plot_parabola(1, -5, 6), "plotParabola"),
             (commands.set_parabola(1, -5, 6), "setParabola"),
+            (commands.set_visual_scene(1), "setVisualScene"),
+            (commands.go_to_step(2), "goToStep"),
             (commands.write_block(["$x = 2$"], job_id="solution"), "writeBlock"),
             (commands.cancel_writing("solution"), "cancelWriting"),
             (commands.focus("vertex"), "panTo"),

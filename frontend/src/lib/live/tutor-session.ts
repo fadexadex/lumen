@@ -312,6 +312,18 @@ export class TutorSession {
     this.raf = requestAnimationFrame(tick);
   }
 
+  /**
+   * Transcript turns are React-keyed by `id`. LiveKit segment ids (SG_…) can
+   * recur — a re-emitted segment, or a new bubble that reuses an id we already
+   * sealed — which would push two turns sharing a key ("Encountered two children
+   * with the same key"). Suffix any id that already belongs to a DIFFERENT turn
+   * so keys stay unique. Only collisions are touched, so id-based upserts below
+   * (which look up the original segment id) are unaffected.
+   */
+  private ensureUniqueTurnId(id: string, selfIndex = -1): string {
+    return uniqueTurnId(this.turns, id, selfIndex);
+  }
+
   private upsertTurn(id: string, from: TranscriptTurn["from"], text: string, final: boolean) {
     if (!text || isNoiseTranscript(text)) return;
 
@@ -344,7 +356,7 @@ export class TutorSession {
       if (last?.from === "tutor" && !last.final) {
         this.turns[lastIdx] = { ...last, final: true };
       }
-      this.turns.push({ id, from, text, final: false });
+      this.turns.push({ id: this.ensureUniqueTurnId(id), from, text, final: false });
       this.lastTutorAt = now;
       this.trimTurns();
       this.emitTurns();
@@ -375,7 +387,8 @@ export class TutorSession {
       if (partialIdx >= 0) {
         const prev = this.turns[partialIdx]!.text;
         const next = text.startsWith(prev) ? text : prev.startsWith(text) ? prev : text;
-        this.turns[partialIdx] = { id, from, text: next, final: false };
+        const uid = this.ensureUniqueTurnId(id, partialIdx);
+        this.turns[partialIdx] = { id: uid, from, text: next, final: false };
         this.trimTurns();
         this.emitTurns();
         return;
@@ -385,14 +398,15 @@ export class TutorSession {
       if (partialIdx >= 0) {
         const prev = this.turns[partialIdx]!.text;
         const next = text.startsWith(prev) ? text : prev.startsWith(text) ? prev : text;
-        this.turns[partialIdx] = { id, from, text: next, final: true };
+        const uid = this.ensureUniqueTurnId(id, partialIdx);
+        this.turns[partialIdx] = { id: uid, from, text: next, final: true };
         this.trimTurns();
         this.emitTurns();
         return;
       }
     }
 
-    this.turns.push({ id, from, text, final });
+    this.turns.push({ id: this.ensureUniqueTurnId(id), from, text, final });
     this.trimTurns();
     this.emitTurns();
   }
@@ -484,6 +498,20 @@ function suffixPrefixOverlap(prev: string, next: string): number {
 }
 
 /** @deprecated kept for tests — prefer shouldMergeTutor for live path. */
+/**
+ * React-key safety for transcript turns: return `id` unchanged unless another
+ * turn (not the one at `selfIndex`) already owns it, in which case append a
+ * `#n` suffix until unique. Prevents "two children with the same key" when
+ * LiveKit re-emits a segment id (SG_…).
+ */
+function uniqueTurnId(turns: TranscriptTurn[], id: string, selfIndex = -1): string {
+  const taken = (candidate: string) => turns.some((t, i) => i !== selfIndex && t.id === candidate);
+  if (!taken(id)) return id;
+  let n = 2;
+  while (taken(`${id}#${n}`)) n += 1;
+  return `${id}#${n}`;
+}
+
 function isNewTutorUtterance(prev: string, next: string): boolean {
   // Legacy linguistic split — only used in unit tests for documentation of old behavior.
   // Live path uses time/status via shouldMergeTutor instead.
@@ -503,5 +531,6 @@ export const __transcriptTest = {
   isNewTutorUtterance,
   shouldMergeTutor,
   suffixPrefixOverlap,
+  uniqueTurnId,
   TUTOR_TURN_GAP_MS,
 };

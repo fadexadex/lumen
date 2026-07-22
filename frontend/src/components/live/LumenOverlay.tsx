@@ -32,7 +32,16 @@ export function LumenOverlay({ session }: { session: ReturnType<typeof useLumenS
         />
       )}
       <div className="lumen-dock" data-no-pan>
-        <LumenOrb amplitude={amplitude} status={status} />
+        <LumenOrb
+          amplitude={amplitude}
+          status={status}
+          muted={muted}
+          onToggle={() => {
+            const m = !muted;
+            setMutedState(m);
+            setMuted(m);
+          }}
+        />
         <LumenControls
           status={status}
           muted={muted}

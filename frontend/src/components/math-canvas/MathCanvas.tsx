@@ -4,7 +4,7 @@ import { InkCanvas, type InkHandle, type MCTool } from "./ink-canvas";
 import { TextNotes, type NotesHandle } from "./text-notes";
 import { ParabolaWidget } from "./parabola-widget";
 import { ConceptAnimationPlayer } from "./concept-animation";
-import { layoutScript, BOARD_W, LEFT_X, COL_W, type Beat } from "./layout";
+import { layoutScript, PAGE_STRIDE, LEFT_X, COL_W, VISUAL_X, VISUAL_W, type Beat } from "./layout";
 import { Equation, toHandMath } from "./equation";
 import { MathText } from "@/lib/math-text";
 import { AnnotationLayer, type LumenCanvasController } from "./annotation-layer";
@@ -37,31 +37,6 @@ function chromePad(el: HTMLElement): Pad {
 type Bounds = { x: number; y: number; w: number; h: number };
 type View = { x: number; y: number; scale: number };
 
-function estimateBeatBox(beat: Beat): Bounds {
-  if (beat.kind === "title") {
-    return {
-      x: beat.x,
-      y: beat.y,
-      w: beat.size === "h1" ? 900 : 640,
-      h: beat.size === "h1" ? 72 : 44,
-    };
-  }
-  if (beat.kind === "text") {
-    const lines = Math.max(1, Math.ceil(beat.text.length / 62));
-    return { x: beat.x, y: beat.y, w: 640, h: 34 * lines };
-  }
-  if (beat.kind === "math") return { x: beat.x, y: beat.y, w: 520, h: 56 };
-  if (beat.kind === "options") return { x: beat.x, y: beat.y, w: 620, h: 100 };
-  return { x: beat.x, y: beat.y, w: beat.w, h: beat.h };
-}
-
-/**
- * The one reading frame every module opens on. It's the left prose column —
- * NOT the union of a lesson's actual content — so a rich multi-step lesson and
- * a short one land on the exact same zoom and position. That consistency is the
- * whole point: the learner always recognizes "the view."
- */
-const READING_FRAME: Bounds = { x: 0, y: 24, w: LEFT_X + COL_W + 40, h: 640 };
 function fitFrame(el: HTMLElement, frame: Bounds, maxScale = 1.05, alignTop = false): View {
   const pad = chromePad(el);
   const availW = Math.max(120, el.clientWidth - pad.left - pad.right);
@@ -74,17 +49,25 @@ function fitFrame(el: HTMLElement, frame: Bounds, maxScale = 1.05, alignTop = fa
   return { x, y, scale };
 }
 
-function teachingFrame(beats: Beat[], stepIndex: number, includeVisual: boolean): Bounds {
-  const active = beats.filter(
-    (beat) => beat.step === stepIndex || (includeVisual && beat.kind === "visual"),
-  );
-  const boxes = active.map(estimateBeatBox);
-  if (!boxes.length) return READING_FRAME;
-  const x = Math.min(...boxes.map((box) => box.x)) - 32;
-  const y = Math.min(...boxes.map((box) => box.y)) - 32;
-  const right = Math.max(...boxes.map((box) => box.x + box.w)) + 32;
-  const bottom = Math.max(...boxes.map((box) => box.y + box.h)) + 32;
-  return { x, y, w: right - x, h: Math.max(420, bottom - y) };
+/* The page frame is the SAME shape for every step — that's what makes every
+   advance land on identical zoom with the visual always in view. */
+const PAGE_FRAME_TOP = 72;
+const PAGE_FRAME_H = 600;
+/** Full page: prose column + visual model side by side. */
+function pageFrame(stepIndex: number): Bounds {
+  const originX = stepIndex * PAGE_STRIDE + LEFT_X;
+  return {
+    x: originX - 40,
+    y: PAGE_FRAME_TOP,
+    w: VISUAL_X + VISUAL_W + 40 - (LEFT_X - 40),
+    h: PAGE_FRAME_H,
+  };
+}
+/** Just the prose column — used on narrow screens where the whole page can't
+    fit legibly; the visual is one horizontal pan to the right, same zoom. */
+function proseFrame(stepIndex: number): Bounds {
+  const originX = stepIndex * PAGE_STRIDE + LEFT_X;
+  return { x: originX - 40, y: PAGE_FRAME_TOP, w: COL_W + 80, h: PAGE_FRAME_H };
 }
 
 export interface MathCanvasProps {
@@ -152,10 +135,11 @@ export function MathCanvas(props: MathCanvasProps) {
     setParaParams(scriptPara);
   }, [scriptPara]);
 
-  const { beats, height: BOARD_H } = useMemo(
-    () => layoutScript(script, stepIndex),
-    [script, stepIndex],
-  );
+  const {
+    beats,
+    height: BOARD_H,
+    width: BOARD_W,
+  } = useMemo(() => layoutScript(script, stepIndex), [script, stepIndex]);
 
   // Register the Lumen Live canvas controller: annotations + view/coord helpers.
   // Re-resolve targets when the lesson OR live parabola params change.
@@ -184,15 +168,19 @@ export function MathCanvas(props: MathCanvasProps) {
         return { x: wx * v.scale + v.x, y: wy * v.scale + v.y };
       },
       boardSize: { w: BOARD_W, h: BOARD_H },
+      pageBounds: () => ({ x: stepIndex * PAGE_STRIDE, y: 0, w: PAGE_STRIDE, h: BOARD_H }),
       setParabola: (a, b, c) => {
         const next = { a, b, c };
         setParaParams(next);
         emitLiveParabola(next);
       },
       setVisualScene: selectVisualScene,
+      setStep: (index) => goto(index),
+      stepCount: script.steps.length,
     });
     return () => setCanvasController(null);
-  }, [script, beats, BOARD_H, paraParams, stepIndex, visualSceneIndex, selectVisualScene]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [script, beats, BOARD_H, paraParams, stepIndex, visualSceneIndex, selectVisualScene, goto]);
 
   // Viewport size (for full-screen ink layer)
   useEffect(() => {
@@ -210,19 +198,21 @@ export function MathCanvas(props: MathCanvasProps) {
     [beats, stepIndex],
   );
 
-  // Standard opening view — identical framing for every module (see READING_FRAME).
-  // Re-fits on script change and significant viewport changes (orientation / resize).
+  // Every step lands on the SAME page frame — identical zoom, visual always in
+  // view. On narrow screens we frame just the prose (visual is one pan right).
+  const hasVisual = useMemo(
+    () => beats.some((beat) => beat.kind === "visual" || beat.kind === "diagram"),
+    [beats],
+  );
   const applyOverview = () => {
     const el = viewportRef.current;
     if (!el || el.clientWidth === 0 || el.clientHeight === 0) return;
-    const includeVisual = el.clientWidth >= 1360;
-    const frame = teachingFrame(beats, stepIndex, includeVisual);
-    const visual = beats.find((beat) => beat.kind === "visual");
-    setView(
-      !includeVisual && visual
-        ? fitFrame(el, estimateBeatBox(visual), 1.05)
-        : fitFrame(el, frame, 1.05),
-    );
+    // With a visual: frame the whole page (prose + model) on wide screens, or
+    // just the prose on narrow ones. Without a visual: always center the prose
+    // so a text-only step never opens on an empty half-board.
+    const wideEnough = el.clientWidth >= 1180;
+    const frame = hasVisual && wideEnough ? pageFrame(stepIndex) : proseFrame(stepIndex);
+    setView(fitFrame(el, frame, 1.05, true));
   };
 
   useEffect(() => {
@@ -238,16 +228,24 @@ export function MathCanvas(props: MathCanvasProps) {
     applyOverview();
   }, [BOARD_H, beats, script.title, vp.w, vp.h]);
 
-  // Every section opens in one deterministic teaching frame. Earlier sections
-  // remain in world-space above it and are available by panning or zooming out.
+  // Advancing (or rewinding) a step glides to that page. A deliberate step
+  // change — whether the learner taps Continue or the AI calls go_to_step — is
+  // always honored, even if an AI write just suspended lesson-follow: navigation
+  // outranks staying put. Re-framing WITHIN the same step still respects the
+  // suspension so an in-progress write isn't yanked off screen.
+  const prevStepRef = useRef(stepIndex);
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
-    if (performance.now() < lessonFollowPausedUntilRef.current) return;
-    const first = activeBeats[0];
-    if (!first) return;
-    // Skip until the initial overview has been applied
-    if (!fittedKeyRef.current) return;
+    if (!fittedKeyRef.current) return; // wait for the initial overview
+    const stepChanged = prevStepRef.current !== stepIndex;
+    prevStepRef.current = stepIndex;
+    if (stepChanged) {
+      lessonFollowPausedUntilRef.current = 0; // navigation clears any write-hold
+    } else if (performance.now() < lessonFollowPausedUntilRef.current) {
+      return;
+    }
+    if (!activeBeats[0]) return;
     applyOverview();
   }, [stepIndex, activeBeats]);
 
@@ -357,6 +355,13 @@ export function MathCanvas(props: MathCanvasProps) {
           <div className="mc-lesson-layer" style={{ pointerEvents: "none" }}>
             {visibleBeats.map((b) => {
               const beatIndex = beats.indexOf(b);
+              const isProse =
+                b.kind === "title" ||
+                b.kind === "text" ||
+                b.kind === "math" ||
+                b.kind === "options";
+              const past = isProse && b.step < stepIndex;
+              const current = isProse && b.step === stepIndex;
               return (
                 <BeatView
                   key={beatIndex}
@@ -364,6 +369,8 @@ export function MathCanvas(props: MathCanvasProps) {
                   beatIndex={beatIndex}
                   charsRevealed={Infinity}
                   active={false}
+                  past={past}
+                  current={current}
                   picked={picked}
                   onPick={(bi, oi) => setPicked((p) => ({ ...p, [bi]: oi }))}
                   paraParams={paraParams}
@@ -489,8 +496,13 @@ export function MathCanvas(props: MathCanvasProps) {
         </div>
         {finished && nextModule ? (
           <span className="mc-continue-hint" title={nextModule.title}>
-            <span className="mc-continue-hint-label">up next</span>
+            <span className="mc-continue-hint-label">next lesson</span>
             <span className="mc-continue-hint-title">{nextModule.title}</span>
+          </span>
+        ) : !finished && script.steps[stepIndex + 1] ? (
+          <span className="mc-continue-hint" title={script.steps[stepIndex + 1].title}>
+            <span className="mc-continue-hint-label">up next</span>
+            <span className="mc-continue-hint-title">{script.steps[stepIndex + 1].title}</span>
           </span>
         ) : null}
         <span className="mc-ctrl-sep mc-ctrl-sep--end" />
@@ -544,6 +556,8 @@ function BeatView({
   beatIndex,
   charsRevealed,
   active,
+  past,
+  current,
   picked,
   onPick,
   paraParams,
@@ -557,6 +571,8 @@ function BeatView({
   beatIndex: number;
   charsRevealed: number;
   active: boolean;
+  past?: boolean;
+  current?: boolean;
   picked: Record<number, number>;
   onPick: (bi: number, oi: number) => void;
   paraParams: { a: number; b: number; c: number } | null;
@@ -567,10 +583,11 @@ function BeatView({
   onVisualSceneChange: (index: number) => void;
 }) {
   const base = { position: "absolute" as const, left: beat.x, top: beat.y };
+  const stateAttr = { "data-beat-state": past ? "past" : current ? "current" : undefined };
   if (beat.kind === "title") {
     const { shown, showCaret } = revealText(beat.text, charsRevealed, active);
     return (
-      <div style={base} className={`mc-title mc-title--${beat.size}`}>
+      <div style={base} className={`mc-title mc-title--${beat.size}`} {...stateAttr}>
         {shown}
         {showCaret && <Caret />}
       </div>
@@ -579,7 +596,7 @@ function BeatView({
   if (beat.kind === "text") {
     const { shown, showCaret } = revealText(beat.text, charsRevealed, active);
     return (
-      <div style={base} className="mc-text">
+      <div style={base} className="mc-text" {...stateAttr}>
         <MathText text={shown} />
         {showCaret && <Caret />}
       </div>
@@ -589,7 +606,7 @@ function BeatView({
     const hand = toHandMath(beat.latex);
     const { shown, showCaret } = revealText(hand, charsRevealed, active);
     return (
-      <div style={base} className="mc-math">
+      <div style={base} className="mc-math" {...stateAttr}>
         {shown ? <Equation>{shown}</Equation> : null}
         {showCaret && <Caret />}
       </div>
@@ -599,7 +616,12 @@ function BeatView({
     const pick = picked[beatIndex];
     const correctIdx = beat.options.findIndex((o) => o === beat.answer);
     return (
-      <div style={{ ...base, pointerEvents: "auto" }} className="mc-options" data-no-pan>
+      <div
+        style={{ ...base, pointerEvents: "auto" }}
+        className="mc-options"
+        data-no-pan
+        {...stateAttr}
+      >
         {beat.options.map((o, i) => {
           const state =
             pick == null ? "" : i === correctIdx ? "correct" : i === pick ? "wrong" : "";

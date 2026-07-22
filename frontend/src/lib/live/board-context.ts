@@ -11,6 +11,8 @@ export interface BoardState {
   stepIndex: number;
   stepTotal: number;
   stepTitle: string;
+  stepTitles: string[]; // every step title, so the model knows the whole arc
+  nextStepTitle: string | null; // what advancing (go_to_step) will reveal next
   equation: string; // human-readable
   parabola: { a: number; b: number; c: number } | null;
   visual: string;
@@ -46,6 +48,8 @@ export function buildBoardState(
     stepIndex,
     stepTotal: script.steps.length,
     stepTitle: step?.title ?? script.title,
+    stepTitles: script.steps.map((s) => s.title),
+    nextStepTitle: script.steps[stepIndex + 1]?.title ?? null,
     equation: stepMath ? prettifyLatex(stepMath) : "",
     parabola: T.parabola ? { a: T.parabola.a, b: T.parabola.b, c: T.parabola.c } : null,
     visual: lessonVisualSummary(script, stepIndex, visualSceneIndex),

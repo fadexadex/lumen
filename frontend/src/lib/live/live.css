@@ -23,6 +23,36 @@
   pointer-events: auto;
   cursor: default;
   filter: saturate(1.05);
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 999px;
+  appearance: none;
+}
+.lumen-orb[data-interactive] {
+  cursor: pointer;
+}
+/* A soft focus ring — this is the primary "talk to me" target, so it must be
+   reachable and legibly interactive. */
+.lumen-orb[data-interactive]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px oklch(0.82 0.12 80 / 0.55);
+}
+.lumen-orb[data-interactive]:hover .lumen-orb-glow {
+  opacity: 1;
+}
+.lumen-orb[data-muted] .lumen-orb-core {
+  filter: grayscale(0.7);
+  opacity: 0.65;
+}
+.lumen-orb[data-muted] .lumen-orb-bars {
+  opacity: 0.3;
+}
+.lumen-orb-muted {
+  position: absolute;
+  font-size: 0.9rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px oklch(0 0 0 / 0.25));
 }
 .lumen-orb-core {
   width: 38px;
@@ -308,10 +338,26 @@
 .lumen-btn--end {
   color: var(--tutor-muted);
 }
+.lumen-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 132px;
+  line-height: 1.15;
+}
+.lumen-identity > strong {
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--tutor-ink);
+  letter-spacing: -0.01em;
+}
 .lumen-status {
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   color: var(--tutor-muted);
-  min-width: 92px;
+}
+.lumen-status[data-muted] {
+  color: oklch(0.55 0.14 40);
 }
 .lumen-toast {
   position: fixed;

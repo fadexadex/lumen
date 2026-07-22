@@ -52,6 +52,11 @@ def set_visual_scene(index: int) -> str:
     return _cmd("setVisualScene", index=index)
 
 
+def go_to_step(index: int) -> str:
+    # 0-based lesson step; the client clamps to the valid range.
+    return _cmd("goToStep", index=index)
+
+
 def write_block(
     lines: list[str],
     target: Optional[str] = None,

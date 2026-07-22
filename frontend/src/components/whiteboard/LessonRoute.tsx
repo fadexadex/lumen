@@ -241,13 +241,16 @@ export function LessonRoute() {
         <div className="lesson-topbar-right">
           <button
             className="live-launch"
-            onClick={() => lumen.start(moduleId)}
-            aria-label="Talk to Lumen live"
+            data-live={lumen.status !== "idle" || undefined}
+            onClick={() => {
+              if (lumen.status === "idle") lumen.start(moduleId);
+            }}
+            aria-label={lumen.status === "idle" ? "Talk to Lumen live" : "Lumen is live"}
           >
             <span className="live-launch-orb" aria-hidden />
             <span className="live-launch-label">
-              <strong>Live</strong>
-              <em>Lumen listens</em>
+              <strong>{lumen.status === "idle" ? "Live" : "● Live"}</strong>
+              <em>{lumen.status === "idle" ? "Tap to talk" : "Lumen is teaching"}</em>
             </span>
           </button>
         </div>

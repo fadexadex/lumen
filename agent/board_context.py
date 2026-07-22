@@ -7,6 +7,8 @@ class BoardContext:
     step_index: int = 0
     step_total: int = 0
     step_title: str = ""
+    step_titles: list[str] = field(default_factory=list)  # every page title, in order
+    next_step_title: str | None = None  # what go_to_step will reveal next (None on last page)
     equation: str = ""  # e.g. "y = x^2 - 5x + 6"
     parabola: dict | None = None  # {"a":1,"b":-5,"c":6}
     visual: str = ""
@@ -17,6 +19,18 @@ class BoardContext:
         lines = [
             f"Current step {self.step_index + 1} of {self.step_total}: {self.step_title}",
         ]
+        if self.next_step_title:
+            lines.append(
+                f"Next step (call go_to_step {self.step_index + 2} to reveal it): {self.next_step_title}"
+            )
+        elif self.step_total:
+            lines.append("This is the last step of the lesson.")
+        if self.step_titles:
+            arc = " → ".join(
+                (f"[{title}]" if i == self.step_index else title)
+                for i, title in enumerate(self.step_titles)
+            )
+            lines.append(f"Lesson arc: {arc}")
         if self.equation:
             lines.append(f"Equation on board: {self.equation}")
         if self.parabola:

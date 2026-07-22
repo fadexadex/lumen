@@ -12,6 +12,7 @@ const {
   mergeTutorText,
   shouldMergeTutor,
   suffixPrefixOverlap,
+  uniqueTurnId,
   TUTOR_TURN_GAP_MS,
 } = __transcriptTest;
 
@@ -109,6 +110,30 @@ describe("tutor transcript merge (word-stream → one bubble)", () => {
     expect(
       mergeTutorText("The parabola opens upward.", "Since a is positive, that makes sense."),
     ).toBe("The parabola opens upward. Since a is positive, that makes sense.");
+  });
+});
+
+describe("uniqueTurnId (no duplicate React keys)", () => {
+  const turn = (id: string): TranscriptTurn => ({ id, from: "tutor", text: "x", final: true });
+
+  it("returns the id unchanged when nothing else uses it", () => {
+    expect(uniqueTurnId([turn("SG_a"), turn("SG_b")], "SG_c")).toBe("SG_c");
+  });
+
+  it("suffixes a re-emitted LiveKit segment id so keys stay unique", () => {
+    const turns = [turn("SG_8d5465622ddf"), turn("SG_other")];
+    expect(uniqueTurnId(turns, "SG_8d5465622ddf")).toBe("SG_8d5465622ddf#2");
+  });
+
+  it("keeps climbing the suffix until it is actually free", () => {
+    const turns = [turn("SG_x"), turn("SG_x#2"), turn("SG_x#3")];
+    expect(uniqueTurnId(turns, "SG_x")).toBe("SG_x#4");
+  });
+
+  it("ignores the slot being rewritten in place (selfIndex)", () => {
+    const turns = [turn("SG_x"), turn("SG_y")];
+    // Rewriting index 1 back to its own id must not suffix it.
+    expect(uniqueTurnId(turns, "SG_y", 1)).toBe("SG_y");
   });
 });
 

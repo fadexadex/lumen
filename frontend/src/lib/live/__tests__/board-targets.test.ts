@@ -100,11 +100,15 @@ describe("board-targets geometry", () => {
     expect(vertex.y).toBeLessThanOrEqual(graph.y + graph.h);
   });
 
+  // Board context is scoped to the visible page, so step-2 equations only exist
+  // when step 2 is the active page (the deck is one-page-at-a-time now).
+  const step2Targets = resolveTargets(script, null, 2);
+
   it("gives every equation in a multi-line example its own described target", () => {
-    expect(targets.names).toEqual(
+    expect(step2Targets.names).toEqual(
       expect.arrayContaining(["step2.equation1", "step2.equation2", "step2.equation3"]),
     );
-    expect(targets.descriptions).toEqual(
+    expect(step2Targets.descriptions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "step2.equation1", text: "x^2 - 5x + 6 = 0" }),
         expect.objectContaining({ name: "step2.equation2", text: "2x^2 + 3x - 2 = 0" }),
@@ -113,8 +117,14 @@ describe("board-targets geometry", () => {
     );
   });
 
+  it("does NOT expose other pages' equations while a different page is active", () => {
+    // Page-scoped context is the fix for the AI teaching a later step's problem
+    // (e.g. solving height=25) while the board shows an earlier page.
+    expect(targets.names).not.toContain("step2.equation1");
+  });
+
   it("uses a line-sized rectangle for an equation highlight", () => {
-    const rect = targets.rect("step2.equation1");
+    const rect = step2Targets.rect("step2.equation1");
     expect(rect).toBeTruthy();
     expect(rect!.h).toBeLessThanOrEqual(64);
     expect(rect!.w).toBeLessThan(260);

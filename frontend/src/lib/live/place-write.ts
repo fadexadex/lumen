@@ -39,16 +39,12 @@ export function offsetPlace(at: WPoint, place: Place): WPoint {
   return at;
 }
 
-function clampPoint(
-  at: WPoint,
-  size: { w: number; h: number },
-  board: { w: number; h: number },
-): WPoint {
+function clampPoint(at: WPoint, size: { w: number; h: number }, region: WRect): WPoint {
   const margin = 24;
-  const minX = margin + 12;
-  const minY = margin + 8;
-  const maxX = Math.max(minX, board.w - size.w - margin + 12);
-  const maxY = Math.max(minY, board.h - size.h - margin + 8);
+  const minX = region.x + margin + 12;
+  const minY = region.y + margin + 8;
+  const maxX = Math.max(minX, region.x + region.w - size.w - margin + 12);
+  const maxY = Math.max(minY, region.y + region.h - size.h - margin + 8);
   return {
     x: Math.min(maxX, Math.max(minX, at.x)),
     y: Math.min(maxY, Math.max(minY, at.y)),
@@ -62,29 +58,38 @@ function isFree(candidate: WRect, occupied: WRect[]): boolean {
 /**
  * Prefer the requested place near the anchor; if that overlaps lesson/AI content,
  * sit just below the lowest occupied block in the reading column, then scan.
+ *
+ * `region` is the placement area in WORLD coords — the CURRENT lesson page, not
+ * the whole board. The board is a horizontal deck now, so writing must land on
+ * the page the learner is looking at; anchoring to the whole board dropped every
+ * write back near page 0, invisible to a learner on a later page.
  */
 export function findFreeWriteSpot(opts: {
   anchor: WPoint;
   place: Place;
   lines: string[];
-  board: { w: number; h: number };
+  region: WRect;
   occupied: WRect[];
 }): WPoint {
   const size = estimateWriteSize(opts.lines);
-  const readingX = Math.min(Math.max(48 + 12, opts.anchor.x), opts.board.w * 0.35);
+  const R = opts.region;
+  const leftX = R.x + 60;
+  const readingX = Math.min(Math.max(leftX, opts.anchor.x), R.x + R.w * 0.35);
 
-  let contentBottom = 0;
+  let contentBottom = R.y;
   for (const o of opts.occupied) {
     // Ignore huge spanning rects (e.g. full-board widgets) when computing "below content".
-    if (o.w > opts.board.w * 0.7 || o.h > opts.board.h * 0.55) continue;
+    if (o.w > R.w * 0.7 || o.h > R.h * 0.55) continue;
+    // Only content within THIS page's x-band counts — other pages sit far along X.
+    if (o.x + o.w < R.x || o.x > R.x + R.w) continue;
     contentBottom = Math.max(contentBottom, o.y + o.h);
   }
 
   const candidates: WPoint[] = [];
-  if (contentBottom > 40) {
+  if (contentBottom > R.y + 40) {
     candidates.push({ x: readingX, y: contentBottom + 32 });
     candidates.push({ x: readingX, y: contentBottom + 32 + size.h + 24 });
-    candidates.push({ x: Math.min(readingX + 220, opts.board.w * 0.45), y: contentBottom + 32 });
+    candidates.push({ x: Math.min(readingX + 220, R.x + R.w * 0.45), y: contentBottom + 32 });
   }
 
   const order: Place[] = [opts.place, "below", "right", "left", "above"].filter(
@@ -95,33 +100,33 @@ export function findFreeWriteSpot(opts: {
   }
 
   for (const raw of candidates) {
-    const at = clampPoint(raw, size, opts.board);
+    const at = clampPoint(raw, size, R);
     if (isFree(writeBlockRect(at, opts.lines), opts.occupied)) return at;
   }
 
-  // Coarse scan — stay in the left/center reading column when possible.
+  // Coarse scan — stay in the left/center reading column of THIS page.
   const stepX = Math.max(72, Math.floor(size.w * 0.5));
   const stepY = Math.max(36, Math.floor(size.h * 0.65));
-  const startY = Math.max(contentBottom + 24, opts.anchor.y);
-  for (let y = startY; y < opts.board.h - size.h; y += stepY) {
-    for (let x = 48 + 12; x < opts.board.w * 0.62; x += stepX) {
-      const at = clampPoint({ x, y }, size, opts.board);
+  const startY = Math.max(contentBottom + 24, opts.anchor.y, R.y + 48);
+  for (let y = startY; y < R.y + R.h - size.h; y += stepY) {
+    for (let x = leftX; x < R.x + R.w * 0.62; x += stepX) {
+      const at = clampPoint({ x, y }, size, R);
       if (isFree(writeBlockRect(at, opts.lines), opts.occupied)) return at;
     }
   }
 
-  // Last resort: full-board scan including the right side.
-  for (let y = 48; y < opts.board.h - size.h; y += stepY) {
-    for (let x = 48 + 12; x < opts.board.w - size.w; x += stepX) {
-      const at = clampPoint({ x, y }, size, opts.board);
+  // Last resort: full-page scan including the right side.
+  for (let y = R.y + 48; y < R.y + R.h - size.h; y += stepY) {
+    for (let x = leftX; x < R.x + R.w - size.w; x += stepX) {
+      const at = clampPoint({ x, y }, size, R);
       if (isFree(writeBlockRect(at, opts.lines), opts.occupied)) return at;
     }
   }
 
   return clampPoint(
-    { x: readingX, y: Math.max(contentBottom + 32, opts.board.h - size.h - 40) },
+    { x: readingX, y: Math.max(contentBottom + 32, R.y + R.h - size.h - 40) },
     size,
-    opts.board,
+    R,
   );
 }
 

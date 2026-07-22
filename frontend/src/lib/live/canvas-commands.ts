@@ -19,6 +19,7 @@ export type CanvasCommand =
   | { id: string; op: "plotParabola"; args: { a: number; b: number; c: number } }
   | { id: string; op: "setParabola"; args: { a: number; b: number; c: number } }
   | { id: string; op: "setVisualScene"; args: { index: number } }
+  | { id: string; op: "goToStep"; args: { index: number } }
   | {
       id: string;
       op: "writeBlock";
@@ -71,6 +72,8 @@ export function isCanvasCommand(x: unknown): x is CanvasCommand {
       return isRecord(args) && finiteNumber(args.a) && finiteNumber(args.b) && finiteNumber(args.c);
     case "setVisualScene":
       return isRecord(args) && Number.isInteger(args.index) && Number(args.index) >= 0;
+    case "goToStep":
+      return isRecord(args) && Number.isInteger(args.index) && Number(args.index) >= 0;
     case "writeBlock":
       return (
         isRecord(args) &&
@@ -112,7 +115,8 @@ export function createCommandDeduper(limit = 32): (id: string) => boolean {
 
 export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): string {
   const anno = ctrl.anno();
-  if (!anno && cmd.op !== "setParabola" && cmd.op !== "setVisualScene") return "no-canvas";
+  const noAnnoOps = new Set(["setParabola", "setVisualScene", "goToStep"]);
+  if (!anno && !noAnnoOps.has(cmd.op)) return "no-canvas";
   const T = ctrl.targets;
 
   switch (cmd.op) {
@@ -175,6 +179,12 @@ export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): 
       ctrl.setVisualScene(cmd.args.index);
       return "ok";
     }
+    case "goToStep": {
+      if (!ctrl.setStep) return "no-step-control";
+      const last = ctrl.stepCount ? ctrl.stepCount - 1 : cmd.args.index;
+      ctrl.setStep(Math.max(0, Math.min(last, cmd.args.index)));
+      return "ok";
+    }
     case "writeBlock": {
       if (!anno) return "no-canvas";
       const lines = cmd.args.lines.filter((l) => typeof l === "string");
@@ -182,10 +192,18 @@ export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): 
       const jobId = cmd.args.jobId ?? cmd.id;
       const existingAt = anno.writeBlockPosition(jobId);
       const place = cmd.args.place ?? "below";
-      const anchor =
-        (cmd.args.target
-          ? (T.point(cmd.args.target) ?? centerOf(T.rect(cmd.args.target)))
-          : null) ?? ({ x: ctrl.boardSize.w * 0.08, y: ctrl.boardSize.h * 0.12 } as const);
+      // Confine writing to the CURRENT page so the learner sees it. Without an
+      // explicit on-page target, anchor to the top-left of the current page —
+      // never the whole board's origin (which is page 0, off screen).
+      const region = ctrl.pageBounds?.() ?? {
+        x: 0,
+        y: 0,
+        w: ctrl.boardSize.w,
+        h: ctrl.boardSize.h,
+      };
+      const anchor = (cmd.args.target
+        ? (T.point(cmd.args.target) ?? centerOf(T.rect(cmd.args.target)))
+        : null) ?? { x: region.x + region.w * 0.08, y: region.y + region.h * 0.14 };
 
       const occupied = [
         ...(ctrl.lessonRects ?? []),
@@ -199,7 +217,7 @@ export function applyCommand(ctrl: CanvasControllerHandle, cmd: CanvasCommand): 
           anchor,
           place,
           lines,
-          board: ctrl.boardSize,
+          region,
           occupied,
         });
       anno.writeBlock(at, lines, { jobId });

@@ -1,4 +1,4 @@
-import type { ConceptAnimation, LessonScript, LessonStep } from "@/lib/types";
+import type { ConceptAnimation, LessonScript } from "@/lib/types";
 import { isLegacyDuplicativeVisual } from "@/lib/concept-visual";
 
 export type Beat =
@@ -26,18 +26,35 @@ export type Beat =
       params?: { a: number; b: number; c: number };
     };
 
-export const BOARD_W = 1600;
-export const BOARD_H = 1000;
+/*
+  Horizontal "story deck" layout.
+
+  A lesson is no longer one tall scroll. Each step is a full page laid side by
+  side along X: prose on the left, the visual model pinned to its right. The
+  visual travels with the active step, so advancing is a clean horizontal glide
+  and the graph is ALWAYS in the same on-screen spot at the same zoom — the
+  learner never has to zoom out to keep the model in view. The AI navigates the
+  same pages by index (see the `goToStep` canvas command).
+*/
+export const PAGE_STRIDE = 1600; // horizontal distance between consecutive step pages
+export const BOARD_H = 820;
+export const BOARD_W = PAGE_STRIDE; // legacy alias — one page wide
 
 /* 4pt-ish rhythm tuned for Inter prose + serif math (not Caveat costume) */
 export const LEFT_X = 88;
 export const COL_W = 680;
+
+/* Where the visual model sits within a page (right of the prose column). */
+export const VISUAL_X = LEFT_X + COL_W + 72;
+export const VISUAL_W = 620;
+export const VISUAL_H = 512;
+const VISUAL_Y = 96;
+/* Vertical origin of each page's prose column. */
+const PAGE_TOP = 132;
 const LINE_H = 34;
 const H2_LINE_H = 40;
 const MATH_H = 58;
 const INTRA = 12; // tight: heading → body / body → math
-const SECTION = 48; // generous: between lesson sections
-const QUIZ_GAP = 56;
 
 /** Approximate CSS word wrapping so absolute-positioned beats never overlap. */
 export function wrappedLineCount(text: string, charsPerLine: number): number {
@@ -67,72 +84,47 @@ export function wrappedLineCount(text: string, charsPerLine: number): number {
 const h2Height = (title: string) => wrappedLineCount(title, 42) * H2_LINE_H;
 const bodyLineCount = (text: string) => wrappedLineCount(text, 62);
 
-function measure(step: LessonStep): number {
-  if (step.kind === "explanation") {
-    const bodyLines = bodyLineCount(step.body);
-    return (
-      h2Height(step.title) + INTRA + bodyLines * LINE_H + (step.math ? INTRA + MATH_H : 0) + SECTION
-    );
-  }
-  if (step.kind === "example") {
-    const lines = step.lines.reduce(
-      (a, l) => a + (l.math ? MATH_H + 8 : LINE_H * bodyLineCount(l.text ?? "")),
-      0,
-    );
-    return h2Height(step.title) + INTRA + lines + SECTION;
-  }
-  return (
-    h2Height(step.title) +
-    INTRA +
-    LINE_H * bodyLineCount(step.prompt) +
-    (step.math ? INTRA + MATH_H : 0) +
-    (step.options ? QUIZ_GAP : 0) +
-    SECTION
-  );
-}
-
 export function layoutScript(
   script: LessonScript,
-  _visualStepIndex = 0,
-): { beats: Beat[]; height: number } {
+  visualStepIndex = 0,
+): { beats: Beat[]; height: number; width: number } {
   const beats: Beat[] = [];
-  const stepStarts: number[] = [];
-  let y = 104;
+  let contentBottom = 0;
 
   script.steps.forEach((step, i) => {
-    // A lesson is one persistent document. Each section gets measured space so
-    // completed reasoning remains above the active section without overlapping it.
-    const startY = y;
-    stepStarts.push(startY);
-    beats.push({ kind: "title", text: step.title, x: LEFT_X, y, size: "h2", step: i });
+    // Each step is its own page. Prose flows top-down WITHIN the page; pages sit
+    // side by side along X so navigation is horizontal, never a long scroll.
+    const originX = i * PAGE_STRIDE + LEFT_X;
+    let y = PAGE_TOP;
+    beats.push({ kind: "title", text: step.title, x: originX, y, size: "h2", step: i });
     y += h2Height(step.title) + INTRA;
 
     if (step.kind === "explanation") {
-      beats.push({ kind: "text", text: step.body, x: LEFT_X, y, size: "body", step: i });
+      beats.push({ kind: "text", text: step.body, x: originX, y, size: "body", step: i });
       const bodyLines = bodyLineCount(step.body);
       y += bodyLines * LINE_H;
       if (step.math) {
         y += INTRA;
-        beats.push({ kind: "math", latex: step.math, x: LEFT_X, y, step: i });
+        beats.push({ kind: "math", latex: step.math, x: originX, y, step: i });
         y += MATH_H;
       }
     } else if (step.kind === "example") {
       step.lines.forEach((l, li) => {
         if (li > 0) y += 14;
         if (l.math) {
-          beats.push({ kind: "math", latex: l.math, x: LEFT_X, y, step: i });
+          beats.push({ kind: "math", latex: l.math, x: originX, y, step: i });
           y += MATH_H;
         } else if (l.text) {
-          beats.push({ kind: "text", text: l.text, x: LEFT_X, y, size: "body", step: i });
+          beats.push({ kind: "text", text: l.text, x: originX, y, size: "body", step: i });
           y += LINE_H * bodyLineCount(l.text);
         }
       });
     } else {
-      beats.push({ kind: "text", text: step.prompt, x: LEFT_X, y, size: "body", step: i });
+      beats.push({ kind: "text", text: step.prompt, x: originX, y, size: "body", step: i });
       y += LINE_H * bodyLineCount(step.prompt);
       if (step.math) {
         y += INTRA;
-        beats.push({ kind: "math", latex: step.math, x: LEFT_X, y, step: i });
+        beats.push({ kind: "math", latex: step.math, x: originX, y, step: i });
         y += MATH_H;
       }
       if (step.options) {
@@ -141,49 +133,54 @@ export function layoutScript(
           kind: "options",
           options: step.options,
           answer: step.answer,
-          x: LEFT_X,
+          x: originX,
           y,
           step: i,
         });
         y += 88;
       }
     }
-    y = Math.max(y + SECTION * 0.25, startY + measure(step));
+    contentBottom = Math.max(contentBottom, y);
   });
 
-  // The visual is one stable reference surface. Its scene may change, but its
-  // position must not jump whenever the learner advances to another section.
-  const visualY = 88;
+  // The visual model travels with the active step: it lives on the current
+  // page, so the learner (and the AI) always see it beside the prose being
+  // discussed — no drift, no zoom hunting.
+  const totalSteps = Math.max(1, script.steps.length);
+  const activeStep = Math.min(Math.max(0, visualStepIndex), totalSteps - 1);
+  const visualX = activeStep * PAGE_STRIDE + VISUAL_X;
 
-  const hasUsefulVisual =
-    script.visual?.kind === "animation" && !isLegacyDuplicativeVisual(script.visual);
+  const animatedVisual =
+    script.visual?.kind === "animation" && !isLegacyDuplicativeVisual(script.visual)
+      ? script.visual
+      : null;
 
-  if (hasUsefulVisual && script.visual.kind === "animation") {
+  if (animatedVisual) {
     beats.push({
       kind: "visual",
-      animation: script.visual,
-      x: LEFT_X + COL_W + 72,
-      y: visualY,
-      w: 620,
-      h: 510,
-      step: 0,
+      animation: animatedVisual,
+      x: visualX,
+      y: VISUAL_Y,
+      w: VISUAL_W,
+      h: VISUAL_H,
+      step: activeStep,
     });
   } else if (script.diagram?.parabola) {
-    const diagramStep = Math.min(2, script.steps.length - 1);
     beats.push({
       kind: "diagram",
       widget: "parabola",
-      x: LEFT_X + COL_W + 72,
-      y: Math.max(96, (stepStarts[diagramStep] ?? 112) - 8),
-      w: 620,
+      x: visualX,
+      y: VISUAL_Y,
+      w: VISUAL_W,
       h: 600,
-      step: diagramStep,
+      step: activeStep,
       params: script.diagram.parabola,
     });
   }
 
-  const visualBottom = hasUsefulVisual ? visualY + 510 : 0;
-  return { beats, height: Math.max(BOARD_H, y + 100, visualBottom + 100) };
+  const width = totalSteps * PAGE_STRIDE;
+  const height = Math.max(BOARD_H, contentBottom + 100, VISUAL_Y + 600 + 60);
+  return { beats, height, width };
 }
 
 export function beatCharCount(b: Beat): number {

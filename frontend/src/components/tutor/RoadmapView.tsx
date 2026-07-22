@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTutorStore } from "@/lib/tutor-store";
 import { retryCourseModule } from "@/lib/course-gen/client";
@@ -25,6 +25,28 @@ export function RoadmapView() {
   const beginNewTopic = useTutorStore((s) => s.beginNewTopic);
   const restoreCourse = useTutorStore((s) => s.restoreCourse);
   const patchModule = useTutorStore((s) => s.patchModule);
+
+  // Native <details> only closes via its own summary, so the "Previous paths"
+  // menu would stay open on an outside click. Close it on any click outside the
+  // menu (or Escape). Listeners check the ref lazily so this works no matter
+  // when the menu mounts (course history can arrive after first render).
+  const historyRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const closeIfOutside = (e: MouseEvent) => {
+      const details = historyRef.current;
+      if (details?.open && !details.contains(e.target as Node)) details.open = false;
+    };
+    const closeOnEscape = (e: KeyboardEvent) => {
+      const details = historyRef.current;
+      if (e.key === "Escape" && details?.open) details.open = false;
+    };
+    window.addEventListener("mousedown", closeIfOutside);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("mousedown", closeIfOutside);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
 
   useEffect(() => {
     // A returning learner may have a profile but no rebuilt roadmap yet.
@@ -148,14 +170,17 @@ export function RoadmapView() {
             + new topic
           </button>
           {courseHistory.length > 0 && (
-            <details className="roadmap-history">
+            <details className="roadmap-history" ref={historyRef}>
               <summary>Previous paths</summary>
               <div className="roadmap-history-menu">
                 {courseHistory.map((previous) => (
                   <button
                     key={previous.id}
                     type="button"
-                    onClick={() => restoreCourse(previous.id)}
+                    onClick={() => {
+                      if (historyRef.current) historyRef.current.open = false;
+                      restoreCourse(previous.id);
+                    }}
                   >
                     <strong>{previous.topic}</strong>
                     <span>{previous.modules.length} modules</span>

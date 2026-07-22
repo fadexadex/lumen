@@ -41,7 +41,7 @@ export function toHandMath(latex: string): string {
     .replace(/\\\\/g, "")
     .replace(/\\/g, "")
     .replace(/-/g, "−")
-    .replace(/\s*([+\−=×÷±∓·≤≥≠≈⇒→])\s*/g, " $1 ")
+    .replace(/\s*([+−=×÷±∓·≤≥≠≈⇒→])\s*/g, " $1 ")
     .replace(/\s+/g, " ")
     .trim();
 }

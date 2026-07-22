@@ -143,7 +143,10 @@ function makeHandle(): {
   calls: { method: string; args: unknown[] }[];
 } {
   const script = lessonScripts["quad-1"];
-  const targets = resolveTargets(script);
+  // Board context is scoped to the active page. Step 2 is quad-1's multi-line
+  // example, so its equations AND the (traveling) graph targets are both live
+  // here — exercising every op against one real page, as the agent sees it.
+  const targets = resolveTargets(script, null, 2);
   const { anno, calls } = makeMockAnno();
   const handle: CanvasControllerHandle = {
     anno: () => anno,

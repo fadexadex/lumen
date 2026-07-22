@@ -3,7 +3,7 @@ import { layoutScript, wrappedLineCount } from "../layout";
 import type { LessonScript } from "@/lib/types";
 
 describe("dynamic MathCanvas layout", () => {
-  it("keeps completed lesson steps on the board without overlapping the next step", () => {
+  it("lays each step out as its own horizontal page at a stable top edge", () => {
     const script: LessonScript = {
       moduleId: "inequalities",
       title: "Understanding Inequalities and Their Symbols",
@@ -18,13 +18,18 @@ describe("dynamic MathCanvas layout", () => {
       ],
     };
 
-    const { beats } = layoutScript(script);
+    const { beats, width } = layoutScript(script);
     const stepTitles = beats.filter(
       (beat): beat is Extract<(typeof beats)[number], { kind: "title" }> => beat.kind === "title",
     );
     expect(wrappedLineCount(script.title, 18)).toBeGreaterThan(1);
-    expect(stepTitles[1]!.y).toBeGreaterThan(stepTitles[0]!.y + 100);
-    expect(stepTitles[2]!.y).toBeGreaterThan(stepTitles[1]!.y + 80);
+    // Titles share a top edge (pages, not a vertical scroll)…
+    expect(stepTitles[1]!.y).toBe(stepTitles[0]!.y);
+    expect(stepTitles[2]!.y).toBe(stepTitles[0]!.y);
+    // …and march rightward, one page apart, monotonically.
+    expect(stepTitles[1]!.x).toBeGreaterThan(stepTitles[0]!.x + 1000);
+    expect(stepTitles[2]!.x).toBeGreaterThan(stepTitles[1]!.x + 1000);
+    expect(width).toBeGreaterThanOrEqual(stepTitles[2]!.x);
   });
 
   it("accounts for long generated step titles", () => {
@@ -112,7 +117,12 @@ describe("dynamic MathCanvas layout", () => {
 
     const first = layoutScript(script, 0).beats.find((beat) => beat.kind === "visual")!;
     const second = layoutScript(script, 1).beats.find((beat) => beat.kind === "visual")!;
+    // Same vertical position every step — it never drifts up or down…
     expect(second.y).toBe(first.y);
+    // …but it travels to the active step's page so it always sits beside the
+    // prose being discussed (this is what removes the zoom-to-see-graph pain).
+    expect(second.x).toBeGreaterThan(first.x + 1000);
+    expect(second.step).toBe(1);
   });
 
   it("does not lay out the legacy prose-copying fallback as a visual", () => {

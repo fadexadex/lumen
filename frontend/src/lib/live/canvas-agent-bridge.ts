@@ -20,10 +20,17 @@ export interface CanvasControllerHandle {
   screenToWorld: (sx: number, sy: number) => WPoint;
   worldToScreen: (wx: number, wy: number) => WPoint;
   boardSize: { w: number; h: number };
+  /** World-space bounds of the CURRENT lesson page — where AI writing must land
+      so the learner actually sees it (the board is a horizontal deck). */
+  pageBounds?: () => WRect;
   /** Drive the live parabola widget (sliders + curve), not just an overlay stroke. */
   setParabola?: (a: number, b: number, c: number) => void;
   /** Select the same generated visual scene the learner can choose from the tabs. */
   setVisualScene?: (index: number) => void;
+  /** Advance/rewind the lesson to a step (0-based) — the AI leads the flow. */
+  setStep?: (index: number) => void;
+  /** Total number of lesson steps, so a relative "next" can be clamped. */
+  stepCount?: number;
 }
 
 let handle: CanvasControllerHandle | null = null;

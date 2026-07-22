@@ -113,6 +113,22 @@ async def show_visual_scene(ctx: RunContext, scene_number: int) -> str:
 
 
 @function_tool
+async def go_to_step(ctx: RunContext, step_number: int) -> str:
+    """Advance (or return) the lesson to a step, sliding the board to that page. step_number is 1-based.
+
+    You lead the lesson: once the learner understands the current page, call this to move to the
+    next step instead of waiting. Read get_board_state for the step titles and what comes next, and
+    say a short spoken bridge into the new material as you move (e.g. "Now let's see this as a graph").
+    """
+    total = board.step_total or 0
+    if step_number < 1:
+        return "invalid-step-number: steps are 1-based; use 1 for the first page"
+    if total and step_number > total:
+        return f"out-of-range: this lesson has {total} steps"
+    return await _send(ctx, C.go_to_step(step_number - 1))
+
+
+@function_tool
 async def write_on_board(
     ctx: RunContext,
     lines: list[str],
@@ -161,6 +177,6 @@ async def get_board_state(ctx: RunContext) -> str:
 
 ALL_TOOLS = [
     highlight_region, circle_point, add_label, draw_arrow, draw_axis_of_symmetry,
-    plot_parabola, set_parabola, show_visual_scene, write_on_board, cancel_writing,
-    focus_on, clear_annotations, get_board_state,
+    plot_parabola, set_parabola, show_visual_scene, go_to_step, write_on_board,
+    cancel_writing, focus_on, clear_annotations, get_board_state,
 ]

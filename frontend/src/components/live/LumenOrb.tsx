@@ -1,7 +1,17 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 import type { SessionStatus } from "@/lib/live/tutor-session";
 
-export function LumenOrb({ amplitude, status }: { amplitude: number; status: SessionStatus }) {
+export function LumenOrb({
+  amplitude,
+  status,
+  muted,
+  onToggle,
+}: {
+  amplitude: number;
+  status: SessionStatus;
+  muted?: boolean;
+  onToggle?: () => void;
+}) {
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = ref.current;
@@ -19,13 +29,21 @@ export function LumenOrb({ amplitude, status }: { amplitude: number; status: Ses
     return () => cancelAnimationFrame(raf);
   }, [amplitude]);
 
+  const interactive = !!onToggle;
   return (
-    <div
-      ref={ref}
+    <button
+      type="button"
+      ref={ref as unknown as React.RefObject<HTMLButtonElement>}
       className={`lumen-orb lumen-orb--${status}`}
       data-speaking={status === "speaking" || undefined}
-      role="img"
-      aria-label={`Lumen is ${status}`}
+      data-muted={muted || undefined}
+      data-interactive={interactive || undefined}
+      onClick={onToggle}
+      disabled={!interactive}
+      aria-label={
+        muted ? "Microphone off — tap to talk to Lumen" : `Lumen is ${status} — tap to mute`
+      }
+      title={muted ? "Tap to talk" : "Tap to mute"}
     >
       <span className="lumen-orb-glow" />
       <span className="lumen-orb-bars" aria-hidden>
@@ -43,6 +61,11 @@ export function LumenOrb({ amplitude, status }: { amplitude: number; status: Ses
         ))}
       </span>
       <span className="lumen-orb-core" />
-    </div>
+      {muted && (
+        <span className="lumen-orb-muted" aria-hidden>
+          🔇
+        </span>
+      )}
+    </button>
   );
 }

@@ -36,6 +36,70 @@
 }
 
 /*
+  Reading focus gradient. A lesson is one persistent document, but only ONE
+  section is "now." Completed sections stay legible above the active one, yet
+  recede so the eye lands on the current material instead of a wall of
+  equal-weight text. This is the single biggest digestibility lever.
+*/
+.mc-lesson-layer [data-beat-state="past"] {
+  opacity: 0.32;
+  filter: saturate(0.55);
+  transition:
+    opacity 0.45s var(--ease-tutor),
+    filter 0.45s var(--ease-tutor);
+}
+.mc-lesson-layer [data-beat-state="current"] {
+  opacity: 1;
+  transition: opacity 0.45s var(--ease-tutor);
+}
+/* Each page's prose slides in from the right the first time it is reached, so
+   advancing reads as a horizontal glide into new material. Transform only — the
+   dim/emphasis above owns opacity, so the two never fight. */
+.mc-lesson-layer .mc-title,
+.mc-lesson-layer .mc-text,
+.mc-lesson-layer .mc-math,
+.mc-lesson-layer .mc-options {
+  animation: mc-page-enter 0.46s var(--ease-tutor) both;
+}
+@keyframes mc-page-enter {
+  from {
+    transform: translateX(22px);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* The active section title carries a quiet accent rule so "you are here" reads
+   instantly without adding chrome. */
+.mc-lesson-layer .mc-title--h2[data-beat-state="current"] {
+  position: relative;
+}
+.mc-lesson-layer .mc-title--h2[data-beat-state="current"]::before {
+  content: "";
+  position: absolute;
+  left: -18px;
+  top: 0.32em;
+  bottom: 0.32em;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--tutor-accent);
+  animation: mc-vis-rise 0.4s var(--ease-tutor) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mc-lesson-layer [data-beat-state="past"],
+  .mc-lesson-layer [data-beat-state="current"],
+  .mc-lesson-layer .mc-title,
+  .mc-lesson-layer .mc-text,
+  .mc-lesson-layer .mc-math,
+  .mc-lesson-layer .mc-options,
+  .mc-lesson-layer .mc-title--h2[data-beat-state="current"]::before {
+    transition: none;
+    animation: none;
+  }
+}
+
+/*
   Board type system
   — Display titles: Instrument Serif
   — Prose: Inter
