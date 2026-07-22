@@ -97,10 +97,35 @@ export function openMonnifyCheckout(input: {
     (sdk) =>
       new Promise((resolve) => {
         let settled = false;
+        let cleanup = () => {};
         const finish = (value: MonnifyCompleteResponse | null) => {
           if (settled) return;
           settled = true;
+          cleanup();
           resolve(value);
+        };
+
+        // Some Monnify sandbox builds throw while tearing down an iframe that
+        // has already been removed. In those builds onClose is never reached,
+        // so without this guard the checkout promise — and the paywall button —
+        // remain pending forever. Treat that SDK-specific teardown error as a
+        // close; the separately persisted reference still allows verification.
+        const onSdkError = (event: ErrorEvent) => {
+          const error = event.error;
+          const isMonnifyScript = event.filename.includes("monnify");
+          const isDuplicateRemoval =
+            error instanceof DOMException &&
+            error.name === "NotFoundError" &&
+            error.message.includes("removeChild");
+          if (!isMonnifyScript || !isDuplicateRemoval) return;
+          event.preventDefault();
+          finish(null);
+        };
+        window.addEventListener("error", onSdkError);
+        const timeout = window.setTimeout(() => finish(null), 120_000);
+        cleanup = () => {
+          window.removeEventListener("error", onSdkError);
+          window.clearTimeout(timeout);
         };
 
         const redirectUrl = monnifySafeRedirectUrl(input.redirectUrl);

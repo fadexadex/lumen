@@ -143,6 +143,24 @@ export async function retryCourseModule(course: Course, moduleId: string): Promi
   const module = course.modules[index];
   if (module.status === "generating") throw new Error("module is already generating");
 
+  // A transient provider failure must not discard a lesson that was already
+  // generated and persisted successfully. This can happen when a stale failed
+  // status is applied after the ready payload, or when a learner retries while
+  // background generation is being rate-limited.
+  if (module.script) {
+    try {
+      const parsed = lessonScriptSchema.parse({ ...module.script, moduleId: module.id });
+      assertLessonMath(parsed);
+      module.script = enrichScript(parsed);
+      module.status = "ready";
+      module.error = undefined;
+      course.updatedAt = Date.now();
+      return module;
+    } catch {
+      // The cached payload is genuinely unusable; regenerate it below.
+    }
+  }
+
   module.error = undefined;
   await generateOne({ course, index, profile: course.profile, send: () => {} });
   return course.modules[index];
